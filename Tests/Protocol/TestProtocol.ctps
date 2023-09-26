@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="12"/>
+    <BuildModes Active="Default"/>
+    <Units>
+      <Unit>
+        <Filename Value="TestProtocol.ppr"/>
+        <FRMtype Value="0"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="0"/>
+        <CursorPos Y="15"/>
+        <UsageCount Value="31"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestProtocolConnectCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="0"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="121"/>
+        <CursorPos X="34" Y="140"/>
+        <UsageCount Value="31"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTClient.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="3"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="90"/>
+        <CursorPos X="26" Y="149"/>
+        <UsageCount Value="31"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTUtils.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="2"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="506"/>
+        <CursorPos X="27" Y="540"/>
+        <UsageCount Value="31"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="1"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="6"/>
+        <CursorPos X="10" Y="24"/>
+        <UsageCount Value="31"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="4"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="1239"/>
+        <CursorPos X="3" Y="1251"/>
+        <UsageCount Value="31"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\Expectations.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="31"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestProtocolConnAckCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="0"/>
+        <WindowIndex Value="0"/>
+        <UsageCount Value="20"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTConnAckCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="0"/>
+        <WindowIndex Value="0"/>
+        <UsageCount Value="20"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\MQTTTestUtils.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="0"/>
+        <WindowIndex Value="0"/>
+        <UsageCount Value="20"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\ExpectationsDynArrays.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="0"/>
+        <WindowIndex Value="0"/>
+        <UsageCount Value="20"/>
+      </Unit>
+    </Units>
+    <JumpHistory HistoryIndex="29">
+      <Position>
+        <Filename Value="TestProtocolConnectCase.pas"/>
+        <Caret Line="141" TopLine="117"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="361" TopLine="344"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="362" TopLine="344"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="364" TopLine="344"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="371" TopLine="354"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="372" TopLine="354"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="374" TopLine="360"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="381" TopLine="360"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="388" TopLine="372"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="390" TopLine="372"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="392" TopLine="372"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="393" TopLine="372"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="383" Column="28" TopLine="372"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Caret Line="392" Column="42" TopLine="372"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTUtils.pas"/>
+        <Caret Line="565" Column="50" TopLine="548"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTUtils.pas"/>
+        <Caret Line="931" TopLine="906"/>
+      </Position>
+      <Position>
+        <Filename Value="TestProtocolConnectCase.pas"/>
+        <Caret Line="143" Column="26" TopLine="117"/>
+      </Position>
+      <Position>
+        <Filename Value="TestProtocolConnectCase.pas"/>
+        <Caret Line="119" Column="37" TopLine="117"/>
+      </Position>
+      <Position>
+        <Filename Value="TestProtocolConnectCase.pas"/>
+        <Caret Line="129" Column="53" TopLine="114"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTClient.pas"/>
+        <Caret Line="149" Column="26" TopLine="90"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="298" Column="60" TopLine="279"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="297" Column="56" TopLine="279"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="241" Column="28" TopLine="223"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="320" Column="26" TopLine="303"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="327" Column="13" TopLine="303"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="259" Column="88" TopLine="234"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="260" Column="45" TopLine="237"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="321" Column="203" TopLine="304"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="1065" Column="39" TopLine="1045"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Caret Line="1078" Column="3" TopLine="1058"/>
+      </Position>
+    </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+  <Debugging>
+    <BreakPoints>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestProtocolConnectCase.pas"/>
+        <Line Value="144"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <Line Value="392"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <Line Value="256"/>
+      </Item>
+    </BreakPoints>
+  </Debugging>
+</CONFIG>

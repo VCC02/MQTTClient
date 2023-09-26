@@ -1,0 +1,688 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="12"/>
+    <BuildModes Active="Default"/>
+    <Units>
+      <Unit>
+        <Filename Value="TestEncoders.ppr"/>
+        <FRMtype Value="0"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="0"/>
+        <CursorPos Y="25"/>
+        <UsageCount Value="200"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestEncodersCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="0"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="599"/>
+        <CursorPos Y="620"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="34"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="248"/>
+        <CursorPos X="35" Y="269"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTUtils.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="16"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="517"/>
+        <CursorPos X="3" Y="534"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\Expectations.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="35"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="115"/>
+        <CursorPos Y="132"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderConnectEncoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="1"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="143"/>
+        <CursorPos X="79" Y="155"/>
+        <UsageCount Value="201"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderConnAckDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="2"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="263"/>
+        <CursorPos X="45" Y="289"/>
+        <UsageCount Value="202"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderPublishDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="3"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="349"/>
+        <CursorPos X="58" Y="375"/>
+        <UsageCount Value="202"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTConnAckCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="18"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="352"/>
+        <CursorPos X="30" Y="362"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="26"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="258"/>
+        <CursorPos X="83" Y="278"/>
+        <UsageCount Value="206"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTCommonProperties.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="21"/>
+        <WindowIndex Value="0"/>
+        <CursorPos X="120" Y="56"/>
+        <UsageCount Value="203"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTPubAckCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="22"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="21"/>
+        <CursorPos X="79" Y="41"/>
+        <UsageCount Value="201"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTPubRecCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="23"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="24"/>
+        <CursorPos X="36" Y="42"/>
+        <UsageCount Value="201"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTPubRelCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="24"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="24"/>
+        <CursorPos X="79" Y="41"/>
+        <UsageCount Value="201"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTPubCompCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="25"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="24"/>
+        <CursorPos X="76" Y="42"/>
+        <UsageCount Value="201"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTSubAckCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="28"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="13"/>
+        <CursorPos X="79" Y="42"/>
+        <UsageCount Value="201"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTUnsubAckCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="29"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="25"/>
+        <CursorPos X="79" Y="42"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTUnsubscribeCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="27"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="176"/>
+        <CursorPos X="117" Y="171"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTPingReqCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="30"/>
+        <WindowIndex Value="0"/>
+        <CursorPos X="58" Y="26"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTPingRespCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="31"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="16"/>
+        <CursorPos Y="31"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTDisconnectCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="32"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="207"/>
+        <CursorPos X="67" Y="237"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTAuthCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="33"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="215"/>
+        <CursorPos X="43" Y="243"/>
+        <UsageCount Value="200"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\MQTTTestUtils.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="15"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="20"/>
+        <CursorPos X="41" Y="15"/>
+        <UsageCount Value="199"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTPublishCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="19"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="181"/>
+        <CursorPos X="70" Y="204"/>
+        <UsageCount Value="203"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderPubAckDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="4"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="93"/>
+        <CursorPos X="5" Y="110"/>
+        <UsageCount Value="140"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTCommonCodecCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="20"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="135"/>
+        <CursorPos X="66" Y="155"/>
+        <UsageCount Value="119"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="8"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="336"/>
+        <CursorPos X="15" Y="340"/>
+        <UsageCount Value="115"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderPubRecDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="5"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="89"/>
+        <CursorPos X="28" Y="110"/>
+        <UsageCount Value="113"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderPubRelDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="6"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="86"/>
+        <CursorPos X="19" Y="109"/>
+        <UsageCount Value="113"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderPubCompDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="7"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="32"/>
+        <CursorPos X="17" Y="109"/>
+        <UsageCount Value="112"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderSubscribeDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="9"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="254"/>
+        <CursorPos X="69" Y="260"/>
+        <UsageCount Value="110"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderSubAckDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="11"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="94"/>
+        <CursorPos X="42" Y="117"/>
+        <UsageCount Value="81"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderUnsubscribeDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="10"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="243"/>
+        <CursorPos X="72" Y="250"/>
+        <UsageCount Value="71"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderUnsubAckDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="12"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="93"/>
+        <CursorPos X="60" Y="116"/>
+        <UsageCount Value="67"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderDisconnectDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="13"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="135"/>
+        <CursorPos X="56" Y="147"/>
+        <UsageCount Value="56"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeaderAuthDecoderCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="14"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="168"/>
+        <CursorPos X="47" Y="182"/>
+        <UsageCount Value="51"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTDynArrays.pas"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="113"/>
+        <CursorPos X="29" Y="207"/>
+        <UsageCount Value="18"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTConnectCtrl.pas"/>
+        <FRMtype Value="0"/>
+        <EditorIndex Value="17"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="337"/>
+        <CursorPos X="66" Y="390"/>
+        <UsageCount Value="100"/>
+        <Loaded Value="True"/>
+      </Unit>
+    </Units>
+    <JumpHistory HistoryIndex="29">
+      <Position>
+        <Filename Value="TestHeaderConnectEncoderCase.pas"/>
+        <Caret Line="336" Column="21" TopLine="321"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderPublishDecoderCase.pas"/>
+        <Caret Line="374" Column="25" TopLine="359"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTCommonCodecCtrl.pas"/>
+        <Caret Line="118" Column="132" TopLine="113"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTPublishCtrl.pas"/>
+        <Caret Line="17" Column="23"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <Caret Line="180" Column="135" TopLine="158"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTUnsubscribeCtrl.pas"/>
+        <Caret Line="171" Column="137" TopLine="161"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTDisconnectCtrl.pas"/>
+        <Caret Line="285" Column="47" TopLine="173"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTAuthCtrl.pas"/>
+        <Caret Line="199" Column="28" TopLine="190"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTCommonCodecCtrl.pas"/>
+        <Caret Line="155" Column="66" TopLine="135"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <Caret Line="417" Column="58" TopLine="396"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <Caret Line="332" Column="157" TopLine="314"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <Caret Line="351" TopLine="315"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <Caret Line="349" Column="44" TopLine="326"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <Caret Line="334" TopLine="292"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <Caret Line="317" Column="20" TopLine="300"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <Caret Line="345" Column="52" TopLine="327"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderSubscribeDecoderCase.pas"/>
+        <Caret Line="214" Column="73" TopLine="202"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderUnsubscribeDecoderCase.pas"/>
+        <Caret Line="226" Column="35" TopLine="214"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderSubscribeDecoderCase.pas"/>
+        <Caret Line="104" Column="26" TopLine="89"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <Caret Line="23" Column="38" TopLine="5"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <Caret Line="266" TopLine="255"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <Caret Line="276" TopLine="267"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <Caret Line="278" TopLine="267"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderUnsubscribeDecoderCase.pas"/>
+        <Caret Line="232" Column="49" TopLine="214"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderSubAckDecoderCase.pas"/>
+        <Caret Line="102" Column="68" TopLine="94"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderUnsubAckDecoderCase.pas"/>
+        <Caret Line="114" Column="92" TopLine="89"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderUnsubAckDecoderCase.pas"/>
+        <Caret Line="30" Column="27" TopLine="11"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderUnsubAckDecoderCase.pas"/>
+        <Caret Line="116" Column="60" TopLine="93"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderSubAckDecoderCase.pas"/>
+        <Caret Line="117" Column="42" TopLine="94"/>
+      </Position>
+      <Position>
+        <Filename Value="TestHeaderCommonDecoderCase.pas"/>
+        <Caret Line="45" Column="64" TopLine="29"/>
+      </Position>
+    </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+  <Debugging>
+    <BreakPoints>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTPublishCtrl.pas"/>
+        <Line Value="503"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderUnsubscribeDecoderCase.pas"/>
+        <Line Value="105"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderUnsubscribeDecoderCase.pas"/>
+        <Line Value="263"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <Line Value="142"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTUnsubscribeCtrl.pas"/>
+        <Line Value="117"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderUnsubscribeDecoderCase.pas"/>
+        <Line Value="259"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTUnsubscribeCtrl.pas"/>
+        <Line Value="78"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderUnsubAckDecoderCase.pas"/>
+        <Line Value="57"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTCommonCodecCtrl.pas"/>
+        <Line Value="183"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTCommonCodecCtrl.pas"/>
+        <Line Value="90"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTDisconnectCtrl.pas"/>
+        <Line Value="263"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderDisconnectDecoderCase.pas"/>
+        <Line Value="79"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderDisconnectDecoderCase.pas"/>
+        <Line Value="187"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTAuthCtrl.pas"/>
+        <Line Value="215"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTAuthCtrl.pas"/>
+        <Line Value="227"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderConnAckDecoderCase.pas"/>
+        <Line Value="288"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTConnAckCtrl.pas"/>
+        <Line Value="405"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <Line Value="266"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderSubscribeDecoderCase.pas"/>
+        <Line Value="266"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestHeaderCommonDecoderCase.pas"/>
+        <Line Value="341"/>
+      </Item>
+    </BreakPoints>
+    <Watches>
+      <Item>
+        <Expression Value="ActualValue"/>
+      </Item>
+      <Item>
+        <Expression Value="ADestPacket.VarHeader.Content^"/>
+      </Item>
+      <Item>
+        <Expression Value="EncodedConnectBuffer.Content^"/>
+      </Item>
+      <Item>
+        <Expression Value="DecodedConnectPacket.Header.Content^"/>
+      </Item>
+      <Item>
+        <Expression Value="DecodedConnectPacket.VarHeader.Content^"/>
+      </Item>
+      <Item>
+        <Expression Value="DecodedConnectPacket.Payload.Content^"/>
+      </Item>
+      <Item>
+        <Expression Value="ADestPacket.Payload.Content^"/>
+      </Item>
+      <Item>
+        <Expression Value="AReceivedPacket.VarHeader.Content^[8] shl 8"/>
+      </Item>
+      <Item>
+        <Expression Value="ASrcPayload.Content^"/>
+      </Item>
+      <Item>
+        <Expression Value="AReceivedPacket.VarHeader.Content^"/>
+      </Item>
+    </Watches>
+  </Debugging>
+</CONFIG>
