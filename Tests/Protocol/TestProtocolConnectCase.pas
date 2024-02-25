@@ -139,6 +139,7 @@ begin
   //FreeDynArray(EncodedConnectBuffer);
   MQTT_FreeControlPacket(DecodedConnectPacket);
 
+  MQTT_DestroyClient(0);
   MQTT_Done;
 end;
 

@@ -1,7 +1,7 @@
 {
-    Copyright (C) 2023 VCC
-    creation date: 25 Sep 2023
-    initial release date: 26 Sep 2023
+    Copyright (C) 2024 VCC
+    creation date: 23 Feb 2024
+    initial release date: 25 Feb 2024
 
     author: VCC
     Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,13 +22,13 @@
 }
 
 
-unit TestProtocolPublishServerToClient;
+unit TestProtocolPubAckCase;
 
 {$IFNDEF IsMCU}
   {$DEFINE IsDesktop}
 {$ENDIF}
 
-{$mode ObjFPC}{$H+}
+{$mode objfpc}{$H+}
 
 interface
 
@@ -37,82 +37,65 @@ uses
 
 type
 
-  TTestProtocolReceivePublishCase = class(TTestCase)
+  TTestProtocolPubAckCase = class(TTestCase)
   protected
     procedure SetUp; override;
     procedure TearDown; override;
 
   published
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0;
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1;
-    procedure TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_0;
-    procedure TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_1;
-
+    procedure TestClientToServerBufferContent_BeforePubAck_OnePacket_QoS_0;
+    procedure TestClientToServerBufferContent_BeforePubAck_OnePacket_QoS_1;
+    procedure TestClientToServerBufferContent_BeforePubAck_TwoPackets_QoS_0;
+    procedure TestClientToServerBufferContent_BeforePubAck_TwoPackets_QoS_1;
   end;
 
 implementation
 
 
 uses
-  MQTTClient, MQTTUtils, MQTTTestUtils, DynArrays, MQTTPublishCtrl,
+  MQTTClient, MQTTUtils, MQTTTestUtils, DynArrays, MQTTPublishCtrl, //MQTTPubAckCtrl,
   Expectations, ExpectationsDynArrays;
 
-
-type
-  TMQTTPublishPropertiesArr = array of TMQTTPublishProperties;
 
 var
   ReceivedPublishFields: TMQTTPublishFields;
   ReceivedPublishProperties: TMQTTPublishProperties;
   DestPacket: TMQTTControlPacket;
 
-  DecodedPublishFields: TMQTTPublishFields;
-  DecodedPublishPropertiesArr: TMQTTPublishPropertiesArr;
-
-  FoundError: Word;
-  ErrorOnPacketType: Byte;
+  FieldsToSend_ReasonCode: array of Integer;
+  FieldsToSend_PacketIdentifier: array of Integer;
 
   ReceivedCount: Byte;  //Counts how many times a PUBLISH handler is called. For QoS=0 and QoS=1, it should be on every receive. For QoS=2, it should be 1.
+  ResponseCount: Byte;  //Counts how many times a PUBACK handler is called.
 
-                                             //The lower word identifies the client instance
-procedure HandleOnAfterReceivingMQTT_PUBLISH(ClientInstance: DWord; var APublishFields: TMQTTPublishFields; var APublishProperties: TMQTTPublishProperties);
-var
-  n: Integer;
-  QoS: Byte;
+
+procedure HandleOnAfterReceivingMQTT_PUBLISH(ClientInstance: DWord; var ATempPublishFields: TMQTTPublishFields; var ATempPublishProperties: TMQTTPublishProperties);
 begin
   Inc(ReceivedCount);
-  DecodedPublishFields := APublishFields;
-
-  //Expect(AErr).ToBe(CMQTT_Success);  //////////////////////////////////////////////////////// verify for incomplete packets???????????
-
-  n := Length(DecodedPublishPropertiesArr);
-  SetLength(DecodedPublishPropertiesArr, n + 1);
-  MQTT_InitPublishProperties(DecodedPublishPropertiesArr[n]);
-  MQTT_CopyPublishProperties(APublishProperties, DecodedPublishPropertiesArr[n]);
-
-  QoS := (APublishFields.PublishCtrlFlags shr 1) and 3;
-
-  if QoS = 0 then
-    Expect(APublishFields.PacketIdentifier).ToBe(0)
-  else
-    Expect(APublishFields.PacketIdentifier).ToBe(456);
 end;
 
 
 procedure HandleOnBeforeSending_MQTT_PUBACK(ClientInstance: DWord; var ATempPubAckFields: TMQTTPubAckFields; var ATempPubAckProperties: TMQTTPubAckProperties);
 begin
-  //Nothing here.
+  Inc(ResponseCount);
+
+  SetLength(FieldsToSend_ReasonCode, Length(FieldsToSend_ReasonCode) + 1);
+  FieldsToSend_ReasonCode[Length(FieldsToSend_ReasonCode) - 1] := ATempPubAckFields.ReasonCode;
+
+  SetLength(FieldsToSend_PacketIdentifier, Length(FieldsToSend_PacketIdentifier) + 1);
+  FieldsToSend_PacketIdentifier[Length(FieldsToSend_PacketIdentifier) - 1] := ATempPubAckFields.PacketIdentifier;
+
+  //This handler can be used to override what is being sent to server as a reply to PUBLISH
 end;
 
 
 procedure HandleOnMQTTError(ClientInstance: DWord; AErr: Word; APacketType: Byte);
 begin
-  FoundError := AErr;
-  ErrorOnPacketType := APacketType;
+  // nothing here
 end;
 
 
-procedure TTestProtocolReceivePublishCase.SetUp;
+procedure TTestProtocolPubAckCase.SetUp;
 begin
   MQTT_Init;
   MQTT_CreateClient; //create a client
@@ -124,12 +107,13 @@ begin
     OnBeforeSendingMQTT_PUBACK^ := @HandleOnBeforeSending_MQTT_PUBACK;
     OnMQTTError^ := @HandleOnMQTTError;
   {$ELSE}
-    OnAfterReceivingMQTT_PUBLISH := @HandleOnAfterReceivingMQTT_PUBLISH;
+    OnAfterReceivingMQTT_PUBLISH^ := @HandleOnAfterReceivingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBACK := @HandleOnBeforeSending_MQTT_PUBACK;
     OnMQTTError := @HandleOnMQTTError;
   {$ENDIF}
 
   ReceivedCount := 0;
+  ResponseCount := 0;
 
   ReceivedPublishFields.PacketIdentifier := 456;
   InitDynArrayToEmpty(ReceivedPublishFields.ApplicationMessage);
@@ -139,36 +123,27 @@ begin
   InitDynArrayToEmpty(ReceivedPublishFields.TopicName);
   StringToDynArrayOfByte('SomeTopic', ReceivedPublishFields.TopicName);
 
+  SetLength(FieldsToSend_ReasonCode, 0);
+  SetLength(FieldsToSend_PacketIdentifier, 0);
+
   MQTT_InitPublishProperties(ReceivedPublishProperties);
   MQTT_InitControlPacket(DestPacket);
-
-  SetLength(DecodedPublishPropertiesArr, 0);
-
-  FoundError := CMQTT_Success;
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TearDown;
-var
-  i: Integer;
+procedure TTestProtocolPubAckCase.TearDown;
 begin
   MQTT_FreeControlPacket(DestPacket);
   MQTT_FreePublishProperties(ReceivedPublishProperties);
-
   FreeDynArray(ReceivedPublishFields.ApplicationMessage);
   FreeDynArray(ReceivedPublishFields.TopicName);
-
-  for i := 0 to Length(DecodedPublishPropertiesArr) - 1 do
-    MQTT_FreePublishProperties(DecodedPublishPropertiesArr[i]);
-
-  SetLength(DecodedPublishPropertiesArr, 0);
 
   MQTT_DestroyClient(0);
   MQTT_Done;
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0;
+procedure TTestProtocolPubAckCase.TestClientToServerBufferContent_BeforePubAck_OnePacket_QoS_0;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -181,12 +156,13 @@ begin
   PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(1);
+  Expect(ResponseCount).ToBe(0);
 
   FreeDynArray(TempBuffer);
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1;
+procedure TTestProtocolPubAckCase.TestClientToServerBufferContent_BeforePubAck_OnePacket_QoS_1;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -199,12 +175,15 @@ begin
   PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(1);
+  Expect(ResponseCount).ToBe(1);
+  Expect(FieldsToSend_ReasonCode[0]).ToBe(CMQTT_Reason_Success);
+  Expect(FieldsToSend_PacketIdentifier[0]).ToBe(456);
 
   FreeDynArray(TempBuffer);
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_0;
+procedure TTestProtocolPubAckCase.TestClientToServerBufferContent_BeforePubAck_TwoPackets_QoS_0;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -218,32 +197,48 @@ begin
   PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(2);
+  Expect(ResponseCount).ToBe(0);
 
   FreeDynArray(TempBuffer);
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_1;
+procedure TTestProtocolPubAckCase.TestClientToServerBufferContent_BeforePubAck_TwoPackets_QoS_1;
 var
   TempBuffer: TDynArrayOfByte;
 begin
   InitDynArrayToEmpty(TempBuffer);
 
   ReceivedPublishFields.PublishCtrlFlags := 1 shl 1; //bits 3-0:  Dup(3), QoS(2-1), Retain(0)
+
+  ReceivedPublishFields.PacketIdentifier := 789;
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
+  PutReceivedBufferToMQTTLib(0, TempBuffer);
 
+  MQTT_FreeControlPacket(DestPacket);
+  FreeDynArray(TempBuffer);
+
+  ReceivedPublishFields.PacketIdentifier := 987;
+  FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
+  EncodeControlPacketToBuffer(DestPacket, TempBuffer);
   PutReceivedBufferToMQTTLib(0, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(2);
+  Expect(ResponseCount).ToBe(2);
+  Expect(FieldsToSend_ReasonCode[0]).ToBe(CMQTT_Reason_Success);
+  Expect(FieldsToSend_PacketIdentifier[0]).ToBe(789);
+  Expect(FieldsToSend_ReasonCode[1]).ToBe(CMQTT_Reason_Success);
+  Expect(FieldsToSend_PacketIdentifier[1]).ToBe(987);
 
   FreeDynArray(TempBuffer);
 end;
+
 
 initialization
 
-  RegisterTest(TTestProtocolReceivePublishCase);
+  RegisterTest(TTestProtocolPubAckCase);
 
 end.
 

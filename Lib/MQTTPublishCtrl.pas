@@ -141,7 +141,7 @@ begin
   if not AddBinaryDataToPropertiesWithoutIdentifier(AVarHeader, ATopicName) then
     Exit;
 
-  if AQoS > 0 then   //this information is encoding in fixed header
+  if AQoS > 0 then   //this information is encoding in fixed header         //PacketIdentifier is not used on QoS = 0.
     AddWordToPropertiesWithoutIdentifier(AVarHeader, APacketIdentifier);
 
   Result := True;
@@ -258,7 +258,7 @@ begin
   begin
     if QoS = 3 then
     begin
-      Result := CSrvErr_MalformedPacket shl 8 or CMQTTDecoderServerErr;
+      Result := CMQTT_Reason_MalformedPacket shl 8 or CMQTTDecoderServerErr;
       FreeDynArray(ADestPacket.Header);  //free all above arrays
       Exit;
     end;

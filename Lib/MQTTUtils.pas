@@ -561,7 +561,51 @@ const
 
 
 const
-  CSrvErr_MalformedPacket = $81;
+  CMQTT_Reason_Success = $0;                               //CONNACK, PUBACK, PUBREC, PUBREL, PUBCOMP, UNSUBACK, AUTH
+  CMQTT_Reason_NormalDisconnection = $0;                   //DISCONNECT
+  CMQTT_Reason_GrantedQoS0 = $0;                           //SUBACK
+  CMQTT_Reason_GrantedQoS1 = $1;                           //SUBACK
+  CMQTT_Reason_GrantedQoS2 = $2;                           //SUBACK
+  CMQTT_Reason_DisconnectWithWillMessage = $4;             //DISCONNECT
+  CMQTT_Reason_NoMatchingSubscribers = $10;                //PUBACK, PUBREC
+  CMQTT_Reason_NoSubscriptionExisted = $11;                //UNSUBACK
+  CMQTT_Reason_ContinueAuthentication = $18;               //AUTH
+  CMQTT_Reason_ReAuthenticate = $19;                       //AUTH
+  CMQTT_Reason_UnspecifiedError = $80;                     //CONNACK, PUBACK, PUBREC, SUBACK, UNSUBACK, DISCONNECT
+  CMQTT_Reason_MalformedPacket = $81;                      //CONNACK, DISCONNECT
+  CMQTT_Reason_ProtocolError = $82;                        //CONNACK, DISCONNECT
+  CMQTT_Reason_ImplementationSpecificError = $83;          //CONNACK, PUBACK, PUBREC, SUBACK, UNSUBACK, DISCONNECT
+  CMQTT_Reason_UnsupportedProtocolVersion = $84;           //CONNACK
+  CMQTT_Reason_ClientIdentifierNotValid = $85;             //CONNACK
+  CMQTT_Reason_BadUserNameOrPassword = $86;                //CONNACK
+  CMQTT_Reason_NotAuthorized = $87;                        //CONNACK, PUBACK, PUBREC, SUBACK, UNSUBACK, DISCONNECT
+  CMQTT_Reason_ServerUnavailable = $88;                    //CONNACK
+  CMQTT_Reason_ServerBusy = $89;                           //CONNACK, DISCONNECT
+  CMQTT_Reason_Banned = $8A;                               //CONNACK
+  CMQTT_Reason_ServerShuttingDown = $8B;                   //DISCONNECT
+  CMQTT_Reason_BadAuthenticationMethod = $8C;              //CONNACK, DISCONNECT
+  CMQTT_Reason_KeepAliveTimeout = $8D;                     //DISCONNECT
+  CMQTT_Reason_SessionTakenOver = $8E;                     //DISCONNECT
+  CMQTT_Reason_TopicFilterInvalid = $8F;                   //SUBACK, UNSUBACK, DISCONNECT
+  CMQTT_Reason_TopicNameInvalid = $90;                     //CONNACK, PUBACK, PUBREC, DISCONNECT
+  CMQTT_Reason_PacketIdentifierInUse = $91;                //PUBACK, PUBREC, SUBACK, UNSUBACK
+  CMQTT_Reason_PacketIdentifierNotFound = $92;             //PUBREL, PUBCOMP
+  CMQTT_Reason_ReceiveMaximumExceeded = $93;               //DISCONNECT
+  CMQTT_Reason_TopicAliasInvalid = $94;                    //DISCONNECT
+  CMQTT_Reason_PacketTooLarge = $95;                       //CONNACK, DISCONNECT
+  CMQTT_Reason_MessageRateTooHigh = $96;                   //DISCONNECT
+  CMQTT_Reason_QuotaExceeded = $97;                        //CONNACK, PUBACK, PUBREC, SUBACK, DISCONNECT
+  CMQTT_Reason_AdministrativeAaction = $98;                //DISCONNECT
+  CMQTT_Reason_PayloadFormatInvalid = $99;                 //CONNACK, PUBACK, PUBREC, DISCONNECT
+  CMQTT_Reason_RetainNotSupported = $9A;                   //CONNACK, DISCONNECT
+  CMQTT_Reason_QoSNotSupported = $9B;                      //CONNACK, DISCONNECT
+  CMQTT_Reason_UseAnotherServer = $9C;                     //CONNACK, DISCONNECT
+  CMQTT_Reason_ServerMoved = $9D;                          //CONNACK, DISCONNECT
+  CMQTT_Reason_SharedSubscriptionsNotSupported = $9E;      //SUBACK, DISCONNECT
+  CMQTT_Reason_ConnectionRateExceeded = $9F;               //CONNACK, DISCONNECT
+  CMQTT_Reason_MaximumConnectTime = $A0;                   //DISCONNECT
+  CMQTT_Reason_SubscriptionIdentifiersNotSupported = $A1;  //SUBACK, DISCONNECT
+  CMQTT_Reason_WildcardSubscriptionsNotSupported = $A2;    //SUBACK, DISCONNECT
 
   CMQTT_OOM_HeaderAlloc = 1 shl 8;
   CMQTT_OOM_VarHeaderAlloc = 2 shl 8;

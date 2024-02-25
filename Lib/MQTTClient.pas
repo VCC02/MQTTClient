@@ -38,7 +38,7 @@ interface
 
 uses
   DynArrays, MQTTUtils,
-  MQTTConnectCtrl, MQTTConnAckCtrl, MQTTPublishCtrl;
+  MQTTConnectCtrl, MQTTConnAckCtrl, MQTTPublishCtrl, MQTTPubAckCtrl, MQTTPubRecCtrl;
 
 {Warning:
   If the library functions return with OutOfMemory errors, it means the library buffers and/or flags are usually, in an unconsistent state.
@@ -64,9 +64,7 @@ type
 
   TOnAfterMQTT_CONNACK = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
                                    var AConnAckFields: TMQTTConnAckFields;
-                                   var AConnAckProperties: TMQTTConnAckProperties;
-                                   AErr: Word
-                                   );
+                                   var AConnAckProperties: TMQTTConnAckProperties);
   POnAfterMQTT_CONNACK = ^TOnAfterMQTT_CONNACK;
 
   TOnAfterReceivingMQTT_PUBLISH = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
@@ -74,10 +72,20 @@ type
                                             var APublishProperties: TMQTTPublishProperties);
   POnAfterReceivingMQTT_PUBLISH = ^TOnAfterReceivingMQTT_PUBLISH;
 
+  TOnBeforeSendingMQTT_PUBACK = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
+                                          var APubAckFields: TMQTTPubAckFields;
+                                          var APubAckProperties: TMQTTPubAckProperties);
+  POnBeforeSendingMQTT_PUBACK = ^TOnBeforeSendingMQTT_PUBACK;
+
+  TOnBeforeSendingMQTT_PUBREC = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
+                                          var APubRecFields: TMQTTPubRecFields;
+                                          var APubRecProperties: TMQTTPubRecProperties);
+  POnBeforeSendingMQTT_PUBREC = ^TOnBeforeSendingMQTT_PUBREC;
+
 procedure MQTT_Init; //Initializes library vars   (call this before any other library function)
 procedure MQTT_Done; //Frees library vars  (after this call, none of the library functions should be called)
-function MQTT_CreateClient: Boolean;
-function MQTT_DestroyClient(ClientInstance: DWord): Boolean;
+function MQTT_CreateClient: Boolean;  //returns True if successful, or False if it can't allocate memory
+function MQTT_DestroyClient(ClientInstance: DWord): Boolean;  //returns True if successful, or False if it can't reallocate memory or the ClientInstance is out of range
 function MQTT_GetClientCount: TDynArrayLength; //Can be used in for loops, which iterate ClientInstance, from 0 to MQTT_GetClientCount - 1.
 
 {$IFDEF SingleOutputBuffer}
@@ -105,7 +113,7 @@ function MQTT_PUBACK(ClientInstance: DWord): Boolean;  //ClientInstance identifi
 function MQTT_PUBREC(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance ////////// should be documented as not to be called by user code (unless there is a use for it). It is public, for testing purposes only.
 
 ////////////////////////////////////////////////////////// Multiple functions require calls to Free, both in happy flow and error cases.
-////////////////////////////////////////////////////////// all decoder functions (e.g. Decode_ConnAckToCtrlPacket) should return the decoded length. Not sure how to compute in case of an error. Probably, it' what the protocol spec says, to disconnect.
+////////////////////////////////////////////////////////// all decoder functions (e.g. Decode_ConnAckToCtrlPacket) should return the decoded length. Not sure how to compute in case of an error. Probably, it's what the protocol spec says, to disconnect.
 ////////////////////////////////////////////////////////// all decoder functions should not compute lengths based on ActualVarAndPayloadLen, because ActualVarAndPayloadLen depends on initial buffer, which may contain multiple packets
 
 
@@ -114,6 +122,8 @@ var
   OnBeforeMQTT_CONNECT: POnBeforeMQTT_CONNECT;
   OnAfterMQTT_CONNACK: POnAfterMQTT_CONNACK;
   OnAfterReceivingMQTT_PUBLISH: POnAfterReceivingMQTT_PUBLISH;
+  OnBeforeSendingMQTT_PUBACK: POnBeforeSendingMQTT_PUBACK;
+  OnBeforeSendingMQTT_PUBREC: POnBeforeSendingMQTT_PUBREC;
 
 const
   CMQTT_Success = 0;
@@ -121,6 +131,8 @@ const
   CMQTT_UnhandledPacketType = 2;  //The client received a packet that is not supposed to receive (that includes packets which are normally sent from client to server)
   CMQTT_HandlerNotAssigned = 3;   //Mostly for internal use. Some user functions may also use it.
   CMQTT_BadQoS = 4;               //The client received a bad QoS value (i.e. 3). It should disconnect from server.
+  CMQTT_Reserved = 5;             //To be implemented
+  CMQTT_OutOfMemory = CMQTTDecoderOutOfMemory; //11
 
 implementation
 
@@ -142,6 +154,7 @@ var
     ClientToServerBuffer: TDynArrayOfPDynArrayOfTDynArrayOfByte;
   {$ENDIF}
   ServerToClientBuffer: TDynArrayOfTDynArrayOfByte;   //indexed by ClientInstance parameter from main functions
+  PacketIdentifiers: TDynArrayOfTDynArrayOfWord;  //used on QoS = 2.
 
 
 procedure MQTT_Init; //Init library vars
@@ -152,18 +165,30 @@ begin
     InitDynArrayOfPDynArrayOfTDynArrayOfByteToEmpty(ClientToServerBuffer);
   {$ENDIF}
   InitDynOfDynOfByteToEmpty(ServerToClientBuffer);
+  InitDynOfDynOfWordToEmpty(PacketIdentifiers);
 
   {$IFDEF IsDesktop}
     New(OnMQTTError);
     New(OnBeforeMQTT_CONNECT);
     New(OnAfterMQTT_CONNACK);
     New(OnAfterReceivingMQTT_PUBLISH);
-  {$ENDIF}
+    New(OnBeforeSendingMQTT_PUBACK);
+    New(OnBeforeSendingMQTT_PUBREC);
 
-  OnMQTTError^ := nil;
-  OnBeforeMQTT_CONNECT^ := nil;
-  OnAfterMQTT_CONNACK^ := nil;
-  OnAfterReceivingMQTT_PUBLISH^ := nil;
+    OnMQTTError^ := nil;
+    OnBeforeMQTT_CONNECT^ := nil;
+    OnAfterMQTT_CONNACK^ := nil;
+    OnAfterReceivingMQTT_PUBLISH^ := nil;
+    OnBeforeSendingMQTT_PUBACK^ := nil;
+    OnBeforeSendingMQTT_PUBREC^ := nil;
+  {$ELSE}
+    OnMQTTError := nil;
+    OnBeforeMQTT_CONNECT := nil;
+    OnAfterMQTT_CONNACK := nil;
+    OnAfterReceivingMQTT_PUBLISH := nil;
+    OnBeforeSendingMQTT_PUBACK := nil;
+    OnBeforeSendingMQTT_PUBREC := nil;
+  {$ENDIF}
 end;
 
 
@@ -174,6 +199,15 @@ begin
     Dispose(OnBeforeMQTT_CONNECT);
     Dispose(OnAfterMQTT_CONNACK);
     Dispose(OnAfterReceivingMQTT_PUBLISH);
+    Dispose(OnBeforeSendingMQTT_PUBACK);
+    Dispose(OnBeforeSendingMQTT_PUBREC);
+  {$ELSE}
+    OnMQTTError := nil;
+    OnBeforeMQTT_CONNECT := nil;
+    OnAfterMQTT_CONNACK := nil;
+    OnAfterReceivingMQTT_PUBLISH := nil;
+    OnBeforeSendingMQTT_PUBACK := nil;
+    OnBeforeSendingMQTT_PUBREC := nil;
   {$ENDIF}
 
   {$IFDEF SingleOutputBuffer}
@@ -182,6 +216,7 @@ begin
     FreeDynArrayOfPDynArrayOfTDynArrayOfByte(ClientToServerBuffer);
   {$ENDIF}
   FreeDynOfDynOfByteArray(ServerToClientBuffer);
+  FreeDynOfDynOfWordArray(PacketIdentifiers);
 end;
 
 
@@ -193,7 +228,7 @@ begin
 end;
 
 
-function MQTT_CreateClient: Boolean;
+function MQTT_CreateClient: Boolean;  //returns True if successful, or False if it can't allocate memory
 begin
   {$IFDEF SingleOutputBuffer}
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer, ClientToServerBuffer.Len + 1);
@@ -202,7 +237,10 @@ begin
   {$ENDIF}
 
   if Result then
+  begin
     Result := SetDynOfDynOfByteLength(ServerToClientBuffer, ServerToClientBuffer.Len + 1);
+    Result := Result and SetDynOfDynOfWordLength(PacketIdentifiers, PacketIdentifiers.Len + 1);
+  end;
 end;
 
 
@@ -219,7 +257,10 @@ begin
   {$ENDIF}
 
   if Result then     //There is some internal reallocation while deleting, so it is possible that Result would be False, in case of an OutOfMemory error.
+  begin
     Result := DeleteItemFromDynOfDynOfByte(ServerToClientBuffer, ClientInstance);
+    Result := Result and DeleteItemFromDynOfDynOfWord(PacketIdentifiers, ClientInstance);
+  end;
 end;
 
 
@@ -293,7 +334,7 @@ begin
       Exit;
     end;
 
-  OnAfterMQTT_CONNACK^(ClientInstance, AConnAckFields, AConnAckProperties, AErr);
+  OnAfterMQTT_CONNACK^(ClientInstance, AConnAckFields, AConnAckProperties);
 end;
 
 
@@ -310,6 +351,38 @@ begin
     end;
 
   OnAfterReceivingMQTT_PUBLISH^(ClientInstance, ATempPublishFields, ATempPublishProperties);
+end;
+
+
+procedure DoOnBeforeSending_MQTT_PUBACK(ClientInstance: DWord; var ATempPubAckFields: TMQTTPubAckFields; var ATempPubAckProperties: TMQTTPubAckProperties; var AErr: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnBeforeSendingMQTT_PUBACK) or not Assigned(OnBeforeSendingMQTT_PUBACK^) then
+  {$ELSE}
+    if OnBeforeSendingMQTT_PUBACK = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnBeforeSendingMQTT_PUBACK^(ClientInstance, ATempPubAckFields, ATempPubAckProperties);
+end;
+
+
+procedure DoOnBeforeSending_MQTT_PUBREC(ClientInstance: DWord; var ATempPubRecFields: TMQTTPubRecFields; var ATempPubRecProperties: TMQTTPubRecProperties; var AErr: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnBeforeSendingMQTT_PUBREC) or not Assigned(OnBeforeSendingMQTT_PUBREC^) then
+  {$ELSE}
+    if OnBeforeSendingMQTT_PUBREC = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnBeforeSendingMQTT_PUBREC^(ClientInstance, ATempPubRecFields, ATempPubRecProperties);
 end;
 
 
@@ -360,11 +433,119 @@ begin
 end;
 
 
+function AddPUBACK_ToBuffer(var ABuffer: TDynArrayOfByte;
+                            var APubAckFields: TMQTTPubAckFields;
+                            var APubAckProperties: TMQTTPubAckProperties;
+                            var ADestPacket: TMQTTControlPacket): Boolean;
+begin
+  Result := FillIn_PubAck(APubAckFields, APubAckProperties, ADestPacket);
+
+  if Result then
+    Result := ConcatDynArrays(ABuffer, ADestPacket.Header);
+
+  if Result then
+    Result := ConcatDynArrays(ABuffer, ADestPacket.VarHeader);
+
+  if Result then
+    Result := ConcatDynArrays(ABuffer, ADestPacket.Payload);
+end;
+
+
+function MQTT_PUBACK_NoCallback(ClientInstance: DWord;  //ClientInstance identifies the client instance (the library is able to implement multiple MQTT clients / device)
+                                var APubAckFields: TMQTTPubAckFields;                    //user code has to fill-in this parameter
+                                var APubAckProperties: TMQTTPubAckProperties): Boolean;  //user code has to fill-in this parameter
+var
+  TempDestPacket: TMQTTControlPacket;
+  {$IFnDEF SingleOutputBuffer}
+    n: LongInt;
+  {$ENDIF}
+  TempClientInstance: DWord;
+begin
+  // APubAckFields and APubAckProperties should be initialized by user code
+
+  TempClientInstance := ClientInstance and CClientIndexMask;
+  {$IFDEF SingleOutputBuffer}
+    Result := AddPUBACK_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APubAckFields, APubAckProperties, TempDestPacket);
+  {$ELSE}
+    n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
+    Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
+    if Result then
+      Result := AddPUBACK_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, APubAckFields, APubAckProperties, TempDestPacket);
+  {$ENDIF}
+
+  MQTT_FreeControlPacket(TempDestPacket);
+end;
+
+
+function AddPUBREC_ToBuffer(var ABuffer: TDynArrayOfByte;
+                            var APubRecFields: TMQTTPubRecFields;
+                            var APubRecProperties: TMQTTPubRecProperties;
+                            var ADestPacket: TMQTTControlPacket): Boolean;
+begin
+  Result := FillIn_PubRec(APubRecFields, APubRecProperties, ADestPacket);
+
+  if Result then
+    Result := ConcatDynArrays(ABuffer, ADestPacket.Header);
+
+  if Result then
+    Result := ConcatDynArrays(ABuffer, ADestPacket.VarHeader);
+
+  if Result then
+    Result := ConcatDynArrays(ABuffer, ADestPacket.Payload);
+end;
+
+
+function MQTT_PUBREC_NoCallback(ClientInstance: DWord;  //ClientInstance identifies the client instance (the library is able to implement multiple MQTT clients / device)
+                                var APubRecFields: TMQTTPubRecFields;                    //user code has to fill-in this parameter
+                                var APubRecProperties: TMQTTPubRecProperties): Boolean;  //user code has to fill-in this parameter
+var
+  TempDestPacket: TMQTTControlPacket;
+  {$IFnDEF SingleOutputBuffer}
+    n: LongInt;
+  {$ENDIF}
+  TempClientInstance: DWord;
+begin
+  // APubRecFields and APubRecProperties should be initialized by user code
+
+  TempClientInstance := ClientInstance and CClientIndexMask;
+  {$IFDEF SingleOutputBuffer}
+    Result := AddPUBREC_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APubRecFields, APubRecProperties, TempDestPacket);
+  {$ELSE}
+    n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
+    Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
+    if Result then
+    begin
+      Result := AddPUBREC_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, APubRecFields, APubRecProperties, TempDestPacket);
+      SetDynOfWordLength(PacketIdentifiers.Content^[TempClientInstance]^, PacketIdentifiers.Content^[TempClientInstance]^.Len + 1);
+      PacketIdentifiers.Content^[TempClientInstance]^.Content^[PacketIdentifiers.Content^[TempClientInstance]^.Len - 1] := APubRecFields.PacketIdentifier;  //////////// Byte := Word
+    end;
+  {$ENDIF}
+
+  MQTT_FreeControlPacket(TempDestPacket);
+end;
+
+
+procedure InitRespPubFieldsAndProperties(var ARespPubFields: TMQTTCommonFields; var ARespPubProperties: TMQTTCommonProperties; APacketIdentifier: Word);
+begin
+  MQTT_InitCommonProperties(ARespPubProperties);
+  ARespPubFields.PacketIdentifier := APacketIdentifier;
+  ARespPubFields.ReasonCode := CMQTT_Reason_Success;
+  ARespPubFields.IncludeReasonCode := 0; //if IncludeReasonCode is 0, probably ReasonCode doesn't matter
+  ARespPubFields.EnabledProperties := 0;
+  InitDynArrayToEmpty(ARespPubFields.SrcPayload);
+end;
+
+
 function Process_PUBLISH(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
 var
   TempReceivedPacket: TMQTTControlPacket;
   TempPublishFields: TMQTTPublishFields;
   TempPublishProperties: TMQTTPublishProperties;
+
+  RespPubFields: TMQTTCommonFields;
+  RespPubProperties: TMQTTCommonProperties;
+
+  QoS: Byte;
 begin
   MQTT_InitControlPacket(TempReceivedPacket);
 
@@ -372,6 +553,8 @@ begin
   if Result = CMQTTDecoderNoErr then
   begin
     MQTT_InitPublishProperties(TempPublishProperties);
+    InitDynArrayToEmpty(TempPublishFields.TopicName);
+    InitDynArrayToEmpty(TempPublishFields.ApplicationMessage);
     Result := Decode_Publish(TempReceivedPacket, TempPublishFields, TempPublishProperties);
   end;
 
@@ -382,23 +565,31 @@ begin
     end;
   }
 
-  if Lo(Result) = CMQTTDecoderNoErr then      ////////////////////////////////////////////// Result or Lo(Result) ???????????//////
+  QoS := 4; //some unhandled value
+  if Lo(Result) = CMQTTDecoderNoErr then      // Hi(Result) may contain more info about the error, like the error location.
   begin
+    QoS := (TempPublishFields.PublishCtrlFlags shr 1) and 3;
     DoOnAfterReceivingMQTT_PUBLISH(ClientInstance, TempPublishFields, TempPublishProperties, Result);
 
-    if Lo(Result) <> CMQTTDecoderNoErr then   ////////////////////////////////////////////// Result or Lo(Result) ???????????//////
+    if Result <> CMQTTDecoderNoErr then
     begin
       MQTT_FreePublishProperties(TempPublishProperties);
       MQTT_FreeControlPacket(TempReceivedPacket);
       Exit;
     end;
+  end
+  else
+  begin
+    MQTT_FreePublishProperties(TempPublishProperties);
+    MQTT_FreeControlPacket(TempReceivedPacket);
+    Exit;
   end;
 
   Result := CMQTT_Success;
   //TempPublishProperties.SubscriptionIdentifier;      //  - array of DWord
 
 
-  case TempPublishFields.PublishCtrlFlags and $3 of
+  case QoS of
     0 : //  Expected Response: None
     begin
       ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -406,16 +597,26 @@ begin
 
     1 : //  Expected Response: PUBACK packet
     begin
-      //Call DoOnBeforeSending_MQTT_PUBACK
-      //MQTT_PUBACK<WithCallBack>   add to send buffer
-      ////////////////////////////////////////////////////////////////////////////////////////////////////
+      InitRespPubFieldsAndProperties(RespPubFields, RespPubProperties, TempPublishFields.PacketIdentifier);
+      DoOnBeforeSending_MQTT_PUBACK(ClientInstance, RespPubFields, RespPubProperties, Result);
+
+      if Result = CMQTT_Success then
+        if MQTT_PUBACK_NoCallback(ClientInstance, RespPubFields, RespPubProperties) then
+          MQTT_FreeCommonProperties(RespPubProperties)
+        else
+          Result := CMQTT_OutOfMemory;    //probably nothing gets sent to server
     end;
 
     2 : //  Expected Response: PUBREC packet
     begin
-      //Call DoOnBeforeSending_MQTT_PUBREC
-      //MQTT_PUBREC<WithCallBack>   add to send buffer
-      ////////////////////////////////////////////////////////////////////////////////////////////////////
+      InitRespPubFieldsAndProperties(RespPubFields, RespPubProperties, TempPublishFields.PacketIdentifier);
+      DoOnBeforeSending_MQTT_PUBREC(ClientInstance, RespPubFields, RespPubProperties, Result);
+
+      if Result = CMQTT_Success then
+        if MQTT_PUBREC_NoCallback(ClientInstance, RespPubFields, RespPubProperties) then      //a mew item is aded to PacketIdentifiers array
+          MQTT_FreeCommonProperties(RespPubProperties)
+        else
+          Result := CMQTT_OutOfMemory;    //probably nothing gets sent to server
     end;
 
     3 : //  Expected Response: Protocol error, should disconnect
@@ -427,6 +628,9 @@ begin
 
   MQTT_FreePublishProperties(TempPublishProperties);
   MQTT_FreeControlPacket(TempReceivedPacket);
+
+  FreeDynArray(TempPublishFields.TopicName);
+  FreeDynArray(TempPublishFields.ApplicationMessage);
 end;
 
 
@@ -604,11 +808,11 @@ function MQTT_CONNECT(ClientInstance: DWord): Boolean;  //ClientInstance identif
 var
   TempConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
   TempConnectProperties: TMQTTConnectProperties;
-  TempDestPacket: TMQTTControlPacket;
-  {$IFnDEF SingleOutputBuffer}
-    n: LongInt;
-  {$ENDIF}
-  TempClientInstance: DWord;
+  //TempDestPacket: TMQTTControlPacket;
+  //{$IFnDEF SingleOutputBuffer}
+  //  n: LongInt;
+  //{$ENDIF}
+  //TempClientInstance: DWord;
 begin
   {$IFDEF IsDesktop}
     if not Assigned(OnBeforeMQTT_CONNECT) or not Assigned(OnBeforeMQTT_CONNECT^) then
@@ -626,19 +830,22 @@ begin
   Result := OnBeforeMQTT_CONNECT^(ClientInstance, TempConnectFields, TempConnectProperties);
   if Result then
   begin
-    TempClientInstance := ClientInstance and CClientIndexMask;
+    //TempClientInstance := ClientInstance and CClientIndexMask;
+    //
+    //{$IFDEF SingleOutputBuffer}
+    //  Result := AddCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, TempConnectFields, TempConnectProperties, TempDestPacket);
+    //{$ELSE}
+    //  n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
+    //  Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
+    //  if Result then
+    //    Result := AddCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, TempConnectFields, TempConnectProperties, TempDestPacket);
+    //{$ENDIF}
 
-    {$IFDEF SingleOutputBuffer}
-      Result := AddCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, TempConnectFields, TempConnectProperties, TempDestPacket);
-    {$ELSE}
-      n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
-      Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
-      if Result then
-        Result := AddCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, TempConnectFields, TempConnectProperties, TempDestPacket);
-    {$ENDIF}
+    //The next line replaces above code:
+    Result := MQTT_CONNECT_NoCallback(ClientInstance, TempConnectFields, TempConnectProperties);
   end;
 
-  MQTT_FreeControlPacket(TempDestPacket);
+  //MQTT_FreeControlPacket(TempDestPacket);
   MQTT_FreeConnectPayloadContentProperties(TempConnectFields.PayloadContent);
   MQTT_FreeConnectProperties(TempConnectProperties);
 end;

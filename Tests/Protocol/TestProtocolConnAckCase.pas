@@ -76,13 +76,11 @@ var
   ErrorOnPacketType: Byte;
 
 
-procedure HandleOnAfterMQTT_CONNACK(ClientInstance: DWord; var AConnAckFields: TMQTTConnAckFields; var AConnAckProperties: TMQTTConnAckProperties; AErr: Word);
+procedure HandleOnAfterMQTT_CONNACK(ClientInstance: DWord; var AConnAckFields: TMQTTConnAckFields; var AConnAckProperties: TMQTTConnAckProperties);
 var
   n: Integer;
 begin
   DecodedConnAckFields := AConnAckFields;
-
-  Expect(AErr).ToBe(CMQTT_Success);
 
   n := Length(DecodedConnAckPropertiesArr);
   SetLength(DecodedConnAckPropertiesArr, n + 1);
@@ -136,6 +134,7 @@ begin
 
   SetLength(DecodedConnAckPropertiesArr, 0);
 
+  MQTT_DestroyClient(0);
   MQTT_Done;
 end;
 
