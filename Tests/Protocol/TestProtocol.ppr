@@ -28,8 +28,8 @@ program TestProtocol;
 
 uses
   Interfaces, Forms, GuiTestRunner, TestProtocolConnectCase, MQTTClient,
-  MQTTUtils, MQTTConnectCtrl, MQTTPublishCtrl, MQTTPubAckCtrl,
-  DynArrays, Expectations, TestProtocolConnAckCase,
+  MQTTUtils, MQTTConnectCtrl, MQTTPublishCtrl, MQTTPubAckCtrl, MQTTPubRelCtrl,
+  MQTTPubCompCtrl, DynArrays, Expectations, TestProtocolConnAckCase,
   ExpectationsDynArrays, TestProtocolPublishClientToServer,
   TestProtocolPublishServerToClient, TestProtocolPubAckCase, MQTTTestUtils;
 
