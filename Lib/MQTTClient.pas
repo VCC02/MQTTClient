@@ -139,6 +139,7 @@ function GetServerToClientBuffer(ClientInstance: DWord; var AErr: Word): PMQTTBu
 function MQTT_Process(ClientInstance: DWord): Word; //Should be called in the main loop (not necessarily at every iteration), to do packet processing and trigger events. It should be called for every client. If it returns OutOfMemory, then the application has to be adjusted to call MQTT_Process more often and/or reserve more heap memory for MQTT library.
 function PutReceivedBufferToMQTTLib(ClientInstance: DWord; var ABuffer: TDynArrayOfByte): Boolean; //Should be called by user code, after receiving data from server. When a valid packet is formed, the MQTT library will process it and call the decoded event.
 function CreatePacketIdentifier(ClientInstance: DWord): Word;
+function PacketIdentifierIsUsed(ClientInstance: DWord; APacketIdentifier: Word): Boolean;
 
 {$IFnDEF SingleOutputBuffer}
   function RemovePacketFromClientToServerBuffer(ClientInstance: DWord): Boolean;
@@ -154,7 +155,7 @@ function MQTT_PUBLISH_NoCallback(ClientInstance: DWord;  //ClientInstance identi
                                  var APublishProperties: TMQTTPublishProperties): Boolean;  //user code has to fill-in this parameter
 
 function MQTT_CONNECT(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance
-function MQTT_PUBLISH(ClientInstance: DWord): Boolean;  //will call OnBeforeSendingMQTT_PUBLISH, to get the content to publish
+function MQTT_PUBLISH(ClientInstance: DWord; AQoS: Byte): Boolean;  //will call OnBeforeSendingMQTT_PUBLISH, to get the content to publish
 function MQTT_PUBACK(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance ////////// should be documented as not to be called by user code (unless there is a use for it). It is public, for testing purposes only.
 function MQTT_PUBREC(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance ////////// should be documented as not to be called by user code (unless there is a use for it). It is public, for testing purposes only.
 
@@ -830,9 +831,9 @@ begin
       ////////////////////////////////////////////////////////////////////////////////////////////////////
     end;
 
-    1 : //  Expected response to server: PUBACK packet
-    begin
-      InitRespPubFieldsAndProperties(RespPubFields, RespPubProperties, TempPublishFields.PacketIdentifier);
+    1 : //  Expected response to server: PUBACK packet           QoS=1 allows duplicates, so PacketIdentifier is not added to ServerToClientPacketIdentifiers array
+    begin    //the receiver MUST respond with a PUBACK packet containing the Packet Identifier from the incoming PUBLISH packet, having accepted ownership of the Application Message (spec pag 94)
+      InitRespPubFieldsAndProperties(RespPubFields, RespPubProperties, TempPublishFields.PacketIdentifier);  //TempPublishFields comes from Decode_Publish above
       DoOnBeforeSending_MQTT_PUBACK(ClientInstance, RespPubFields, RespPubProperties, Result);
 
       if Result = CMQTT_Success then
@@ -848,7 +849,7 @@ begin
       //If responding (as PUBREC) with an error code (greater than $80) in RespPubFields,
       //then add a flag (maybe to a new array) with that PacketIdentifier, to treat it as new, until a PUBREL packet is received (with that ID). (see spec, pag 96)
 
-      InitRespPubFieldsAndProperties(RespPubFields, RespPubProperties, TempPublishFields.PacketIdentifier);
+      InitRespPubFieldsAndProperties(RespPubFields, RespPubProperties, TempPublishFields.PacketIdentifier);   //TempPublishFields comes from Decode_Publish above
 
       //This should be filtered further, by Topic Filters. (spec pag 77)
       if IndexOfWordInArrayOfWord(ServerToClientPacketIdentifiers.Content^[TempClientInstance]^, TempPublishFields.PacketIdentifier) = -1 then
@@ -1067,6 +1068,31 @@ begin
 end;
 
 
+function GetIndexOfPacketIdentifier(ClientInstance: DWord; APacketIdentifier: Word): TDynArrayLengthSig; //returns -1 if not found
+var
+  i, Dest: TDynArrayLengthSig;
+  TempClientInstance: DWord;
+begin
+  Result := -1;
+
+  TempClientInstance := ClientInstance and CClientIndexMask;
+  Dest := ClientToServerPacketIdentifiers.Content^[TempClientInstance]^.Len - 1;
+
+  for i := 0 to Dest do
+    if ClientToServerPacketIdentifiers.Content^[TempClientInstance]^.Content^[i] = APacketIdentifier then
+    begin
+      Result := i;
+      Exit;
+    end;
+end;
+
+
+function PacketIdentifierIsUsed(ClientInstance: DWord; APacketIdentifier: Word): Boolean;
+begin
+  Result := GetIndexOfPacketIdentifier(ClientInstance, APacketIdentifier) <> -1;
+end;
+
+
 function MQTT_CONNECT(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance
 var
   TempConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
@@ -1088,7 +1114,7 @@ begin
 end;
 
 
-function MQTT_PUBLISH(ClientInstance: DWord): Boolean;
+function MQTT_PUBLISH(ClientInstance: DWord; AQoS: Byte): Boolean;
 var
   TempPublishFields: TMQTTPublishFields;                    //user code has to fill-in this parameter
   TempPublishProperties: TMQTTPublishProperties;
@@ -1105,25 +1131,44 @@ begin
 
   Result := True;
 
-  NewPacketIdentifier := CreatePacketIdentifier(ClientInstance);
-  if NewPacketIdentifier = $FFFF then
+  if AQoS = 2 then
   begin
-    DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_PUBLISH);  //
-    Result := False;
-    Exit;
-  end;
+    NewPacketIdentifier := CreatePacketIdentifier(ClientInstance);
+    if NewPacketIdentifier = $FFFF then
+    begin
+      DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_PUBLISH);  //
+      Result := False;
+      Exit;
+    end;
+  end
+  else
+    NewPacketIdentifier := 0; //just set a default, but do not add it to the array of identifiers
 
   //Decrement SendQuota[ClientInstance] array until it reaches 0. Trigger an event in that case. ////////////////////////
 
   InitDynArrayToEmpty(TempPublishFields.ApplicationMessage);
   InitDynArrayToEmpty(TempPublishFields.TopicName);
   TempPublishFields.PacketIdentifier := NewPacketIdentifier;
-  TempPublishFields.PublishCtrlFlags := 0; //bits 3-0:  Dup(3), QoS(2-1), Retain(0)   - should be overridden in user callback
+  TempPublishFields.PublishCtrlFlags := AQoS shl 1; //bits 3-0:  Dup(3), QoS(2-1), Retain(0)   - should be overridden in user callback
   TempPublishFields.EnabledProperties := 0;
   MQTT_InitPublishProperties(TempPublishProperties);
 
   Err := CMQTT_Success;
   Result := DoOnBeforeSendingMQTT_PUBLISH(ClientInstance, TempPublishFields, TempPublishProperties, Err);
+
+  if (TempPublishFields.PacketIdentifier shr 1) and $F = 2 then  //if the user changed the QoS, using the handler, then allocate a PacketIdentifier
+  begin
+    NewPacketIdentifier := CreatePacketIdentifier(ClientInstance);
+    if NewPacketIdentifier = $FFFF then
+    begin
+      DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_PUBLISH);  //
+      Result := False;
+      Exit;
+    end;
+
+    TempPublishFields.PacketIdentifier := NewPacketIdentifier;
+  end;
+
   if Result then
     Result := MQTT_PUBLISH_NoCallback(ClientInstance, TempPublishFields, TempPublishProperties)
   else

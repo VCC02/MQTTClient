@@ -40,14 +40,19 @@ type
 
   TTestProtocolSendPublishCase = class(TTestCase)
   private
-
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(AQoS: Byte);
   protected
     procedure SetUp; override;
     procedure TearDown; override;
 
   published
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_Content;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_SendQuota;
 
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_PacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_PacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_PacketIdentifier;
   end;
 
 
@@ -65,6 +70,7 @@ var
   FoundError: Word;
   ErrorOnPacketType: Byte;
   AllocatedPacketIdentifier: Word;
+  FAppMsg, FTopicName: string;
 
 
 
@@ -74,8 +80,8 @@ function HandleOnBeforeSendingMQTT_PUBLISH(ClientInstance: DWord;  //The lower w
 begin
   Result := False;
 
-  Expect(StringToDynArrayOfByte('MyAppMsg', APublishFields.ApplicationMessage)).ToBe(True);
-  Expect(StringToDynArrayOfByte('SomeTopic', APublishFields.TopicName)).ToBe(True);
+  Expect(StringToDynArrayOfByte(FAppMsg, APublishFields.ApplicationMessage)).ToBe(True);
+  Expect(StringToDynArrayOfByte(FTopicName, APublishFields.TopicName)).ToBe(True);
   AllocatedPacketIdentifier := APublishFields.PacketIdentifier;
 
   //APublishFields.PublishCtrlFlags := 0; //bits 3-0:  Dup(3), QoS(2-1), Retain(0)   - should be overridden if a different QoS is required
@@ -111,6 +117,8 @@ begin
   FoundError := CMQTT_Success;
   ErrorOnPacketType := CMQTT_UNDEFINED;
   AllocatedPacketIdentifier := 65534;
+  FAppMsg := 'NoApp';
+  FTopicName := 'NoName';
 end;
 
 
@@ -124,12 +132,12 @@ begin
 end;
 
 
-procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0;
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket;
 var
   BufferPointer: PMQTTBuffer;
   Err: Word;
 begin
-  Expect(MQTT_PUBLISH(0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+  Expect(MQTT_PUBLISH(0, 0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
   //verify buffer content
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Err).ToBe(CMQTT_Success);
@@ -139,6 +147,88 @@ begin
   Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
   Expect(DecodedPublishPacket.Header.Content^[0]).ToBe(CMQTT_PUBLISH);
   Expect(DecodedBufferLen).ToBe(BufferPointer^.Len);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_Content;
+var
+  BufferPointer: PMQTTBuffer;
+  Err: Word;
+  DecodedPublishFields: TMQTTPublishFields;
+  DecodedPublishProperties: TMQTTPublishProperties;
+begin
+  FAppMsg := 'MyAppMsg';
+  FTopicName := 'SomeTopic';
+  Expect(MQTT_PUBLISH(0, 0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+
+  BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
+
+  InitDynArrayToEmpty(DecodedPublishFields.ApplicationMessage);
+  InitDynArrayToEmpty(DecodedPublishFields.TopicName);
+  Decode_Publish(DecodedPublishPacket, DecodedPublishFields, DecodedPublishProperties);
+
+  Expect(DynArrayOfByteToString(DecodedPublishFields.ApplicationMessage)).ToBe(FAppMsg);
+  Expect(DynArrayOfByteToString(DecodedPublishFields.TopicName)).ToBe(FTopicName);
+  FreeDynArray(DecodedPublishFields.ApplicationMessage);
+  FreeDynArray(DecodedPublishFields.TopicName);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_SendQuota; //SendQuota should not be used on QoS=0
+var
+  BufferPointer: PMQTTBuffer;
+  Err: Word;
+begin
+  Expect(MQTT_PUBLISH(0, 0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+
+  BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
+
+  Expect(True).ToBe(False, 'Send quota is not implemented.');  //ToDo:  implement Send quota, then make sure it is used on QoS > 0 only.
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(AQoS: Byte);
+var
+  BufferPointer: PMQTTBuffer;
+  Err: Word;
+  DecodedPublishFields: TMQTTPublishFields;
+  DecodedPublishProperties: TMQTTPublishProperties;
+begin
+  Expect(MQTT_PUBLISH(0, AQoS)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+
+  BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
+
+  InitDynArrayToEmpty(DecodedPublishFields.ApplicationMessage);
+  InitDynArrayToEmpty(DecodedPublishFields.TopicName);
+  Decode_Publish(DecodedPublishPacket, DecodedPublishFields, DecodedPublishProperties);
+  FreeDynArray(DecodedPublishFields.ApplicationMessage);
+  FreeDynArray(DecodedPublishFields.TopicName);
+
+  Expect(PacketIdentifierIsUsed(0, DecodedPublishFields.PacketIdentifier)).ToBe(AQoS = 2, 'PacketIdentifier is used on QoS=2 only.');  // for QoS = 2 only!!!
+
+  if AQoS = 2 then
+    Expect(AllocatedPacketIdentifier).ToBe(0);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_PacketIdentifier;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(0);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_PacketIdentifier;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(1);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_PacketIdentifier;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(2);
 end;
 
 
