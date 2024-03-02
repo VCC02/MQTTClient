@@ -169,7 +169,7 @@ function GetServerToClientPacketIdentifiersCount(ClientInstance: DWord): TDynArr
 function GetServerToClientPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of ClientToServerPacketIdentifiers array
 function GetClientToServerPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
 function GetClientToServerPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of ClientToServerPacketIdentifiers array
-
+function GetSendQuota(ClientInstance: DWord): Word;
 
 
 var
@@ -192,11 +192,12 @@ const
   CMQTT_BadClientIndex = 301;       //ClientInstance parameter, from main functions, is out of bounds
   CMQTT_UnhandledPacketType = 302;  //The client received a packet that is not supposed to receive (that includes packets which are normally sent from client to server)
   CMQTT_HandlerNotAssigned = 303;   //Mostly for internal use. Some user functions may also use it.
-  CMQTT_BadQoS = 304;               //The client received a bad QoS value (i.e. 3). It should disconnect from server.
+  CMQTT_BadQoS = 304;               //The client received a bad QoS value (i.e. 3). It should disconnect from server. Or, the user code calls Publish with a bad QoS.
   CMQTT_ProtocolError = 305;        //The server sent this in a ReasonCode field
   CMQTT_PacketIdentifierNotFound_ClientToServer = 306;            //The server sent an unknown Packet identifier, so the client responds with this error in a PubComp packet
   CMQTT_Reserved = 307;     /////////////////////////////////
   CMQTT_NoMorePacketIdentifiersAvailable = 308; //Likely a bad state or a memory leak would lead to this error. Usually, the library should end up here.
+  CMQTT_ReceiveMaximumExceeded = 309; //The user code gets this error when attempting to publish more packets than acknowledged by server. The ReceiveMaximum value is set on connect.
   CMQTT_OutOfMemory = 300 + CMQTTDecoderOutOfMemory; //11
 
 implementation
@@ -204,6 +205,7 @@ implementation
 
 const
   CClientIndexMask = $0000FFFF;
+
 
 var
   //This is array of array of Byte, i.e. array of buffers. The outer array is indexed by ClientInstance parameter from below functions.
@@ -221,12 +223,15 @@ var
   ServerToClientBuffer: TDynArrayOfTDynArrayOfByte;   //indexed by ClientInstance parameter from main functions
   ServerToClientPacketIdentifiers: TDynArrayOfTDynArrayOfWord;  //used on QoS = 2.
   ClientToServerPacketIdentifiers: TDynArrayOfTDynArrayOfWord;
-  MaximumQoS: TDynArrayOfByte; //used when initiating connections.
+  ClientToServerUnAckPacketIdentifiers: TDynArrayOfTDynArrayOfByte;  //should be kept in sync with ClientToServerPacketIdentifiers array
+  MaximumQoS: TDynArrayOfByte; //used when initiating connections.  This keeps track of the requested and server-updated value of QoS
+  ClientToServerSendQuota: TDynArrayOfWord; //used on Publish, initialized by Connect, updated by Publish and PubAck/PubRec
+  ClientToServerReceiveMaximum: TDynArrayOfWord; //used on Publish, initialized by Connect
   //TopicAliases: TDynArrayOfTDynArrayOfWord; //used when initiating connections.   See also TMQTTProp_TopicAliasMaximum type.
   //an array based on TMQTTProp_ReceiveMaximum
 
 
-procedure MQTT_Init; //Init library vars
+procedure InitLibStateVars;
 begin
   {$IFDEF SingleOutputBuffer}
     InitDynOfDynOfByteToEmpty(ClientToServerBuffer);
@@ -236,8 +241,32 @@ begin
   InitDynOfDynOfByteToEmpty(ServerToClientBuffer);
   InitDynOfDynOfWordToEmpty(ServerToClientPacketIdentifiers);
   InitDynOfDynOfWordToEmpty(ClientToServerPacketIdentifiers);
+  InitDynOfDynOfByteToEmpty(ClientToServerUnAckPacketIdentifiers);
+  InitDynArrayOfWordToEmpty(ClientToServerSendQuota);
+  InitDynArrayOfWordToEmpty(ClientToServerReceiveMaximum);
   InitDynArrayToEmpty(MaximumQoS);
+end;
 
+
+procedure CleanupLibStateVars;
+begin
+  {$IFDEF SingleOutputBuffer}
+    FreeDynOfDynOfByteArray(ClientToServerBuffer);
+  {$ELSE}
+    FreeDynArrayOfPDynArrayOfTDynArrayOfByte(ClientToServerBuffer);
+  {$ENDIF}
+  FreeDynOfDynOfByteArray(ServerToClientBuffer);
+  FreeDynOfDynOfWordArray(ServerToClientPacketIdentifiers);
+  FreeDynOfDynOfWordArray(ClientToServerPacketIdentifiers);
+  FreeDynOfDynOfByteArray(ClientToServerUnAckPacketIdentifiers);
+  FreeDynArrayOfWord(ClientToServerSendQuota);
+  FreeDynArrayOfWord(ClientToServerReceiveMaximum);
+  FreeDynArray(MaximumQoS);
+end;
+
+
+procedure InitEvents;
+begin
   {$IFDEF IsDesktop}
     New(OnMQTTAfterCreateClient);
     New(OnMQTTBeforeDestroyClient);
@@ -281,7 +310,7 @@ begin
 end;
 
 
-procedure MQTT_Done; //Frees library vars
+procedure CleanupEvents;
 begin
   {$IFDEF IsDesktop}
     Dispose(OnMQTTAfterCreateClient);
@@ -310,16 +339,20 @@ begin
   OnBeforeSendingMQTT_PUBACK := nil;
   OnBeforeSendingMQTT_PUBREC := nil;
   OnBeforeSendingMQTT_PUBCOMP := nil;
+end;
 
-  {$IFDEF SingleOutputBuffer}
-    FreeDynOfDynOfByteArray(ClientToServerBuffer);
-  {$ELSE}
-    FreeDynArrayOfPDynArrayOfTDynArrayOfByte(ClientToServerBuffer);
-  {$ENDIF}
-  FreeDynOfDynOfByteArray(ServerToClientBuffer);
-  FreeDynOfDynOfWordArray(ServerToClientPacketIdentifiers);
-  FreeDynOfDynOfWordArray(ClientToServerPacketIdentifiers);
-  FreeDynArray(MaximumQoS);
+
+procedure MQTT_Init; //Init library vars
+begin
+  InitLibStateVars;
+  InitEvents;
+end;
+
+
+procedure MQTT_Done; //Frees library vars
+begin
+  CleanupEvents;
+  CleanupLibStateVars;
 end;
 
 
@@ -492,6 +525,9 @@ begin
     Result := SetDynOfDynOfByteLength(ServerToClientBuffer, ServerToClientBuffer.Len + 1);
     Result := Result and SetDynOfDynOfWordLength(ServerToClientPacketIdentifiers, ServerToClientPacketIdentifiers.Len + 1);
     Result := Result and SetDynOfDynOfWordLength(ClientToServerPacketIdentifiers, ClientToServerPacketIdentifiers.Len + 1);
+    Result := Result and SetDynOfDynOfByteLength(ClientToServerUnAckPacketIdentifiers, ClientToServerUnAckPacketIdentifiers.Len + 1);
+    Result := Result and SetDynOfWordLength(ClientToServerSendQuota, ClientToServerSendQuota.Len + 1);
+    Result := Result and SetDynOfWordLength(ClientToServerReceiveMaximum, ClientToServerSendQuota.Len + 1);
     Result := Result and SetDynLength(MaximumQoS, MaximumQoS.Len + 1);
 
     {$IFDEF IsDesktop}
@@ -531,6 +567,9 @@ begin
     Result := DeleteItemFromDynOfDynOfByte(ServerToClientBuffer, ClientInstance);
     Result := Result and DeleteItemFromDynOfDynOfWord(ServerToClientPacketIdentifiers, ClientInstance);
     Result := Result and DeleteItemFromDynOfDynOfWord(ClientToServerPacketIdentifiers, ClientInstance);
+    Result := Result and DeleteItemFromDynOfDynOfByte(ClientToServerUnAckPacketIdentifiers, ClientInstance);
+    Result := Result and DeleteItemFromDynArrayOfWord(ClientToServerSendQuota, ClientInstance);
+    Result := Result and DeleteItemFromDynArrayOfWord(ClientToServerReceiveMaximum, ClientInstance);
     Result := Result and DeleteItemFromDynArray(MaximumQoS, ClientInstance);
   end;
 end;
@@ -803,7 +842,7 @@ begin
     //call MQTT_DISCONNECTResponse_NoCallback(ClientInstance, RespPubFields, RespPubProperties) with CMQTT_Reason_QoSNotSupported
     //and call OnMQTTClientRequestsDisconnection(ClientInstance, CMQTT_Reason_QoSNotSupported).
 
-    //ToDo: also verify if "Topic Alias" if is greater than "Maximum Topic Alias". If that's the case, disconnect with CMQTT_Reason_TopicAliasInvalid.
+    //ToDo: also verify if "Topic Alias" is greater than "Maximum Topic Alias". If that's the case, disconnect with CMQTT_Reason_TopicAliasInvalid.
     //      if (TempPublishProperties.TopicAlias = 0) or (TempPublishProperties.TopicAlias >= TempConnAckProperties.TopicAliasMaximum) then   (see pag 61 of MQTT doc)
     //ToDo: update "Topic Name", based on "Topic Alias".
 
@@ -883,12 +922,16 @@ end;
 function Process_PUBACK(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
 begin
   Result := CMQTT_Success;
+  //ToDo: Delete item from ClientToServerPacketIdentifiers and ClientToServerUnAckPacketIdentifiers, using RemovePacketIdentifierByIndex
+  //ToDo: IncrementSendQuota
 end;
 
 
 function Process_PUBREC(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
 begin    //This is a response from server, after the client has sent a Publish.
   Result := CMQTT_Success;
+  //ToDo: Delete item from ClientToServerPacketIdentifiers and ClientToServerUnAckPacketIdentifiers, using RemovePacketIdentifierByIndex
+  //ToDo: IncrementSendQuota if error code is $80 or greater !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end;
 
 
@@ -936,7 +979,7 @@ begin
       if MQTT_PUBResponse_NoCallback(ClientInstance, CMQTT_PUBCOMP, RespPubFields, RespPubProperties) then
       begin
         MQTT_FreeCommonProperties(RespPubProperties);
-        // The PacketIdentifier is removed here, not in MQTT_PUBCOMP_NoCallback, because its index is already available here.
+        // The PacketIdentifier is removed here, not in MQTT_PUBResponse_NoCallback, because its index is already available here.
         if PacketIdentifierIdx <> -1 then
           if not DeleteItemFromDynArrayOfWord(ServerToClientPacketIdentifiers.Content^[TempClientInstance]^, PacketIdentifierIdx) then
             Result := CMQTT_OutOfMemory;
@@ -954,6 +997,7 @@ end;
 function Process_PUBCOMP(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
 begin     //This is a response from server, after the client has sent a PubRel.
   Result := CMQTT_Success;
+  //ToDo: IncrementSendQuota
 end;
 
 
@@ -1059,12 +1103,19 @@ begin
 end;
 
 
-function CreatePacketIdentifier(ClientInstance: DWord): Word;
+function CreatePacketIdentifier(ClientInstance: DWord): Word;   // Returns $FFFF if it can't find a new available number to allocate
 var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
   Result := CreateUniqueWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^);
+
+  if Result <> $FFFF then
+    if not AddByteToDynArray(0, ClientToServerUnAckPacketIdentifiers.Content^[TempClientInstance]^) then
+    begin
+      Result := $FFFF;
+      DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_UNDEFINED);
+    end;
 end;
 
 
@@ -1087,9 +1138,51 @@ begin
 end;
 
 
+function RemovePacketIdentifierByIndex(ClientInstance: DWord; AIndex: Word): Boolean;
+var
+  TempClientInstance: DWord;
+begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+
+  Result := DeleteItemFromDynArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, AIndex);
+  if Result then
+    Result := DeleteItemFromDynArray(ClientToServerUnAckPacketIdentifiers.Content^[TempClientInstance]^, AIndex);
+end;
+
+
 function PacketIdentifierIsUsed(ClientInstance: DWord; APacketIdentifier: Word): Boolean;
 begin
   Result := GetIndexOfPacketIdentifier(ClientInstance, APacketIdentifier) <> -1;
+end;
+
+
+function DecrementSendQuota(ClientInstance: DWord): Boolean;
+var
+  TempClientInstance: DWord;
+begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+
+  Result := True;
+
+  if ClientToServerSendQuota.Content^[TempClientInstance] > 0 then
+    Dec(ClientToServerSendQuota.Content^[TempClientInstance])
+  else
+    Result := False;
+end;
+
+
+function IncrementSendQuota(ClientInstance: DWord): Boolean;
+var
+  TempClientInstance: DWord;
+begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+
+  Result := True;
+
+  if ClientToServerSendQuota.Content^[TempClientInstance] < ClientToServerReceiveMaximum.Content^[TempClientInstance] then
+    Inc(ClientToServerSendQuota.Content^[TempClientInstance])
+  else
+    Result := False;
 end;
 
 
@@ -1098,16 +1191,26 @@ var
   TempConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
   TempConnectProperties: TMQTTConnectProperties;
   Err: Word;
+  TempClientInstance: DWord;
 begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+
   MQTT_InitConnectPayloadContentProperties(TempConnectFields.PayloadContent);
   MQTT_InitConnectProperties(TempConnectProperties);
 
   Err := CMQTT_Success;
   Result := DoOnBeforeMQTT_CONNECT(ClientInstance, TempConnectFields, TempConnectProperties, Err);
+
   if Result then
     Result := MQTT_CONNECT_NoCallback(ClientInstance, TempConnectFields, TempConnectProperties)
   else
     DoOnMQTTError(ClientInstance, Err, CMQTT_CONNECT);
+
+  if Result then
+  begin
+    ClientToServerSendQuota.Content^[TempClientInstance] := TempConnectProperties.ReceiveMaximum;       //this keeps track of current quota (valid range: 0..ReceiveMaximum)
+    ClientToServerReceiveMaximum.Content^[TempClientInstance] := TempConnectProperties.ReceiveMaximum;  //this keeps track of the maximum value
+  end;
 
   MQTT_FreeConnectPayloadContentProperties(TempConnectFields.PayloadContent);
   MQTT_FreeConnectProperties(TempConnectProperties);
@@ -1120,8 +1223,10 @@ var
   TempPublishProperties: TMQTTPublishProperties;
   Err: Word;
   NewPacketIdentifier: Word;
+  IndexOfNewPacketIdentifier: TDynArrayLengthSig;
+  NewQoS: Byte;
 begin
-  { Every client should have a queue of "PUBLISH-sending" state machines and buffers for QoS > 0 (and a list of PacketIdentifiers for QoS = 2).
+  { Every client should have a queue of "PUBLISH-sending" state machines, buffers and PacketIdentifiers for QoS > 0.
   From spec (pag 103):
   Each time the Client or Server sends a PUBLISH packet at QoS > 0, it decrements the send quota. If the
   send quota reaches zero, the Client or Server MUST NOT send any more PUBLISH packets with QoS > 0.
@@ -1130,8 +1235,16 @@ begin
   Control Packets even if the quota is zero.}
 
   Result := True;
+  AQoS := AQoS and 3;
 
-  if AQoS = 2 then
+  if AQoS = 3 then
+  begin
+    DoOnMQTTError(ClientInstance, CMQTT_BadQoS, CMQTT_PUBLISH);  //
+    Result := False;
+    Exit;
+  end;
+
+  if AQoS > 0 then
   begin
     NewPacketIdentifier := CreatePacketIdentifier(ClientInstance);
     if NewPacketIdentifier = $FFFF then
@@ -1140,11 +1253,16 @@ begin
       Result := False;
       Exit;
     end;
+
+    if not DecrementSendQuota(ClientInstance) then
+    begin
+      DoOnMQTTError(ClientInstance, CMQTT_ReceiveMaximumExceeded, CMQTT_PUBLISH);  //
+      Result := False;
+      Exit;
+    end;
   end
   else
     NewPacketIdentifier := 0; //just set a default, but do not add it to the array of identifiers
-
-  //Decrement SendQuota[ClientInstance] array until it reaches 0. Trigger an event in that case. ////////////////////////
 
   InitDynArrayToEmpty(TempPublishFields.ApplicationMessage);
   InitDynArrayToEmpty(TempPublishFields.TopicName);
@@ -1156,17 +1274,33 @@ begin
   Err := CMQTT_Success;
   Result := DoOnBeforeSendingMQTT_PUBLISH(ClientInstance, TempPublishFields, TempPublishProperties, Err);
 
-  if (TempPublishFields.PacketIdentifier shr 1) and $F = 2 then  //if the user changed the QoS, using the handler, then allocate a PacketIdentifier
+  NewQoS := (TempPublishFields.PublishCtrlFlags shr 1) and $F;
+  if NewQoS <> AQoS then  //if the user changed the QoS, using the handler, so allocate a PacketIdentifier
   begin
-    NewPacketIdentifier := CreatePacketIdentifier(ClientInstance);
-    if NewPacketIdentifier = $FFFF then
+    if AQoS > 0 then //PacketIdentifier is already allocated above
     begin
-      DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_PUBLISH);  //
-      Result := False;
-      Exit;
+      IndexOfNewPacketIdentifier := GetIndexOfPacketIdentifier(ClientInstance, NewPacketIdentifier);
+      if IndexOfNewPacketIdentifier > -1 then
+        if not RemovePacketIdentifierByIndex(ClientInstance, IndexOfNewPacketIdentifier) then
+        begin
+          DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_UNDEFINED);  //
+          Result := False;
+          Exit;
+        end;
     end;
 
-    TempPublishFields.PacketIdentifier := NewPacketIdentifier;
+    if NewQoS > 0 then
+    begin
+      NewPacketIdentifier := CreatePacketIdentifier(ClientInstance);    //This also allocates an UnAck flag, which can be reset later from PubAck (for QoS=1) or PubRec (for QoS=2) packet. See ClientToServerUnAckPacketIdentifiers array.
+      if NewPacketIdentifier = $FFFF then
+      begin
+        DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_PUBLISH);  //
+        Result := False;
+        Exit;
+      end;
+
+      TempPublishFields.PacketIdentifier := NewPacketIdentifier;
+    end;
   end;
 
   if Result then
@@ -1289,6 +1423,15 @@ begin
 
 
   Result := ClientToServerPacketIdentifiers.Content^[ClientInstance]^.Content^[AIndex];
+end;
+
+
+function GetSendQuota(ClientInstance: DWord): Word;
+var
+  TempClientInstance: DWord;
+begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+  Result := ClientToServerSendQuota.Content^[TempClientInstance];
 end;
 
 end.

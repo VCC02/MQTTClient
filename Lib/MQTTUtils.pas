@@ -630,6 +630,12 @@ const
   CMQTTDecoderBadCtrlPacketOnDisconnect = 10;  //a special case of CMQTTDecoderBadCtrlPacket, where the receiver is required to send a DISCONNECT with an error code
   CMQTTDecoderOutOfMemory = 11;
 
+
+//Other library constants
+const
+  CMQTT_DefaultReceiveMaximum = $0003; //Some valid value, greater than 0, used to initialize the ReceiveMaximum property. The greater the value, the greater the number of Publish packets can be sent from this client without a PubAck or PubRec response.
+
+
 type
   TCtrlPacketDecoderFunc = function(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var AErr: Word): Boolean;
   PCtrlPacketDecoderFunc = ^TCtrlPacketDecoderFunc;
@@ -1158,7 +1164,7 @@ end;
 procedure MQTT_InitConnectProperties(var AProperties: TMQTTConnectProperties);
 begin
   AProperties.SessionExpiryInterval := 3600; //[s]      //some valid default values
-  AProperties.ReceiveMaximum := 30000;
+  AProperties.ReceiveMaximum := CMQTT_DefaultReceiveMaximum;
   AProperties.MaximumPacketSize := 40000;
   AProperties.TopicAliasMaximum := 20;
   AProperties.RequestResponseInformation := 1;

@@ -41,6 +41,8 @@ type
   TTestProtocolSendPublishCase = class(TTestCase)
   private
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(AQoS: Byte);
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuota(AQoS: Byte);
+
   protected
     procedure SetUp; override;
     procedure TearDown; override;
@@ -49,10 +51,20 @@ type
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket;
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_Content;
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_SendQuota;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_SendQuota;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_SendQuota;
 
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_PacketIdentifier;
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_PacketIdentifier;
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_PacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0To0_ModifiedPacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0To1_ModifiedPacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0To2_ModifiedPacketIdentifier;
+
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1To0_ModifiedPacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1To1_ModifiedPacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1To2_ModifiedPacketIdentifier;
+
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2To0_ModifiedPacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2To1_ModifiedPacketIdentifier;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2To2_ModifiedPacketIdentifier;
   end;
 
 
@@ -71,7 +83,16 @@ var
   ErrorOnPacketType: Byte;
   AllocatedPacketIdentifier: Word;
   FAppMsg, FTopicName: string;
+  NewQoS: Byte;
 
+
+function HandleOnBeforeMQTT_CONNECT(ClientInstance: DWord;  //The lower byte identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
+                                    var AConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
+                                    var AConnectProperties: TMQTTConnectProperties): Boolean;
+begin
+  Result := True;
+  //MQTT_InitWillProperties(TempWillProperties);
+end;
 
 
 function HandleOnBeforeSendingMQTT_PUBLISH(ClientInstance: DWord;  //The lower word identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
@@ -82,9 +103,10 @@ begin
 
   Expect(StringToDynArrayOfByte(FAppMsg, APublishFields.ApplicationMessage)).ToBe(True);
   Expect(StringToDynArrayOfByte(FTopicName, APublishFields.TopicName)).ToBe(True);
-  AllocatedPacketIdentifier := APublishFields.PacketIdentifier;
+  AllocatedPacketIdentifier := APublishFields.PacketIdentifier;                    //if users override QoS in this handler, then a a different PacketIdentifier might be allocated (depending on what is available)
 
-  //APublishFields.PublishCtrlFlags := 0; //bits 3-0:  Dup(3), QoS(2-1), Retain(0)   - should be overridden if a different QoS is required
+  APublishFields.PublishCtrlFlags := APublishFields.PublishCtrlFlags and $9; //clear QoS //bits 3-0:  Dup(3), QoS(2-1), Retain(0)   - should be overridden if a different QoS is required
+  APublishFields.PublishCtrlFlags := APublishFields.PublishCtrlFlags or (NewQoS shl 1);
 
   Result := True;
 end;
@@ -106,8 +128,10 @@ begin
 
   {$IFDEF IsDesktop}
     OnBeforeSendingMQTT_PUBLISH^ := @HandleOnBeforeSendingMQTT_PUBLISH;
+    OnBeforeMQTT_CONNECT^ := @HandleOnBeforeMQTT_CONNECT;
   {$ELSE}
     OnBeforeSendingMQTT_PUBLISH := @HandleOnBeforeSendingMQTT_PUBLISH;
+    OnBeforeMQTT_CONNECT := @HandleOnBeforeMQTT_CONNECT;
   {$ENDIF}
 
   //InitDynArrayToEmpty(EncodedPublishBuffer);
@@ -119,6 +143,7 @@ begin
   AllocatedPacketIdentifier := 65534;
   FAppMsg := 'NoApp';
   FTopicName := 'NoName';
+  NewQoS := 0; //some valid default value
 end;
 
 
@@ -175,17 +200,36 @@ begin
 end;
 
 
-procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_SendQuota; //SendQuota should not be used on QoS=0
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuota(AQoS: Byte); //SendQuota should not be used on QoS=0
 var
   BufferPointer: PMQTTBuffer;
   Err: Word;
 begin
-  Expect(MQTT_PUBLISH(0, 0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+  Expect(MQTT_CONNECT(0)).ToBe(True);
+  Expect(MQTT_PUBLISH(0, AQoS)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
 
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
 
-  Expect(True).ToBe(False, 'Send quota is not implemented.');  //ToDo:  implement Send quota, then make sure it is used on QoS > 0 only.
+  Expect(GetSendQuota(0)).ToBe(3 - Ord(AQoS > 0), 'Send quota is less than initial of QoS > 0.');
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_SendQuota;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuota(0);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_SendQuota;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuota(1);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_SendQuota;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuota(2);
 end;
 
 
@@ -207,27 +251,78 @@ begin
   FreeDynArray(DecodedPublishFields.ApplicationMessage);
   FreeDynArray(DecodedPublishFields.TopicName);
 
-  Expect(PacketIdentifierIsUsed(0, DecodedPublishFields.PacketIdentifier)).ToBe(AQoS = 2, 'PacketIdentifier is used on QoS=2 only.');  // for QoS = 2 only!!!
+  Expect(GetClientToServerPacketIdentifiersCount(0)).ToBe(Ord(NewQoS > 0));
 
-  if AQoS = 2 then
+  if NewQoS > 0 then
+  begin
     Expect(AllocatedPacketIdentifier).ToBe(0);
+    Expect(PacketIdentifierIsUsed(0, DecodedPublishFields.PacketIdentifier)).ToBe(True, 'PacketIdentifier is used on QoS>0 only.');  // for QoS > 0 only!!!
+  end;
 end;
 
+///////////////////
 
-procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_PacketIdentifier;
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0To0_ModifiedPacketIdentifier;
 begin
+  NewQoS := 0;
   TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(0);
 end;
 
 
-procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_PacketIdentifier;
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0To1_ModifiedPacketIdentifier;
 begin
+  NewQoS := 1;
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(0);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0To2_ModifiedPacketIdentifier;
+begin
+  NewQoS := 2;
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(0);
+end;
+
+///////////////////
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1To0_ModifiedPacketIdentifier;
+begin
+  NewQoS := 0;
   TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(1);
 end;
 
 
-procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_PacketIdentifier;
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1To1_ModifiedPacketIdentifier;
 begin
+  NewQoS := 1;
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(1);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1To2_ModifiedPacketIdentifier;
+begin
+  NewQoS := 2;
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(1);
+end;
+
+///////////////////
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2To0_ModifiedPacketIdentifier;
+begin
+  NewQoS := 0;
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(2);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2To1_ModifiedPacketIdentifier;
+begin
+  NewQoS := 1;
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(2);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2To2_ModifiedPacketIdentifier;
+begin
+  NewQoS := 2;
   TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(2);
 end;
 
