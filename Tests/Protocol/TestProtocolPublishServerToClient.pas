@@ -39,15 +39,17 @@ type
 
   TTestProtocolReceivePublishCase = class(TTestCase)
   private
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_Generic(APacketIdentifier,
+    procedure TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_Generic(APacketIdentifier,
                                                                                    AModifiedPacketIdentifier,
                                                                                    AExpectedIdentifiersCount,
                                                                                    ANewReasonCode,
                                                                                    AExpectedFoundError,
                                                                                    AExpectedErrorOnPacketType: Word);
 
-    procedure TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(APacketIdentifier,
+    procedure TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(APacketIdentifier,
                                                                                     AModifiedPacketIdentifier,
+                                                                                    ASecondPacketIdentifier,
+                                                                                    ASecondModifiedPacketIdentifier,
                                                                                     AExpectedIdentifiersCount,
                                                                                     ANewReasonCode,
                                                                                     AExpectedFoundError,
@@ -57,19 +59,21 @@ type
     procedure TearDown; override;
 
   published
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0;
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1;
+    procedure TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_0;
+    procedure TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_1;
 
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_HappyFlow;
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_BadReasonCode;
-    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_BadPacketIdentifier;
+    procedure TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_HappyFlow;
+    procedure TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_BadReasonCode;
+    procedure TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_BadPacketIdentifier;
 
-    procedure TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_0;
-    procedure TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_1;
+    procedure TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_0;
+    procedure TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_1;
 
-    procedure TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_HappyFlow;
-    procedure TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_BadReasonCode;
-    procedure TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_BadPacketIdentifier;
+    procedure TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_HappyFlow;
+    procedure TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_BadReasonCode;
+    procedure TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_BadPacketIdentifier;
+
+    procedure TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_HappyFlow_DUP;
   end;
 
 implementation
@@ -99,6 +103,7 @@ var
   ReceivedCount: Byte;  //Counts how many times a PUBLISH handler is called. For QoS=0 and QoS=1, it should be on every receive. For QoS=2, it should be 1.
   RecCount: Byte;
   CompCount: Byte;
+  ExpectedReceivedPacketIdentiier: Word;
 
                                              //The lower word identifies the client instance
 procedure HandleOnAfterReceivingMQTT_PUBLISH(ClientInstance: DWord; var APublishFields: TMQTTPublishFields; var APublishProperties: TMQTTPublishProperties);
@@ -120,16 +125,16 @@ begin
 
   case QoS of
     0:
-      Expect(APublishFields.PacketIdentifier).ToBe(0);
+      Expect(APublishFields.PacketIdentifier).ToBe(0, 'Handler');
     1:
-      Expect(APublishFields.PacketIdentifier).ToBe(456);
+      Expect(APublishFields.PacketIdentifier).ToBe(456, 'Handler');
     2:
     begin
       case ReceivedCount of
         1:
-          Expect(APublishFields.PacketIdentifier).ToBe(20);
+          Expect(APublishFields.PacketIdentifier).ToBe(20, 'Handler on ReceivedCount=1');
         2:
-          Expect(APublishFields.PacketIdentifier).ToBe(60);
+          Expect(APublishFields.PacketIdentifier).ToBe(ExpectedReceivedPacketIdentiier, 'Handler on ReceivedCount=2');
         else
           Expect(APublishFields.PacketIdentifier).ToBe(-2, 'Unhandled case for PacketIdentifier value');
       end;
@@ -209,6 +214,7 @@ begin
 
   FoundError := CMQTT_Success;
   ErrorOnPacketType := CMQTT_UNDEFINED;
+  ExpectedReceivedPacketIdentiier := 65530;
 end;
 
 
@@ -236,7 +242,7 @@ begin
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_0;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -254,7 +260,7 @@ begin
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_1;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -272,7 +278,7 @@ begin
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_Generic(APacketIdentifier,
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_Generic(APacketIdentifier,
                                                                                                                AModifiedPacketIdentifier,
                                                                                                                AExpectedIdentifiersCount,
                                                                                                                ANewReasonCode,
@@ -315,8 +321,10 @@ begin
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(APacketIdentifier,
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(APacketIdentifier,
                                                                                                                 AModifiedPacketIdentifier,
+                                                                                                                ASecondPacketIdentifier,
+                                                                                                                ASecondModifiedPacketIdentifier,
                                                                                                                 AExpectedIdentifiersCount,
                                                                                                                 ANewReasonCode,
                                                                                                                 AExpectedFoundError,
@@ -337,17 +345,17 @@ begin
   MQTT_FreeControlPacket(DestPacket);
   FreeDynArray(TempBuffer);
   MQTT_FreePublishProperties(ReceivedPublishProperties);
-  ReceivedPublishFields.PacketIdentifier := APacketIdentifier + 40; //some value
+  ReceivedPublishFields.PacketIdentifier := ASecondPacketIdentifier; //some value
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
   PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing 1');
   Expect(ReceivedCount).ToBe(2, 'Second ReceivedCount');
-  Expect(RecCount).ToBe(2, 'Second RecCount');
+  Expect(RecCount).ToBe(1 + Ord(APacketIdentifier <> ASecondPacketIdentifier), 'Second RecCount');  ////////////////// also possible that the Modified args will have to be part of the formula
   Expect(GetServerToClientPacketIdentifiersCount(0)).ToBe(2, 'PacketIdentifier created.');
   Expect(GetServerToClientPacketIdentifierByIndex(0, 0)).ToBe(APacketIdentifier);
-  Expect(GetServerToClientPacketIdentifierByIndex(0, 1)).ToBe(APacketIdentifier + 40);
+  Expect(GetServerToClientPacketIdentifierByIndex(0, 1)).ToBe(ASecondPacketIdentifier);
 
   //send second part of the ping-pong
   MQTT_FreeControlPacket(DestPacket);
@@ -368,7 +376,7 @@ begin
   //send second part of the ping-pong  - second packet
   MQTT_FreeControlPacket(DestPacket);
   FreeDynArray(TempBuffer);
-  ReceivedPubRelFields.PacketIdentifier := AModifiedPacketIdentifier + 40; //If different than above, it should cause an error event.
+  ReceivedPubRelFields.PacketIdentifier := ASecondModifiedPacketIdentifier; //If different than above, it should cause an error event.
   ReceivedPubRelFields.ReasonCode := ANewReasonCode;
   FillIn_PubRel(ReceivedPubRelFields, ReceivedPubRelProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
@@ -385,34 +393,37 @@ begin
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_HappyFlow;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_HappyFlow;
 begin
-  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_Generic(20, 20, 0,
+  ExpectedReceivedPacketIdentiier := 20;
+  TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_Generic(20, 20, 0,
                                                                        0,
                                                                        CMQTT_Success,
                                                                        CMQTT_UNDEFINED);
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_BadReasonCode;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_BadReasonCode;
 begin
-  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_Generic(20, 20, 0,
+  ExpectedReceivedPacketIdentiier := 20;
+  TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_Generic(20, 20, 0,
                                                                        CMQTT_Reason_PacketIdentifierNotFound, //new reason code
                                                                        CMQTT_ProtocolError or CMQTT_Reason_PacketIdentifierNotFound shl 8,
                                                                        CMQTT_PUBREL);
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_BadPacketIdentifier;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_BadPacketIdentifier;
 begin
-  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_Generic(20, 30, 1,
+  ExpectedReceivedPacketIdentiier := 20;
+  TestServerToClientBufferContent_AfterPublish_OnePacket_QoS_2_Generic(20, 30, 1,
                                                                        0,
-                                                                       CMQTT_PacketIdentifierNotFound_ClientToServer,
+                                                                       CMQTT_PacketIdentifierNotFound_ServerToClient,
                                                                        CMQTT_PUBREL);
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_0;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_0;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -431,7 +442,7 @@ begin
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_1;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_1;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -450,32 +461,44 @@ begin
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_HappyFlow;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_HappyFlow;
 begin
-  TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(20, 20, 0,
+  ExpectedReceivedPacketIdentiier := 60;
+  TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(20, 20, 40 + 20, 40 + 20, 0,
                                                                         0,
                                                                         CMQTT_Success,
                                                                         CMQTT_UNDEFINED);
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_BadReasonCode;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_BadReasonCode;
 begin
-  TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(20, 20, 0,
+  ExpectedReceivedPacketIdentiier := 60;
+  TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(20, 20, 40 + 20, 40 + 20,  0,
                                                                         CMQTT_Reason_PacketIdentifierNotFound, //new reason code
                                                                         CMQTT_ProtocolError or CMQTT_Reason_PacketIdentifierNotFound shl 8,
                                                                         CMQTT_PUBREL);
 end;
 
 
-procedure TTestProtocolReceivePublishCase.TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_BadPacketIdentifier;
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_BadPacketIdentifier;
 begin
-  TestClientToServerBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(20, 30, 1,
+  ExpectedReceivedPacketIdentiier := 60;
+  TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(20, 30, 40 + 20, 40 + 30, 1,
                                                                         0,
-                                                                        CMQTT_PacketIdentifierNotFound_ClientToServer,
+                                                                        CMQTT_PacketIdentifierNotFound_ServerToClient,
                                                                         CMQTT_PUBREL);
 end;
 
+
+procedure TTestProtocolReceivePublishCase.TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_HappyFlow_DUP;
+begin
+  ExpectedReceivedPacketIdentiier := 20;
+  TestServerToClientBufferContent_AfterPublish_TwoPackets_QoS_2_Generic(20, 20, 0 + 20, 0 + 20, 0,
+                                                                        0,
+                                                                        CMQTT_Success,
+                                                                        CMQTT_UNDEFINED);
+end;
 
 initialization
 

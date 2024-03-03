@@ -211,7 +211,7 @@ begin
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
 
-  Expect(GetSendQuota(0)).ToBe(3 - Ord(AQoS > 0), 'Send quota is less than initial of QoS > 0.');
+  Expect(GetSendQuota(0)).ToBe(CMQTT_DefaultReceiveMaximum - Ord(AQoS > 0), 'Send quota is less than initial of QoS > 0.');
 end;
 
 
@@ -256,7 +256,7 @@ begin
   if NewQoS > 0 then
   begin
     Expect(AllocatedPacketIdentifier).ToBe(0);
-    Expect(PacketIdentifierIsUsed(0, DecodedPublishFields.PacketIdentifier)).ToBe(True, 'PacketIdentifier is used on QoS>0 only.');  // for QoS > 0 only!!!
+    Expect(ClientToServerPacketIdentifierIsUsed(0, DecodedPublishFields.PacketIdentifier)).ToBe(True, 'PacketIdentifier is used on QoS>0 only.');  // for QoS > 0 only!!!
   end;
 end;
 

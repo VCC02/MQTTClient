@@ -43,10 +43,10 @@ type
     procedure TearDown; override;
 
   published
-    procedure TestClientToServerBufferContent_BeforePubAck_OnePacket_QoS_0;
-    procedure TestClientToServerBufferContent_BeforePubAck_OnePacket_QoS_1;
-    procedure TestClientToServerBufferContent_BeforePubAck_TwoPackets_QoS_0;
-    procedure TestClientToServerBufferContent_BeforePubAck_TwoPackets_QoS_1;
+    procedure TestServerToClientBufferContent_BeforePubAck_OnePacket_QoS_0;
+    procedure TestServerToClientBufferContent_BeforePubAck_OnePacket_QoS_1;
+    procedure TestServerToClientBufferContent_BeforePubAck_TwoPackets_QoS_0;
+    procedure TestServerToClientBufferContent_BeforePubAck_TwoPackets_QoS_1;
   end;
 
 implementation
@@ -143,7 +143,7 @@ begin
 end;
 
 
-procedure TTestProtocolPubAckCase.TestClientToServerBufferContent_BeforePubAck_OnePacket_QoS_0;
+procedure TTestProtocolPubAckCase.TestServerToClientBufferContent_BeforePubAck_OnePacket_QoS_0;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -162,7 +162,7 @@ begin
 end;
 
 
-procedure TTestProtocolPubAckCase.TestClientToServerBufferContent_BeforePubAck_OnePacket_QoS_1;
+procedure TTestProtocolPubAckCase.TestServerToClientBufferContent_BeforePubAck_OnePacket_QoS_1;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -183,7 +183,7 @@ begin
 end;
 
 
-procedure TTestProtocolPubAckCase.TestClientToServerBufferContent_BeforePubAck_TwoPackets_QoS_0;
+procedure TTestProtocolPubAckCase.TestServerToClientBufferContent_BeforePubAck_TwoPackets_QoS_0;
 var
   TempBuffer: TDynArrayOfByte;
 begin
@@ -203,7 +203,7 @@ begin
 end;
 
 
-procedure TTestProtocolPubAckCase.TestClientToServerBufferContent_BeforePubAck_TwoPackets_QoS_1;
+procedure TTestProtocolPubAckCase.TestServerToClientBufferContent_BeforePubAck_TwoPackets_QoS_1;
 var
   TempBuffer: TDynArrayOfByte;
 begin
