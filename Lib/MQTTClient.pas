@@ -39,7 +39,8 @@ interface
 uses
   DynArrays, MQTTUtils,
   MQTTConnectCtrl, MQTTConnAckCtrl,
-  MQTTPublishCtrl, MQTTCommonCodecCtrl, MQTTPubAckCtrl, MQTTPubRecCtrl, MQTTPubRelCtrl, MQTTPubCompCtrl
+  MQTTPublishCtrl, MQTTCommonCodecCtrl, MQTTPubAckCtrl, MQTTPubRecCtrl, MQTTPubRelCtrl, MQTTPubCompCtrl,
+  MQTTSubscribeCtrl
 
   {$IFDEF IsDesktop}
     , SysUtils
@@ -76,7 +77,8 @@ type
 
   TOnBeforeMQTT_CONNECT = function(ClientInstance: DWord;  //The lower word identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
                                    var AConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
-                                   var AConnectProperties: TMQTTConnectProperties): Boolean;  //user code has to fill-in this parameter
+                                   var AConnectProperties: TMQTTConnectProperties;            //user code has to fill-in this parameter
+                                   ACallbackID: Word): Boolean;
   POnBeforeMQTT_CONNECT = ^TOnBeforeMQTT_CONNECT;
 
 
@@ -89,7 +91,8 @@ type
   //Called when user code sends a publish packet to server.
   TOnBeforeSendingMQTT_PUBLISH = function(ClientInstance: DWord;  //The lower word identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
                                           var APublishFields: TMQTTPublishFields;                    //user code has to fill-in this parameter
-                                          var APublishProperties: TMQTTPublishProperties): Boolean;  //user code has to fill-in this parameter
+                                          var APublishProperties: TMQTTPublishProperties;            //user code has to fill-in this parameter
+                                          ACallbackID: Word): Boolean;
   POnBeforeSendingMQTT_PUBLISH = ^TOnBeforeSendingMQTT_PUBLISH;
 
 
@@ -122,6 +125,12 @@ type
                                            var APubCompFields: TMQTTPubCompFields;
                                            var APubCompProperties: TMQTTPubCompProperties);
   POnBeforeSendingMQTT_PUBCOMP = ^TOnBeforeSendingMQTT_PUBCOMP;
+
+  TOnBeforeSendingMQTT_SUBSCRIBE = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
+                                             var ASubscribeFields: TMQTTSubscribeFields;
+                                             var ASubscribeProperties: TMQTTSubscribeProperties;
+                                             ACallbackID: Word);
+  POnBeforeSendingMQTT_SUBSCRIBE = ^TOnBeforeSendingMQTT_SUBSCRIBE;
 
 
 procedure MQTT_Init; //Initializes library vars   (call this before any other library function)
@@ -160,10 +169,12 @@ function MQTT_PUBLISH_NoCallback(ClientInstance: DWord;  //ClientInstance identi
                                  var APublishFields: TMQTTPublishFields;                    //user code has to fill-in this parameter
                                  var APublishProperties: TMQTTPublishProperties): Boolean;  //user code has to fill-in this parameter
 
-function MQTT_CONNECT(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance
-function MQTT_PUBLISH(ClientInstance: DWord; AQoS: Byte): Boolean;  //will call OnBeforeSendingMQTT_PUBLISH, to get the content to publish
-function MQTT_PUBACK(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance ////////// should be documented as not to be called by user code (unless there is a use for it). It is public, for testing purposes only.
-function MQTT_PUBREC(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance ////////// should be documented as not to be called by user code (unless there is a use for it). It is public, for testing purposes only.
+function MQTT_CONNECT(ClientInstance: DWord; ACallbackID: Word): Boolean;  //ClientInstance identifies the client instance
+function MQTT_PUBLISH(ClientInstance: DWord; ACallbackID: Word; AQoS: Byte): Boolean;  //will call OnBeforeSendingMQTT_PUBLISH, to get the content to publish
+//function MQTT_PUBACK(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance ////////// should be documented as not to be called by user code (unless there is a use for it). It is public, for testing purposes only.
+//function MQTT_PUBREC(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance ////////// should be documented as not to be called by user code (unless there is a use for it). It is public, for testing purposes only.
+function MQTT_SUBSCRIBE(ClientInstance: DWord; ACallbackID: Word): Boolean;
+
 
 ////////////////////////////////////////////////////////// Multiple functions require calls to Free, both in happy flow and error cases.
 ////////////////////////////////////////////////////////// all decoder functions (e.g. Decode_ConnAckToCtrlPacket) should return the decoded length. Not sure how to compute in case of an error. Probably, it's what the protocol spec says, to disconnect.
@@ -193,6 +204,7 @@ var
   OnBeforeSendingMQTT_PUBREC: POnBeforeSendingMQTT_PUBREC;
   OnBeforeSendingMQTT_PUBREL: POnBeforeSendingMQTT_PUBREL;
   OnBeforeSendingMQTT_PUBCOMP: POnBeforeSendingMQTT_PUBCOMP;
+  OnBeforeSendingMQTT_SUBSCRIBE: POnBeforeSendingMQTT_SUBSCRIBE;
 
 const
   CMQTT_Success = 0;     //the following error codes are 300+, to have a different range, compared to standard MQTT error codes
@@ -203,10 +215,11 @@ const
   CMQTT_ProtocolError = 305;        //The server sent this in a ReasonCode field
   CMQTT_PacketIdentifierNotFound_ClientToServer = 306;            //The server sent an unknown Packet identifier, so the client responds with this error in a PubComp packet
   CMQTT_PacketIdentifierNotFound_ServerToClient = 307;            //The server sent an unknown Packet identifier (in PubAck, i.e. QoS=1), so the client notifies the user about it. No further response to server is expected.
-  CMQTT_NoMorePacketIdentifiersAvailable = 308; //Likely a bad state or a memory leak would lead to this error. Usually, the library should end up here.
+  CMQTT_NoMorePacketIdentifiersAvailable = 308; //Likely a bad state or a memory leak would lead to this error. Usually, the library should not end up here.
   CMQTT_ReceiveMaximumExceeded = 309; //The user code gets this error when attempting to publish more packets than acknowledged by server. The ReceiveMaximum value is set on connect.
   CMQTT_ReceiveMaximumReset = 310;    //The user code gets this error when too many SubAck (and PubRec) packets are received without being published. This may point to a retransmission case.
   CMQTT_OutOfMemory = 300 + CMQTTDecoderOutOfMemory; //11
+  CMQTT_NoMoreSubscriptionIdentifiersAvailable = 312; //Likely a bad state or a memory leak would lead to this error. Usually, the library should not end up here.
 
 implementation
 
@@ -249,6 +262,7 @@ var
   ClientToServerReceiveMaximum: TDynArrayOfWord; //used on Publish, initialized by Connect
   //TopicAliases: TDynArrayOfTDynArrayOfWord; //used when initiating connections.   See also TMQTTProp_TopicAliasMaximum type.
   //an array based on TMQTTProp_ReceiveMaximum
+  ClientToServerSubscriptionIdentifier: TDynArrayOfTDynArrayOfWord; //limited to 65534 subscriptions at a time
 
 
 procedure InitLibStateVars;
@@ -258,6 +272,7 @@ begin
   {$ELSE}
     InitDynArrayOfPDynArrayOfTDynArrayOfByteToEmpty(ClientToServerBuffer);
   {$ENDIF}
+
   InitDynOfDynOfByteToEmpty(ServerToClientBuffer);
   InitDynOfDynOfWordToEmpty(ServerToClientPacketIdentifiers);
   InitDynOfDynOfWordToEmpty(ClientToServerPacketIdentifiers);
@@ -265,6 +280,7 @@ begin
   InitDynArrayOfWordToEmpty(ClientToServerSendQuota);
   InitDynArrayOfWordToEmpty(ClientToServerReceiveMaximum);
   InitDynOfDynOfByteToEmpty(MaximumQoS);
+  InitDynOfDynOfWordToEmpty(ClientToServerSubscriptionIdentifier);
 end;
 
 
@@ -275,6 +291,7 @@ begin
   {$ELSE}
     FreeDynArrayOfPDynArrayOfTDynArrayOfByte(ClientToServerBuffer);
   {$ENDIF}
+
   FreeDynOfDynOfByteArray(ServerToClientBuffer);
   FreeDynOfDynOfWordArray(ServerToClientPacketIdentifiers);
   FreeDynOfDynOfWordArray(ClientToServerPacketIdentifiers);
@@ -282,6 +299,7 @@ begin
   FreeDynArrayOfWord(ClientToServerSendQuota);
   FreeDynArrayOfWord(ClientToServerReceiveMaximum);
   FreeDynOfDynOfByteArray(MaximumQoS);
+  FreeDynOfDynOfWordArray(ClientToServerSubscriptionIdentifier);
 end;
 
 
@@ -301,6 +319,7 @@ begin
     New(OnBeforeSendingMQTT_PUBREC);
     New(OnBeforeSendingMQTT_PUBREL);
     New(OnBeforeSendingMQTT_PUBCOMP);
+    New(OnBeforeSendingMQTT_SUBSCRIBE);
 
     OnMQTTAfterCreateClient^ := nil;
     OnMQTTBeforeDestroyClient^ := nil;
@@ -315,6 +334,7 @@ begin
     OnBeforeSendingMQTT_PUBREC^ := nil;
     OnBeforeSendingMQTT_PUBREL^ := nil;
     OnBeforeSendingMQTT_PUBCOMP^ := nil;
+    OnBeforeSendingMQTT_SUBSCRIBE^ := nil;
   {$ELSE}
     OnMQTTAfterCreateClient := nil;
     OnMQTTBeforeDestroyClient := nil;
@@ -329,6 +349,7 @@ begin
     OnBeforeSendingMQTT_PUBREC := nil;
     OnBeforeSendingMQTT_PUBREL := nil;
     OnBeforeSendingMQTT_PUBCOMP := nil;
+    OnBeforeSendingMQTT_SUBSCRIBE := nil;
   {$ENDIF}
 end;
 
@@ -349,6 +370,7 @@ begin
     Dispose(OnBeforeSendingMQTT_PUBREC);
     Dispose(OnBeforeSendingMQTT_PUBREL);
     Dispose(OnBeforeSendingMQTT_PUBCOMP);
+    Dispose(OnBeforeSendingMQTT_SUBSCRIBE);
   {$ENDIF}
 
   OnMQTTAfterCreateClient := nil;
@@ -364,6 +386,7 @@ begin
   OnBeforeSendingMQTT_PUBREC := nil;
   OnBeforeSendingMQTT_PUBREL := nil;
   OnBeforeSendingMQTT_PUBCOMP := nil;
+  OnBeforeSendingMQTT_SUBSCRIBE := nil;
 end;
 
 
@@ -422,7 +445,7 @@ begin
 end;
 
 
-function DoOnBeforeMQTT_CONNECT(ClientInstance: DWord; var ATempConnectFields: TMQTTConnectFields; var ATempConnectProperties: TMQTTConnectProperties; var AErr: Word): Boolean;
+function DoOnBeforeMQTT_CONNECT(ClientInstance: DWord; var ATempConnectFields: TMQTTConnectFields; var ATempConnectProperties: TMQTTConnectProperties; var AErr: Word; ACallbackID: Word): Boolean;
 begin
   {$IFDEF IsDesktop}
     if not Assigned(OnBeforeMQTT_CONNECT) or not Assigned(OnBeforeMQTT_CONNECT^) then
@@ -435,7 +458,7 @@ begin
       Exit;
     end;
 
-  Result := OnBeforeMQTT_CONNECT^(ClientInstance, ATempConnectFields, ATempConnectProperties);
+  Result := OnBeforeMQTT_CONNECT^(ClientInstance, ATempConnectFields, ATempConnectProperties, ACallbackID);
 end;
 
                                  //The lower word identifies the client instance
@@ -455,7 +478,7 @@ begin
 end;
 
 
-function DoOnBeforeSendingMQTT_PUBLISH(ClientInstance: DWord; var ATempPublishFields: TMQTTPublishFields; var ATempPublishProperties: TMQTTPublishProperties; var AErr: Word): Boolean;
+function DoOnBeforeSendingMQTT_PUBLISH(ClientInstance: DWord; var ATempPublishFields: TMQTTPublishFields; var ATempPublishProperties: TMQTTPublishProperties; var AErr: Word; ACallbackID: Word): Boolean;
 begin
   {$IFDEF IsDesktop}
     if not Assigned(OnBeforeSendingMQTT_PUBLISH) or not Assigned(OnBeforeSendingMQTT_PUBLISH^) then
@@ -468,7 +491,7 @@ begin
       Exit;
     end;
 
-  Result := OnBeforeSendingMQTT_PUBLISH^(ClientInstance, ATempPublishFields, ATempPublishProperties);
+  Result := OnBeforeSendingMQTT_PUBLISH^(ClientInstance, ATempPublishFields, ATempPublishProperties, ACallbackID);
 end;
 
 
@@ -549,6 +572,22 @@ begin
     end;
 
   OnBeforeSendingMQTT_PUBCOMP^(ClientInstance, ATempPubCompFields, ATempPubCompProperties);
+end;
+
+
+procedure DoOnBeforeSending_MQTT_SUBSCRIBE(ClientInstance: DWord; var ATempSubscribeFields: TMQTTSubscribeFields; var ATempSubscribeProperties: TMQTTSubscribeProperties; var AErr: Word; ACallbackID: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnBeforeSendingMQTT_SUBSCRIBE) or not Assigned(OnBeforeSendingMQTT_SUBSCRIBE^) then
+  {$ELSE}
+    if OnBeforeSendingMQTT_SUBSCRIBE = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnBeforeSendingMQTT_SUBSCRIBE^(ClientInstance, ATempSubscribeFields, ATempSubscribeProperties, ACallbackID);
 end;
 
 
@@ -691,6 +730,18 @@ begin
     Inc(ClientToServerSendQuota.Content^[TempClientInstance])
   else
     Result := False;
+end;
+
+
+/////////////////////
+
+
+function CreateClientToServerSubscriptionIdentifier(ClientInstance: DWord): Word;   // Returns $FFFF if it can't find a new available number to allocate
+var
+  TempClientInstance: DWord;
+begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+  Result := CreateUniqueWord(ClientToServerSubscriptionIdentifier.Content^[TempClientInstance]^);
 end;
 
 
@@ -848,6 +899,19 @@ begin
 end;
 
 
+function AddSUBSCRIBE_ToBuffer(var ABuffer: TDynArrayOfByte;
+                               var ASubscribeFields: TMQTTSubscribeFields;
+                               var ASubscribeProperties: TMQTTSubscribeProperties;
+                               // APacketType: Byte; //valid values are
+                               var ADestPacket: TMQTTControlPacket): Boolean;
+begin
+  Result := FillIn_Subscribe(ASubscribeFields, ASubscribeProperties, ADestPacket);
+  if Result then
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+end;
+
+
+
 /////////////////////////////////
 
 
@@ -924,6 +988,32 @@ begin
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
       Result := AddPUBResponse_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, APubAckFields, APubAckProperties, APacketType, TempDestPacket);
+  {$ENDIF}
+
+  MQTT_FreeControlPacket(TempDestPacket);
+end;
+
+
+function MQTT_SUBSCRIBE_NoCallback(ClientInstance: DWord;  //ClientInstance identifies the client instance (the library is able to implement multiple MQTT clients / device)
+                                   var ASubscribeFields: TMQTTSubscribeFields;                    //user code has to fill-in this parameter
+                                   var ASubscribeProperties: TMQTTSubscribeProperties): Boolean;  //user code has to fill-in this parameter
+var
+  TempDestPacket: TMQTTControlPacket;
+  {$IFnDEF SingleOutputBuffer}
+    n: LongInt;
+  {$ENDIF}
+  TempClientInstance: DWord;
+begin
+  // ASubscribeFields and ASubscribeProperties should be initialized by user code
+
+  TempClientInstance := ClientInstance and CClientIndexMask;
+  {$IFDEF SingleOutputBuffer}
+    Result := AddSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, ASubscribeFields, ASubscribeProperties, TempDestPacket);
+  {$ELSE}
+    n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
+    Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
+    if Result then
+      Result := AddSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, ASubscribeFields, ASubscribeProperties, TempDestPacket);
   {$ENDIF}
 
   MQTT_FreeControlPacket(TempDestPacket);
@@ -1398,7 +1488,7 @@ end;
 //////////////////////////
 
 
-function MQTT_CONNECT(ClientInstance: DWord): Boolean;  //ClientInstance identifies the client instance
+function MQTT_CONNECT(ClientInstance: DWord; ACallbackID: Word): Boolean;  //ClientInstance identifies the client instance
 var
   TempConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
   TempConnectProperties: TMQTTConnectProperties;
@@ -1411,7 +1501,7 @@ begin
   MQTT_InitConnectProperties(TempConnectProperties);
 
   Err := CMQTT_Success;
-  Result := DoOnBeforeMQTT_CONNECT(ClientInstance, TempConnectFields, TempConnectProperties, Err);
+  Result := DoOnBeforeMQTT_CONNECT(ClientInstance, TempConnectFields, TempConnectProperties, Err, ACallbackID);
 
   if Result then
     Result := MQTT_CONNECT_NoCallback(ClientInstance, TempConnectFields, TempConnectProperties)
@@ -1429,7 +1519,7 @@ begin
 end;
 
 
-function MQTT_PUBLISH(ClientInstance: DWord; AQoS: Byte): Boolean;
+function MQTT_PUBLISH(ClientInstance: DWord; ACallbackID: Word; AQoS: Byte): Boolean;
 var
   TempPublishFields: TMQTTPublishFields;                    //user code has to fill-in this parameter
   TempPublishProperties: TMQTTPublishProperties;
@@ -1484,7 +1574,7 @@ begin
   MQTT_InitPublishProperties(TempPublishProperties);
 
   Err := CMQTT_Success;
-  Result := DoOnBeforeSendingMQTT_PUBLISH(ClientInstance, TempPublishFields, TempPublishProperties, Err);
+  Result := DoOnBeforeSendingMQTT_PUBLISH(ClientInstance, TempPublishFields, TempPublishProperties, Err, ACallbackID);
 
   NewQoS := (TempPublishFields.PublishCtrlFlags shr 1) and $F;
   if NewQoS <> AQoS then  //if the user changed the QoS, using the handler, so allocate a PacketIdentifier
@@ -1526,15 +1616,64 @@ begin
 end;
 
 
-function MQTT_PUBACK(ClientInstance: DWord): Boolean;
-begin
-  Result := True;
-end;
+//function MQTT_PUBACK(ClientInstance: DWord): Boolean;
+//begin
+//  Result := True;
+//end;
+//
+//
+//function MQTT_PUBREC(ClientInstance: DWord): Boolean;
+//begin
+//  Result := True;
+//end;
 
 
-function MQTT_PUBREC(ClientInstance: DWord): Boolean;
+function MQTT_SUBSCRIBE(ClientInstance: DWord; ACallbackID: Word): Boolean;
+var
+  TempSubscribeFields: TMQTTSubscribeFields;                    //user code has to fill-in this parameter
+  TempSubscribeProperties: TMQTTSubscribeProperties;
+  Err: Word;
+  NewPacketIdentifier: Word;
 begin
   Result := True;
+
+  // SubscriptionIdentifier can be a DWord, while a PacketIdentifier is a word only.
+
+  //From spec: "A Packet Identifier cannot be used by more than one command at any time." - pag 24.
+  //This means that CreateClientToServerPacketIdentifier should be used to allocate a new identifier.
+
+  //if AQoS > 0 then
+  begin
+    NewPacketIdentifier := CreateClientToServerPacketIdentifier(ClientInstance);
+    if NewPacketIdentifier = $FFFF then
+    begin
+      DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_SUBSCRIBE);  //
+      Result := False;
+      Exit;
+    end;
+  end;
+  //else
+  //  NewPacketIdentifier := 0; //just set a default, but do not add it to the array of identifiers
+
+  InitDynArrayToEmpty(TempSubscribeFields.TopicFilters);
+  TempSubscribeFields.PacketIdentifier := NewPacketIdentifier;
+  TempSubscribeFields.EnabledProperties := CMQTTSubscribe_EnSubscriptionIdentifier;
+  MQTT_InitSubscribeProperties(TempSubscribeProperties);
+
+  Err := CMQTT_Success;
+  DoOnBeforeSending_MQTT_SUBSCRIBE(ClientInstance, TempSubscribeFields, TempSubscribeProperties, Err, ACallbackID);
+
+  //ToDo: Cache topic filters ///////////////////////////////////////////////////////////
+
+  Result := Err = CMQTT_Success;
+
+  if Result then
+    Result := MQTT_SUBSCRIBE_NoCallback(ClientInstance, TempSubscribeFields, TempSubscribeProperties)
+  else
+    DoOnMQTTError(ClientInstance, Err, CMQTT_PUBLISH);
+
+  FreeDynArray(TempSubscribeFields.TopicFilters);
+  MQTT_FreeSubscribeProperties(TempSubscribeProperties);
 end;
 
 

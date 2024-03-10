@@ -88,7 +88,8 @@ var
 
 function HandleOnBeforeMQTT_CONNECT(ClientInstance: DWord;  //The lower byte identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
                                     var AConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
-                                    var AConnectProperties: TMQTTConnectProperties): Boolean;
+                                    var AConnectProperties: TMQTTConnectProperties;
+                                    ACallbackID: Word): Boolean;
 begin
   Result := True;
   //MQTT_InitWillProperties(TempWillProperties);
@@ -97,7 +98,8 @@ end;
 
 function HandleOnBeforeSendingMQTT_PUBLISH(ClientInstance: DWord;  //The lower word identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
                                            var APublishFields: TMQTTPublishFields;                    //user code has to fill-in this parameter
-                                           var APublishProperties: TMQTTPublishProperties): Boolean;  //user code has to fill-in this parameter
+                                           var APublishProperties: TMQTTPublishProperties;            //user code has to fill-in this parameter
+                                           ACallbackID: Word): Boolean;
 begin
   Result := False;
 
@@ -162,7 +164,7 @@ var
   BufferPointer: PMQTTBuffer;
   Err: Word;
 begin
-  Expect(MQTT_PUBLISH(0, 0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+  Expect(MQTT_PUBLISH(0, 0, 0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
   //verify buffer content
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Err).ToBe(CMQTT_Success);
@@ -184,7 +186,7 @@ var
 begin
   FAppMsg := 'MyAppMsg';
   FTopicName := 'SomeTopic';
-  Expect(MQTT_PUBLISH(0, 0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+  Expect(MQTT_PUBLISH(0, 0, 0)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
 
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
@@ -205,8 +207,8 @@ var
   BufferPointer: PMQTTBuffer;
   Err: Word;
 begin
-  Expect(MQTT_CONNECT(0)).ToBe(True);
-  Expect(MQTT_PUBLISH(0, AQoS)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+  Expect(MQTT_CONNECT(0, 0)).ToBe(True);
+  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
 
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
@@ -240,7 +242,7 @@ var
   DecodedPublishFields: TMQTTPublishFields;
   DecodedPublishProperties: TMQTTPublishProperties;
 begin
-  Expect(MQTT_PUBLISH(0, AQoS)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
+  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
 
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);

@@ -69,7 +69,8 @@ var
 
 function HandleOnBeforeMQTT_CONNECT(ClientInstance: DWord;  //The lower byte identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
                                     var AConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
-                                    var AConnectProperties: TMQTTConnectProperties): Boolean;
+                                    var AConnectProperties: TMQTTConnectProperties;
+                                    ACallbackID: Word): Boolean;
 var
   TempWillProperties: TMQTTWillProperties;
   ClientId, UserName, Password: string[20];
@@ -149,7 +150,7 @@ var
   BufferPointer: PMQTTBuffer;
   Err: Word;
 begin
-  Expect(MQTT_CONNECT(0)).ToBe(True);  //add a CONNECT packet to ClientToServer buffer
+  Expect(MQTT_CONNECT(0, 0)).ToBe(True);  //add a CONNECT packet to ClientToServer buffer
   //verify buffer content
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Err).ToBe(CMQTT_Success);
@@ -165,8 +166,8 @@ var
   BufferPointer: PMQTTBuffer;
   Err: Word;
 begin
-  Expect(MQTT_CONNECT(0)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
-  Expect(MQTT_CONNECT(0)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
+  Expect(MQTT_CONNECT(0, 0)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
+  Expect(MQTT_CONNECT(0, 1)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
   //verify buffer content
   BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Err).ToBe(CMQTT_Success);
@@ -208,7 +209,7 @@ var
   i: Word;
 begin
   for i := 0 to CPacketCount - 1 do
-    Expect(MQTT_CONNECT(0)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
+    Expect(MQTT_CONNECT(0, i)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
 
   TestClientToServerBufferContent_AfterConnect_WithCallback_GenericPacketCount(CPacketCount);
 end;
@@ -221,7 +222,7 @@ var
   i: Word;
 begin
   for i := 0 to CPacketCount - 1 do
-    Expect(MQTT_CONNECT(0)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
+    Expect(MQTT_CONNECT(0, i)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
 
   TestClientToServerBufferContent_AfterConnect_WithCallback_GenericPacketCount(CPacketCount);
 end;
@@ -234,7 +235,7 @@ var
   i: Word;
 begin
   for i := 0 to CPacketCount - 1 do
-    Expect(MQTT_CONNECT(0)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
+    Expect(MQTT_CONNECT(0, i)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
 
   {$IFnDEF SingleOutputBuffer}
     Expect(RemovePacketFromClientToServerBuffer(0)).ToBe(True);
