@@ -126,10 +126,10 @@ type
                                            var APubCompProperties: TMQTTPubCompProperties);
   POnBeforeSendingMQTT_PUBCOMP = ^TOnBeforeSendingMQTT_PUBCOMP;
 
-  TOnBeforeSendingMQTT_SUBSCRIBE = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
-                                             var ASubscribeFields: TMQTTSubscribeFields;
-                                             var ASubscribeProperties: TMQTTSubscribeProperties;
-                                             ACallbackID: Word);
+  TOnBeforeSendingMQTT_SUBSCRIBE = function(ClientInstance: DWord;  //The lower word identifies the client instance
+                                            var ASubscribeFields: TMQTTSubscribeFields;
+                                            var ASubscribeProperties: TMQTTSubscribeProperties;
+                                            ACallbackID: Word): Boolean;
   POnBeforeSendingMQTT_SUBSCRIBE = ^TOnBeforeSendingMQTT_SUBSCRIBE;
 
 
@@ -155,6 +155,7 @@ function MQTT_Process(ClientInstance: DWord): Word; //Should be called in the ma
 function PutReceivedBufferToMQTTLib(ClientInstance: DWord; var ABuffer: TDynArrayOfByte): Boolean; //Should be called by user code, after receiving data from server. When a valid packet is formed, the MQTT library will process it and call the decoded event.
 function CreateClientToServerPacketIdentifier(ClientInstance: DWord): Word;
 function ClientToServerPacketIdentifierIsUsed(ClientInstance: DWord; APacketIdentifier: Word): Boolean;
+function CreateClientToServerSubscriptionIdentifier(ClientInstance: DWord): Word;   // Returns $FFFF if it can't find a new available number to allocate
 
 {$IFnDEF SingleOutputBuffer}
   function RemovePacketFromClientToServerBuffer(ClientInstance: DWord): Boolean;
@@ -575,7 +576,7 @@ begin
 end;
 
 
-procedure DoOnBeforeSending_MQTT_SUBSCRIBE(ClientInstance: DWord; var ATempSubscribeFields: TMQTTSubscribeFields; var ATempSubscribeProperties: TMQTTSubscribeProperties; var AErr: Word; ACallbackID: Word);
+function DoOnBeforeSending_MQTT_SUBSCRIBE(ClientInstance: DWord; var ATempSubscribeFields: TMQTTSubscribeFields; var ATempSubscribeProperties: TMQTTSubscribeProperties; var AErr: Word; ACallbackID: Word): Boolean;
 begin
   {$IFDEF IsDesktop}
     if not Assigned(OnBeforeSendingMQTT_SUBSCRIBE) or not Assigned(OnBeforeSendingMQTT_SUBSCRIBE^) then
@@ -587,7 +588,7 @@ begin
       Exit;
     end;
 
-  OnBeforeSendingMQTT_SUBSCRIBE^(ClientInstance, ATempSubscribeFields, ATempSubscribeProperties, ACallbackID);
+  Result := OnBeforeSendingMQTT_SUBSCRIBE^(ClientInstance, ATempSubscribeFields, ATempSubscribeProperties, ACallbackID);
 end;
 
 
@@ -764,6 +765,7 @@ begin
     Result := Result and SetDynOfWordLength(ClientToServerSendQuota, ClientToServerSendQuota.Len + 1);
     Result := Result and SetDynOfWordLength(ClientToServerReceiveMaximum, ClientToServerSendQuota.Len + 1);
     Result := Result and SetDynOfDynOfByteLength(MaximumQoS, MaximumQoS.Len + 1);
+    Result := Result and SetDynOfDynOfWordLength(ClientToServerSubscriptionIdentifier, ClientToServerSubscriptionIdentifier.Len + 1);
 
     {$IFDEF IsDesktop}
       if Assigned(OnMQTTAfterCreateClient) and Assigned(OnMQTTAfterCreateClient^) then
@@ -806,6 +808,7 @@ begin
     Result := Result and DeleteItemFromDynArrayOfWord(ClientToServerSendQuota, ClientInstance);
     Result := Result and DeleteItemFromDynArrayOfWord(ClientToServerReceiveMaximum, ClientInstance);
     Result := Result and DeleteItemFromDynOfDynOfByte(MaximumQoS, ClientInstance);
+    Result := Result and DeleteItemFromDynOfDynOfWord(ClientToServerSubscriptionIdentifier, ClientInstance);
   end;
 end;
 
@@ -1013,8 +1016,17 @@ begin
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
+    begin
       Result := AddSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, ASubscribeFields, ASubscribeProperties, TempDestPacket);
-  {$ENDIF}
+      //ToDo: Cache topic filters ///////////////////////////////////////////////////////////  in MQTT_SUBSCRIBE_NoCallback
+      //The Subscription Identifiers should not be cached for Session State. See spec pag 76:
+      //  "The Subscription Identifiers do not form part of the Client’s Session State in the Client."
+      //However, they should be cached, to be able to generate unique identifiers when required.
+      //Also, they are required to implement a look-up table when receiving messages, to return the topic filter to the user application.
+
+      //The library assumes that the user code calls CreateClientToServerSubscriptionIdentifier in OnBeforeSendingMQTT_SUBSCRIBE handler.
+    end;
+    {$ENDIF}
 
   MQTT_FreeControlPacket(TempDestPacket);
 end;
@@ -1661,16 +1673,22 @@ begin
   MQTT_InitSubscribeProperties(TempSubscribeProperties);
 
   Err := CMQTT_Success;
-  DoOnBeforeSending_MQTT_SUBSCRIBE(ClientInstance, TempSubscribeFields, TempSubscribeProperties, Err, ACallbackID);
+  Result := DoOnBeforeSending_MQTT_SUBSCRIBE(ClientInstance, TempSubscribeFields, TempSubscribeProperties, Err, ACallbackID);
 
-  //ToDo: Cache topic filters ///////////////////////////////////////////////////////////
+  if not Result then
+  begin
+    DoOnMQTTError(ClientInstance, Err, CMQTT_SUBSCRIBE);
+    Exit;
+  end;
+
+  //ToDo: Cache topic filters ///////////////////////////////////////////////////////////  in MQTT_SUBSCRIBE_NoCallback
 
   Result := Err = CMQTT_Success;
 
   if Result then
     Result := MQTT_SUBSCRIBE_NoCallback(ClientInstance, TempSubscribeFields, TempSubscribeProperties)
   else
-    DoOnMQTTError(ClientInstance, Err, CMQTT_PUBLISH);
+    DoOnMQTTError(ClientInstance, Err, CMQTT_SUBSCRIBE);
 
   FreeDynArray(TempSubscribeFields.TopicFilters);
   MQTT_FreeSubscribeProperties(TempSubscribeProperties);
@@ -1784,6 +1802,7 @@ begin
   TempClientInstance := ClientInstance and CClientIndexMask;
   Result := ClientToServerSendQuota.Content^[TempClientInstance];
 end;
+
 
 end.
 

@@ -32,7 +32,7 @@ uses
   MQTTPubCompCtrl, MQTTSubscribeCtrl, DynArrays, Expectations,
   TestProtocolConnAckCase, ExpectationsDynArrays,
   TestProtocolPublishClientToServer, TestProtocolPublishServerToClient,
-  TestProtocolPubAckCase, MQTTTestUtils;
+  TestProtocolPubAckCase, MQTTTestUtils, TestProtocolSubscribeCase;
 
 {$R *.res}
 

@@ -131,9 +131,11 @@ begin
   {$IFDEF IsDesktop}
     OnBeforeSendingMQTT_PUBLISH^ := @HandleOnBeforeSendingMQTT_PUBLISH;
     OnBeforeMQTT_CONNECT^ := @HandleOnBeforeMQTT_CONNECT;
+    OnMQTTError^ := @HandleOnMQTTError;
   {$ELSE}
     OnBeforeSendingMQTT_PUBLISH := @HandleOnBeforeSendingMQTT_PUBLISH;
     OnBeforeMQTT_CONNECT := @HandleOnBeforeMQTT_CONNECT;
+    OnMQTTError^ := @HandleOnMQTTError;
   {$ENDIF}
 
   //InitDynArrayToEmpty(EncodedPublishBuffer);
