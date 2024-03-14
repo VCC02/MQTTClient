@@ -53,6 +53,12 @@ function Decode_ConnAck(var AReceivedPacket: TMQTTControlPacket;
                         var AConnAckProperties: TMQTTConnAckProperties): Word;
 
 
+{$IFDEF IsDesktop}
+  type
+    TMQTTConnAckPropertiesArr = array of TMQTTConnAckProperties;
+{$ENDIF}
+
+
 implementation
 
 

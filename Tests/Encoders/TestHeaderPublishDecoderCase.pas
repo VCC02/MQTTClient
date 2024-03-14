@@ -191,7 +191,7 @@ begin
   Expect(FillIn_Publish(TempPublishFields, PublishProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedPubBuffer);
 
-  Expect(Decode_PublishToCtrlPacket(EncodedPubBuffer, DecodedPubPacket, DecodedBufferLen)).ToBe(CSrvErr_MalformedPacket shl 8 or CMQTTDecoderServerErr);
+  Expect(Decode_PublishToCtrlPacket(EncodedPubBuffer, DecodedPubPacket, DecodedBufferLen)).ToBe(CMQTT_Reason_MalformedPacket shl 8 or CMQTTDecoderServerErr);
   Expect(DecodedBufferLen).ToBe(EncodedPubBuffer.Len);
 end;
 

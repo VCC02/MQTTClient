@@ -123,7 +123,7 @@ begin
   EncodeControlPacketToBuffer(DestPacket, EncodedSubscribeBuffer);
 
   Expect(Decode_SubscribeToCtrlPacket(EncodedSubscribeBuffer, DecodedSubscribePacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
-  Expect(DecodedSubscribePacket.Header.Content^[0]).ToBe(CMQTT_SUBSCRIBE);
+  Expect(DecodedSubscribePacket.Header.Content^[0]).ToBe(CMQTT_SUBSCRIBE or 2);
   Expect(DecodedBufferLen).ToBe(EncodedSubscribeBuffer.Len);
 
   Expect(DestPacket.Header.Len).ToBe(AExpectedHeaderLen);
@@ -131,7 +131,7 @@ begin
   Expect(DecodedSubscribePacket.VarHeader.Len).ToBe(DestPacket.VarHeader.Len, 'VarHeader len mismatch');
   Expect(DecodedSubscribePacket.Payload.Len).ToBe(DestPacket.Payload.Len, 'Payload len mismatch');
 
-  Expect(DecodedSubscribePacket.Header.Content^[0]).ToBe(CMQTT_SUBSCRIBE);
+  Expect(DecodedSubscribePacket.Header.Content^[0]).ToBe(CMQTT_SUBSCRIBE or 2);
   Expect(DecodedSubscribePacket.VarHeader.Content^[0]).ToBe($47);
   Expect(DecodedSubscribePacket.VarHeader.Content^[1]).ToBe($30);
 
@@ -191,7 +191,7 @@ procedure THeaderSubscribeDecoderCase.Test_FillIn_Subscribe_Decoder_BadVarInt;
 begin
   Expect(SetDynLength(EncodedSubscribeBuffer, 5)).ToBe(True);
 
-  EncodedSubscribeBuffer.Content^[0] := CMQTT_SUBSCRIBE;
+  EncodedSubscribeBuffer.Content^[0] := CMQTT_SUBSCRIBE or 2;
   FillChar(EncodedSubscribeBuffer.Content^[1], 4, $FF);
 
   Expect(Decode_SubscribeToCtrlPacket(EncodedSubscribeBuffer, DecodedSubscribePacket, DecodedBufferLen)).ToBe(CMQTTDecoderBadVarInt);

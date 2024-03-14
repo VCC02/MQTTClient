@@ -40,7 +40,7 @@ uses
   DynArrays, MQTTUtils,
   MQTTConnectCtrl, MQTTConnAckCtrl,
   MQTTPublishCtrl, MQTTCommonCodecCtrl, MQTTPubAckCtrl, MQTTPubRecCtrl, MQTTPubRelCtrl, MQTTPubCompCtrl,
-  MQTTSubscribeCtrl
+  MQTTSubscribeCtrl, MQTTSubAckCtrl
 
   {$IFDEF IsDesktop}
     , SysUtils
@@ -132,6 +132,12 @@ type
                                             ACallbackID: Word): Boolean;
   POnBeforeSendingMQTT_SUBSCRIBE = ^TOnBeforeSendingMQTT_SUBSCRIBE;
 
+  //Called when receiving a SubAck packet from server.
+  TOnAfterReceivingMQTT_SUBACK = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
+                                           var ASubAckFields: TMQTTSubAckFields;
+                                           var ASubAckProperties: TMQTTSubAckProperties);
+  POnAfterReceivingMQTT_SUBACK = ^TOnAfterReceivingMQTT_SUBACK;
+
 
 procedure MQTT_Init; //Initializes library vars   (call this before any other library function)
 procedure MQTT_Done; //Frees library vars  (after this call, none of the library functions should be called)
@@ -206,6 +212,7 @@ var
   OnBeforeSendingMQTT_PUBREL: POnBeforeSendingMQTT_PUBREL;
   OnBeforeSendingMQTT_PUBCOMP: POnBeforeSendingMQTT_PUBCOMP;
   OnBeforeSendingMQTT_SUBSCRIBE: POnBeforeSendingMQTT_SUBSCRIBE;
+  OnAfterReceivingMQTT_SUBACK: POnAfterReceivingMQTT_SUBACK;
 
 const
   CMQTT_Success = 0;     //the following error codes are 300+, to have a different range, compared to standard MQTT error codes
@@ -221,6 +228,8 @@ const
   CMQTT_ReceiveMaximumReset = 310;    //The user code gets this error when too many SubAck (and PubRec) packets are received without being published. This may point to a retransmission case.
   CMQTT_OutOfMemory = 300 + CMQTTDecoderOutOfMemory; //11
   CMQTT_NoMoreSubscriptionIdentifiersAvailable = 312; //Likely a bad state or a memory leak would lead to this error. Usually, the library should not end up here.
+  CMQTT_CannotReserveBadSubscriptionIdentifier = 313; //The library cannot preallocate the value 0 (which is a current limitation of DynArrays lib).
+  CMQTT_CannotReserveBadPacketIdentifier = 314; //see 313
 
 implementation
 
@@ -321,6 +330,7 @@ begin
     New(OnBeforeSendingMQTT_PUBREL);
     New(OnBeforeSendingMQTT_PUBCOMP);
     New(OnBeforeSendingMQTT_SUBSCRIBE);
+    New(OnAfterReceivingMQTT_SUBACK);
 
     OnMQTTAfterCreateClient^ := nil;
     OnMQTTBeforeDestroyClient^ := nil;
@@ -336,6 +346,7 @@ begin
     OnBeforeSendingMQTT_PUBREL^ := nil;
     OnBeforeSendingMQTT_PUBCOMP^ := nil;
     OnBeforeSendingMQTT_SUBSCRIBE^ := nil;
+    OnAfterReceivingMQTT_SUBACK^ := nil;
   {$ELSE}
     OnMQTTAfterCreateClient := nil;
     OnMQTTBeforeDestroyClient := nil;
@@ -351,6 +362,7 @@ begin
     OnBeforeSendingMQTT_PUBREL := nil;
     OnBeforeSendingMQTT_PUBCOMP := nil;
     OnBeforeSendingMQTT_SUBSCRIBE := nil;
+    OnAfterReceivingMQTT_SUBACK := nil;
   {$ENDIF}
 end;
 
@@ -372,6 +384,7 @@ begin
     Dispose(OnBeforeSendingMQTT_PUBREL);
     Dispose(OnBeforeSendingMQTT_PUBCOMP);
     Dispose(OnBeforeSendingMQTT_SUBSCRIBE);
+    Dispose(OnAfterReceivingMQTT_SUBACK);
   {$ENDIF}
 
   OnMQTTAfterCreateClient := nil;
@@ -388,6 +401,7 @@ begin
   OnBeforeSendingMQTT_PUBREL := nil;
   OnBeforeSendingMQTT_PUBCOMP := nil;
   OnBeforeSendingMQTT_SUBSCRIBE := nil;
+  OnAfterReceivingMQTT_SUBACK := nil;
 end;
 
 
@@ -592,6 +606,22 @@ begin
 end;
 
 
+procedure DoOnAfterReceivingMQTT_SUBACK(ClientInstance: DWord; var ATempSubAckFields: TMQTTSubAckFields; var ATempSubAckProperties: TMQTTSubAckProperties; var AErr: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnAfterReceivingMQTT_SUBACK) or not Assigned(OnAfterReceivingMQTT_SUBACK^) then
+  {$ELSE}
+    if OnAfterReceivingMQTT_SUBACK = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnAfterReceivingMQTT_SUBACK^(ClientInstance, ATempSubAckFields, ATempSubAckProperties);
+end;
+
+
 /////////////////////////////////
 
 
@@ -766,6 +796,12 @@ begin
     Result := Result and SetDynOfWordLength(ClientToServerReceiveMaximum, ClientToServerSendQuota.Len + 1);
     Result := Result and SetDynOfDynOfByteLength(MaximumQoS, MaximumQoS.Len + 1);
     Result := Result and SetDynOfDynOfWordLength(ClientToServerSubscriptionIdentifier, ClientToServerSubscriptionIdentifier.Len + 1);
+
+    if CreateClientToServerPacketIdentifier(ClientToServerPacketIdentifiers.Len - 1) <> 0 then
+      DoOnMQTTError(ClientToServerSubscriptionIdentifier.Len - 1, CMQTT_CannotReserveBadPacketIdentifier, 0); //preallocate 0,
+
+    if CreateClientToServerSubscriptionIdentifier(ClientToServerSubscriptionIdentifier.Len - 1) <> 0 then  //preallocate 0, since this not a valid identifier
+      DoOnMQTTError(ClientToServerSubscriptionIdentifier.Len - 1, CMQTT_CannotReserveBadSubscriptionIdentifier, 0);
 
     {$IFDEF IsDesktop}
       if Assigned(OnMQTTAfterCreateClient) and Assigned(OnMQTTAfterCreateClient^) then
@@ -1396,8 +1432,50 @@ end;
 
 
 function Process_SUBACK(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
+var
+  TempReceivedPacket: TMQTTControlPacket;
+  PacketIdentifierIdx: TDynArrayLengthSig;
+  TempClientInstance: DWord;
+  Err: Word;
+
+  TempSubAckFields: TMQTTSubAckFields;
+  TempSubAckProperties: TMQTTSubAckProperties;
 begin
-  Result := CMQTT_Success;
+  Err := 0;
+  MQTT_InitControlPacket(TempReceivedPacket);
+  TempClientInstance := ClientInstance and CClientIndexMask;
+
+  Result := Decode_SubAckToCtrlPacket(ABuffer, TempReceivedPacket, ASizeToFree);
+  if Result = CMQTTDecoderNoErr then
+  begin
+    MQTT_InitCommonProperties(TempSubAckProperties);
+    InitDynArrayToEmpty(TempSubAckFields.SrcPayload);
+    Result := Decode_SubAck(TempReceivedPacket, TempSubAckFields, TempSubAckProperties);
+
+    DoOnAfterReceivingMQTT_SUBACK(ClientInstance, TempSubAckFields, TempSubAckProperties, Err);
+
+    MQTT_FreeControlPacket(TempReceivedPacket);
+
+    //if TempCommonFields.ReasonCode >= 128 then  //expecting CMQTT_Reason_PacketIdentifierNotFound
+    //  DoOnMQTTError(TempClientInstance, CMQTT_ProtocolError or TempCommonFields.ReasonCode shl 8, APacketType);   //not sure what to do here. Disconnect?
+    //
+    //PacketIdentifierIdx := IndexOfWordInArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, TempCommonFields.PacketIdentifier);
+    ////No sure what happens if the server sends a wrong Packet Identifier.
+    //
+    //if PacketIdentifierIdx = -1 then
+    //  DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServer, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
+    //else
+    //begin
+    //  if not IncrementSendQuota(ClientInstance) then
+    //    DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, APacketType);   //too many acknowledgements
+    //
+    //  RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx);
+    //end;
+
+    FreeDynArray(TempSubAckFields.SrcPayload);
+    MQTT_FreeCommonProperties(TempSubAckProperties);
+
+  end;
 end;
 
 
@@ -1576,7 +1654,7 @@ begin
     end;
   end
   else
-    NewPacketIdentifier := 0; //just set a default, but do not add it to the array of identifiers
+    NewPacketIdentifier := 1; //just set a default, but do not add it to the array of identifiers
 
   InitDynArrayToEmpty(TempPublishFields.ApplicationMessage);
   InitDynArrayToEmpty(TempPublishFields.TopicName);
@@ -1649,10 +1727,12 @@ var
 begin
   Result := True;
 
+  //MQTT_SUBSCRIBE uses both packet identifier and subscription identifier. Do not mix those two!!!
+
   // SubscriptionIdentifier can be a DWord, while a PacketIdentifier is a word only.
 
   //From spec: "A Packet Identifier cannot be used by more than one command at any time." - pag 24.
-  //This means that CreateClientToServerPacketIdentifier should be used to allocate a new identifier.
+  //This means that CreateClientToServerPacketIdentifier should be used to allocate a new Packet identifier.
 
   //if AQoS > 0 then
   begin
@@ -1693,6 +1773,7 @@ begin
   FreeDynArray(TempSubscribeFields.TopicFilters);
   MQTT_FreeSubscribeProperties(TempSubscribeProperties);
 end;
+
 
 
 {$IFnDEF SingleOutputBuffer}

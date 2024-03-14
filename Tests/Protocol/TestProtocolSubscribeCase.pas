@@ -139,7 +139,7 @@ begin
   Expect(ErrorOnPacketType).ToBe(CMQTT_UNDEFINED);
 
   Expect(Decode_SubscribeToCtrlPacket(BufferPointer^, DecodedSubscribePacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
-  Expect(DecodedSubscribePacket.Header.Content^[0]).ToBe(CMQTT_SUBSCRIBE);
+  Expect(DecodedSubscribePacket.Header.Content^[0]).ToBe(CMQTT_SUBSCRIBE or 2);
   Expect(DecodedBufferLen).ToBe(BufferPointer^.Len);
 end;
 

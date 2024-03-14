@@ -150,7 +150,7 @@ begin
 
   if not SetDynLength(ADestPacket.Header, 1) then
     Exit;
-  ADestPacket.Header.Content^[0] := CMQTT_SUBSCRIBE;
+  ADestPacket.Header.Content^[0] := CMQTT_SUBSCRIBE or 2;
 
   if not AddVarIntAsDWordToPropertiesWithoutIdentifier(ADestPacket.Header, ADestPacket.VarHeader.Len + ADestPacket.Payload.Len) then
     Exit;

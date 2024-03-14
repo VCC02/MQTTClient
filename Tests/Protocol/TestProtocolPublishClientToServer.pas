@@ -255,11 +255,11 @@ begin
   FreeDynArray(DecodedPublishFields.ApplicationMessage);
   FreeDynArray(DecodedPublishFields.TopicName);
 
-  Expect(GetClientToServerPacketIdentifiersCount(0)).ToBe(Ord(NewQoS > 0));
+  Expect(GetClientToServerPacketIdentifiersCount(0)).ToBe(Ord(NewQoS > 0) + 1); //+1 because of preallocated PacketIdentifiers
 
   if NewQoS > 0 then
   begin
-    Expect(AllocatedPacketIdentifier).ToBe(0);
+    Expect(AllocatedPacketIdentifier).ToBe(1, 'AllocatedPacketIdentifier');
     Expect(ClientToServerPacketIdentifierIsUsed(0, DecodedPublishFields.PacketIdentifier)).ToBe(True, 'PacketIdentifier is used on QoS>0 only.');  // for QoS > 0 only!!!
   end;
 end;
