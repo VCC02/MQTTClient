@@ -44,7 +44,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
     EditLabel.ParentFont = False
     ParentFont = False
     TabOrder = 2
-    Text = '192.168.15.1'
+    Text = '127.0.0.1'
   end
   object lbePort: TLabeledEdit
     Left = 99
@@ -134,13 +134,13 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
       TabOrder = 2
       OnClick = btnPublishClick
     end
-    object chkAddRnd: TCheckBox
+    object chkAddInc: TCheckBox
       Left = 128
       Height = 19
-      Hint = 'Appends a random number to the message.'
+      Hint = 'Appends an incremented number to the message.'
       Top = 68
-      Width = 64
-      Caption = 'Add Rnd'
+      Width = 59
+      Caption = 'Add Inc'
       Checked = True
       ParentShowHint = False
       ShowHint = True

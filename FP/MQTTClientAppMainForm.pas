@@ -47,7 +47,7 @@ type
     btnSetToLocalhost: TButton;
     btnPublish: TButton;
     btnSubscribeTo: TButton;
-    chkAddRnd: TCheckBox;
+    chkAddInc: TCheckBox;
     cmbQoS: TComboBox;
     grpSubscription: TGroupBox;
     grpPublish: TGroupBox;
@@ -304,8 +304,15 @@ begin
   Result := True;
   Msg := frmMQTTClientAppMain.lbeAppMsgToPublish.Text;
 
-  if frmMQTTClientAppMain.chkAddRnd.Checked then
-    Msg := Msg + IntToStr(Random(10));
+  if frmMQTTClientAppMain.chkAddInc.Checked then
+  begin
+    if frmMQTTClientAppMain.chkAddInc.Tag = 10 then
+      frmMQTTClientAppMain.chkAddInc.Tag := 0
+    else
+      frmMQTTClientAppMain.chkAddInc.Tag := frmMQTTClientAppMain.chkAddInc.Tag + 1;
+
+    Msg := Msg + IntToStr(frmMQTTClientAppMain.chkAddInc.Tag);
+  end;
 
   QoS := (APublishFields.PublishCtrlFlags shr 1) and 3;
   frmMQTTClientAppMain.AddToLog('Publishing "' + Msg + '" at QoS = ' + IntToStr(QoS));
@@ -337,6 +344,8 @@ end;
 
 procedure HandleOnAfterReceivingMQTT_PUBACK(ClientInstance: DWord; var APubAckFields: TMQTTPubAckFields; var APubAckProperties: TMQTTPubAckProperties);
 begin
+  frmMQTTClientAppMain.btnPublish.Enabled := True;
+
   frmMQTTClientAppMain.AddToLog('Received PUBACK');
   frmMQTTClientAppMain.AddToLog('APubAckFields.EnabledProperties: ' + IntToStr(APubAckFields.EnabledProperties));
   frmMQTTClientAppMain.AddToLog('APubAckFields.IncludeReasonCode: ' + IntToStr(APubAckFields.IncludeReasonCode));
@@ -373,20 +382,46 @@ end;
 
 procedure HandleOnBeforeSending_MQTT_PUBREC(ClientInstance: DWord; var ATempPubRecFields: TMQTTPubRecFields; var ATempPubRecProperties: TMQTTPubRecProperties);
 begin
-  frmMQTTClientAppMain.AddToLog('Sending PUBREC for PacketID: ' + IntToStr(ATempPubRecFields.PacketIdentifier));
+  frmMQTTClientAppMain.AddToLog('Acknowledging with PUBREC for PacketID: ' + IntToStr(ATempPubRecFields.PacketIdentifier));
+end;
+
+
+procedure HandleOnAfterReceiving_MQTT_PUBREC(ClientInstance: DWord; var ATempPubRecFields: TMQTTPubRecFields; var ATempPubRecProperties: TMQTTPubRecProperties);
+begin
+  frmMQTTClientAppMain.AddToLog('Received PUBREC for PacketID: ' + IntToStr(ATempPubRecFields.PacketIdentifier));
 end;
 
 
 //Sending PUBREL after the PUBREC response from server, after the client has sent a PUBLISH packet with QoS=2.
 procedure HandleOnBeforeSending_MQTT_PUBREL(ClientInstance: DWord; var ATempPubRelFields: TMQTTPubRelFields; var ATempPubRelProperties: TMQTTPubRelProperties);
 begin
-  frmMQTTClientAppMain.AddToLog('Sending PUBREC for PacketID: ' + IntToStr(ATempPubRelFields.PacketIdentifier));
+  frmMQTTClientAppMain.AddToLog('Acknowledging with PUBREL for PacketID: ' + IntToStr(ATempPubRelFields.PacketIdentifier));
+end;
+
+
+procedure HandleOnAfterReceiving_MQTT_PUBREL(ClientInstance: DWord; var ATempPubRelFields: TMQTTPubRelFields; var ATempPubRelProperties: TMQTTPubRelProperties);
+begin
+  frmMQTTClientAppMain.AddToLog('Received PUBREL for PacketID: ' + IntToStr(ATempPubRelFields.PacketIdentifier));
+end;
+
+
+procedure HandleOnSend_MQTT_PUBREL(ClientInstance: DWord);
+begin
+  frmMQTTClientAppMain.AddToLog('Sending PUBREL packet...');
+  frmMQTTClientAppMain.SendPacketToServer(ClientInstance);
 end;
 
 
 procedure HandleOnBeforeSending_MQTT_PUBCOMP(ClientInstance: DWord; var ATempPubCompFields: TMQTTPubCompFields; var ATempPubCompProperties: TMQTTPubCompProperties);
 begin
-  frmMQTTClientAppMain.AddToLog('Sending PUBCOMP for PacketID: ' + IntToStr(ATempPubCompFields.PacketIdentifier));
+  frmMQTTClientAppMain.AddToLog('Acknowledging with PUBCOMP for PacketID: ' + IntToStr(ATempPubCompFields.PacketIdentifier));
+end;
+
+
+procedure HandleOnAfterReceiving_MQTT_PUBCOMP(ClientInstance: DWord; var ATempPubCompFields: TMQTTPubCompFields; var ATempPubCompProperties: TMQTTPubCompProperties);
+begin
+  frmMQTTClientAppMain.btnPublish.Enabled := True;
+  frmMQTTClientAppMain.AddToLog('Received PUBCOMP for PacketID: ' + IntToStr(ATempPubCompFields.PacketIdentifier));
 end;
 
 
@@ -450,8 +485,12 @@ begin
     OnAfterReceivingMQTT_PUBACK^ := @HandleOnAfterReceivingMQTT_PUBACK;
     OnAfterReceivingMQTT_PUBLISH^ := @HandleOnAfterReceivingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBREC^ := @HandleOnBeforeSending_MQTT_PUBREC;
+    OnAfterReceivingMQTT_PUBREC^ := @HandleOnAfterReceiving_MQTT_PUBREC;
     OnBeforeSendingMQTT_PUBREL^ := @HandleOnBeforeSending_MQTT_PUBREL;
+    OnAfterReceivingMQTT_PUBREL^ := @HandleOnAfterReceiving_MQTT_PUBREL;
+    OnSendMQTT_PUBREL^ := @HandleOnSend_MQTT_PUBREL;
     OnBeforeSendingMQTT_PUBCOMP^ := @HandleOnBeforeSending_MQTT_PUBCOMP;
+    OnAfterReceivingMQTT_PUBCOMP^ := @HandleOnAfterReceiving_MQTT_PUBCOMP;
     OnBeforeSendingMQTT_SUBSCRIBE^ := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
     OnAfterReceivingMQTT_SUBACK^ := @HandleOnAfterReceivingMQTT_SUBACK;
   {$ELSE}
@@ -463,8 +502,11 @@ begin
     OnAfterReceivingMQTT_PUBACK := @HandleOnAfterReceivingMQTT_PUBACK;
     OnAfterReceivingMQTT_PUBLISH := @HandleOnAfterReceivingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBREC := @HandleOnBeforeSending_MQTT_PUBREC;
+    OnAfterReceivingMQTT_PUBREC := @HandleOnAfterReceiving_MQTT_PUBREC;
     OnBeforeSendingMQTT_PUBREL := @HandleOnBeforeSending_MQTT_PUBREL;
+    OnAfterReceivingMQTT_PUBREL := @HandleOnAfterReceiving_MQTT_PUBREL;
     OnBeforeSendingMQTT_PUBCOMP := @HandleOnBeforeSending_MQTT_PUBCOMP;
+    OnAfterReceivingMQTT_PUBCOMP := @HandleOnAfterReceiving_MQTT_PUBCOMP;
     OnBeforeSendingMQTT_SUBSCRIBE := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
     OnAfterReceivingMQTT_SUBACK := @HandleOnAfterReceivingMQTT_SUBACK;
   {$ENDIF}
@@ -596,6 +638,7 @@ end;
 
 procedure TfrmMQTTClientAppMain.btnPublishClick(Sender: TObject);
 begin
+  btnPublish.Enabled := False;
   if not MQTT_PUBLISH(0, 0, cmbQoS.ItemIndex) then
   begin
     AddToLog('Can''t prepare MQTT_PUBLISH packet.');

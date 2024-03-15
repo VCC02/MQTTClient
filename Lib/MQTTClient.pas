@@ -121,16 +121,39 @@ type
   POnBeforeSendingMQTT_PUBREC = ^TOnBeforeSendingMQTT_PUBREC;
 
 
+  TOnAfterReceivingMQTT_PUBREC = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
+                                           var APubRecFields: TMQTTPubRecFields;
+                                           var APubRecProperties: TMQTTPubRecProperties);
+  POnAfterReceivingMQTT_PUBREC = ^TOnAfterReceivingMQTT_PUBREC;
+
+
   TOnBeforeSendingMQTT_PUBREL = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
                                           var APubRelFields: TMQTTPubRelFields;
                                           var APubRelProperties: TMQTTPubRelProperties);
   POnBeforeSendingMQTT_PUBREL = ^TOnBeforeSendingMQTT_PUBREL;
 
 
+  TOnOnSend_MQTT_PUBREL = procedure(ClientInstance: DWord);  //The lower word identifies the client instance
+  POnOnSend_MQTT_PUBREL = ^TOnOnSend_MQTT_PUBREL;
+
+
+  TOnAfterReceivingMQTT_PUBREL = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
+                                           var APubRelFields: TMQTTPubRelFields;
+                                           var APubRelProperties: TMQTTPubRelProperties);
+  POnAfterReceivingMQTT_PUBREL = ^TOnAfterReceivingMQTT_PUBREL;
+
+
   TOnBeforeSendingMQTT_PUBCOMP = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
                                            var APubCompFields: TMQTTPubCompFields;
                                            var APubCompProperties: TMQTTPubCompProperties);
   POnBeforeSendingMQTT_PUBCOMP = ^TOnBeforeSendingMQTT_PUBCOMP;
+
+
+  TOnAfterReceivingMQTT_PUBCOMP = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
+                                            var APubCompFields: TMQTTPubCompFields;
+                                            var APubCompProperties: TMQTTPubCompProperties);
+  POnAfterReceivingMQTT_PUBCOMP = ^TOnAfterReceivingMQTT_PUBCOMP;
+
 
   TOnBeforeSendingMQTT_SUBSCRIBE = function(ClientInstance: DWord;  //The lower word identifies the client instance
                                             var ASubscribeFields: TMQTTSubscribeFields;
@@ -211,32 +234,42 @@ var
 
   OnBeforeMQTT_CONNECT: POnBeforeMQTT_CONNECT;
   OnAfterMQTT_CONNACK: POnAfterMQTT_CONNACK;
+
   OnBeforeSendingMQTT_PUBLISH: POnBeforeSendingMQTT_PUBLISH;
   OnAfterReceivingMQTT_PUBLISH: POnAfterReceivingMQTT_PUBLISH;
+
   OnBeforeSendingMQTT_PUBACK: POnBeforeSendingMQTT_PUBACK;
   OnAfterReceivingMQTT_PUBACK: POnAfterReceivingMQTT_PUBACK;
+
   OnBeforeSendingMQTT_PUBREC: POnBeforeSendingMQTT_PUBREC;
+  OnAfterReceivingMQTT_PUBREC: POnAfterReceivingMQTT_PUBREC;
+
   OnBeforeSendingMQTT_PUBREL: POnBeforeSendingMQTT_PUBREL;
+  OnAfterReceivingMQTT_PUBREL: POnBeforeSendingMQTT_PUBREL;
+  OnSendMQTT_PUBREL: POnOnSend_MQTT_PUBREL;
+
   OnBeforeSendingMQTT_PUBCOMP: POnBeforeSendingMQTT_PUBCOMP;
+  OnAfterReceivingMQTT_PUBCOMP: POnAfterReceivingMQTT_PUBCOMP;
+
   OnBeforeSendingMQTT_SUBSCRIBE: POnBeforeSendingMQTT_SUBSCRIBE;
   OnAfterReceivingMQTT_SUBACK: POnAfterReceivingMQTT_SUBACK;
 
 const
   CMQTT_Success = 0;     //the following error codes are 300+, to have a different range, compared to standard MQTT error codes
-  CMQTT_BadClientIndex = 301;       //ClientInstance parameter, from main functions, is out of bounds
-  CMQTT_UnhandledPacketType = 302;  //The client received a packet that is not supposed to receive (that includes packets which are normally sent from client to server)
-  CMQTT_HandlerNotAssigned = 303;   //Mostly for internal use. Some user functions may also use it.
-  CMQTT_BadQoS = 304;               //The client received a bad QoS value (i.e. 3). It should disconnect from server. Or, the user code calls Publish with a bad QoS.
-  CMQTT_ProtocolError = 305;        //The server sent this in a ReasonCode field
-  CMQTT_PacketIdentifierNotFound_ClientToServer = 306;            //The server sent an unknown Packet identifier, so the client responds with this error in a PubComp packet
-  CMQTT_PacketIdentifierNotFound_ServerToClient = 307;            //The server sent an unknown Packet identifier (in PubAck, i.e. QoS=1), so the client notifies the user about it. No further response to server is expected.
-  CMQTT_NoMorePacketIdentifiersAvailable = 308; //Likely a bad state or a memory leak would lead to this error. Usually, the library should not end up here.
-  CMQTT_ReceiveMaximumExceeded = 309; //The user code gets this error when attempting to publish more packets than acknowledged by server. The ReceiveMaximum value is set on connect.
-  CMQTT_ReceiveMaximumReset = 310;    //The user code gets this error when too many SubAck (and PubRec) packets are received without being published. This may point to a retransmission case.
-  CMQTT_OutOfMemory = 300 + CMQTTDecoderOutOfMemory; //11
-  CMQTT_NoMoreSubscriptionIdentifiersAvailable = 312; //Likely a bad state or a memory leak would lead to this error. Usually, the library should not end up here.
-  CMQTT_CannotReserveBadSubscriptionIdentifier = 313; //The library cannot preallocate the value 0 (which is a current limitation of DynArrays lib).
-  CMQTT_CannotReserveBadPacketIdentifier = 314; //see 313
+  CMQTT_BadClientIndex = 201;       //ClientInstance parameter, from main functions, is out of bounds
+  CMQTT_UnhandledPacketType = 202;  //The client received a packet that is not supposed to receive (that includes packets which are normally sent from client to server)
+  CMQTT_HandlerNotAssigned = 203;   //Mostly for internal use. Some user functions may also use it.
+  CMQTT_BadQoS = 204;               //The client received a bad QoS value (i.e. 3). It should disconnect from server. Or, the user code calls Publish with a bad QoS.
+  CMQTT_ProtocolError = 205;        //The server sent this in a ReasonCode field
+  CMQTT_PacketIdentifierNotFound_ClientToServer = 206;            //The server sent an unknown Packet identifier, so the client responds with this error in a PubComp packet
+  CMQTT_PacketIdentifierNotFound_ServerToClient = 207;            //The server sent an unknown Packet identifier (in PubAck, i.e. QoS=1), so the client notifies the user about it. No further response to server is expected.
+  CMQTT_NoMorePacketIdentifiersAvailable = 208; //Likely a bad state or a memory leak would lead to this error. Usually, the library should not end up here.
+  CMQTT_ReceiveMaximumExceeded = 209; //The user code gets this error when attempting to publish more packets than acknowledged by server. The ReceiveMaximum value is set on connect.
+  CMQTT_ReceiveMaximumReset = 210;    //The user code gets this error when too many SubAck (and PubRec) packets are received without being published. This may point to a retransmission case.
+  CMQTT_OutOfMemory = 200 + CMQTTDecoderOutOfMemory; //11
+  CMQTT_NoMoreSubscriptionIdentifiersAvailable = 212; //Likely a bad state or a memory leak would lead to this error. Usually, the library should not end up here.
+  CMQTT_CannotReserveBadSubscriptionIdentifier = 213; //The library cannot preallocate the value 0 (which is a current limitation of DynArrays lib).
+  CMQTT_CannotReserveBadPacketIdentifier = 214; //see 213
 
 implementation
 
@@ -320,6 +353,31 @@ begin
 end;
 
 
+procedure SetEventsToNil;
+begin
+  OnMQTTAfterCreateClient := nil;
+  OnMQTTBeforeDestroyClient := nil;
+
+  OnMQTTError := nil;
+  OnMQTTClientRequestsDisconnection := nil;
+  OnBeforeMQTT_CONNECT := nil;
+  OnAfterMQTT_CONNACK := nil;
+  OnBeforeSendingMQTT_PUBLISH := nil;
+  OnAfterReceivingMQTT_PUBLISH := nil;
+  OnBeforeSendingMQTT_PUBACK := nil;
+  OnAfterReceivingMQTT_PUBACK := nil;
+  OnBeforeSendingMQTT_PUBREC := nil;
+  OnAfterReceivingMQTT_PUBREC := nil;
+  OnBeforeSendingMQTT_PUBREL := nil;
+  OnAfterReceivingMQTT_PUBREL := nil;
+  OnSendMQTT_PUBREL := nil;
+  OnBeforeSendingMQTT_PUBCOMP := nil;
+  OnAfterReceivingMQTT_PUBCOMP := nil;
+  OnBeforeSendingMQTT_SUBSCRIBE := nil;
+  OnAfterReceivingMQTT_SUBACK := nil;
+end;
+
+
 procedure InitEvents;
 begin
   {$IFDEF IsDesktop}
@@ -335,8 +393,12 @@ begin
     New(OnBeforeSendingMQTT_PUBACK);
     New(OnAfterReceivingMQTT_PUBACK);
     New(OnBeforeSendingMQTT_PUBREC);
+    New(OnAfterReceivingMQTT_PUBREC);
     New(OnBeforeSendingMQTT_PUBREL);
+    New(OnAfterReceivingMQTT_PUBREL);
+    New(OnSendMQTT_PUBREL);
     New(OnBeforeSendingMQTT_PUBCOMP);
+    New(OnAfterReceivingMQTT_PUBCOMP);
     New(OnBeforeSendingMQTT_SUBSCRIBE);
     New(OnAfterReceivingMQTT_SUBACK);
 
@@ -352,27 +414,16 @@ begin
     OnBeforeSendingMQTT_PUBACK^ := nil;
     OnAfterReceivingMQTT_PUBACK^ := nil;
     OnBeforeSendingMQTT_PUBREC^ := nil;
+    OnAfterReceivingMQTT_PUBREC^ := nil;
     OnBeforeSendingMQTT_PUBREL^ := nil;
+    OnAfterReceivingMQTT_PUBREL^ := nil;
+    OnSendMQTT_PUBREL^ := nil;
     OnBeforeSendingMQTT_PUBCOMP^ := nil;
+    OnAfterReceivingMQTT_PUBCOMP^ := nil;
     OnBeforeSendingMQTT_SUBSCRIBE^ := nil;
     OnAfterReceivingMQTT_SUBACK^ := nil;
   {$ELSE}
-    OnMQTTAfterCreateClient := nil;
-    OnMQTTBeforeDestroyClient := nil;
-
-    OnMQTTError := nil;
-    OnMQTTClientRequestsDisconnection := nil;
-    OnBeforeMQTT_CONNECT := nil;
-    OnAfterMQTT_CONNACK := nil;
-    OnBeforeSendingMQTT_PUBLISH := nil;
-    OnAfterReceivingMQTT_PUBLISH := nil;
-    OnBeforeSendingMQTT_PUBACK := nil;
-    OnAfterReceivingMQTT_PUBACK := nil;
-    OnBeforeSendingMQTT_PUBREC := nil;
-    OnBeforeSendingMQTT_PUBREL := nil;
-    OnBeforeSendingMQTT_PUBCOMP := nil;
-    OnBeforeSendingMQTT_SUBSCRIBE := nil;
-    OnAfterReceivingMQTT_SUBACK := nil;
+    SetEventsToNil;
   {$ENDIF}
 end;
 
@@ -392,28 +443,17 @@ begin
     Dispose(OnBeforeSendingMQTT_PUBACK);
     Dispose(OnAfterReceivingMQTT_PUBACK);
     Dispose(OnBeforeSendingMQTT_PUBREC);
+    Dispose(OnAfterReceivingMQTT_PUBREC);
     Dispose(OnBeforeSendingMQTT_PUBREL);
+    Dispose(OnAfterReceivingMQTT_PUBREL);
+    Dispose(OnSendMQTT_PUBREL);
     Dispose(OnBeforeSendingMQTT_PUBCOMP);
+    Dispose(OnAfterReceivingMQTT_PUBCOMP);
     Dispose(OnBeforeSendingMQTT_SUBSCRIBE);
     Dispose(OnAfterReceivingMQTT_SUBACK);
   {$ENDIF}
 
-  OnMQTTAfterCreateClient := nil;
-  OnMQTTBeforeDestroyClient := nil;
-
-  OnMQTTError := nil;
-  OnMQTTClientRequestsDisconnection := nil;
-  OnBeforeMQTT_CONNECT := nil;
-  OnAfterMQTT_CONNACK := nil;
-  OnBeforeSendingMQTT_PUBLISH := nil;
-  OnAfterReceivingMQTT_PUBLISH := nil;
-  OnBeforeSendingMQTT_PUBACK := nil;
-  OnAfterReceivingMQTT_PUBACK := nil;
-  OnBeforeSendingMQTT_PUBREC := nil;
-  OnBeforeSendingMQTT_PUBREL := nil;
-  OnBeforeSendingMQTT_PUBCOMP := nil;
-  OnBeforeSendingMQTT_SUBSCRIBE := nil;
-  OnAfterReceivingMQTT_SUBACK := nil;
+  SetEventsToNil;
 end;
 
 
@@ -586,6 +626,22 @@ begin
 end;
 
 
+procedure DoOnAfterReceiving_MQTT_PUBREC(ClientInstance: DWord; var ATempPubRecFields: TMQTTPubRecFields; var ATempPubRecProperties: TMQTTPubRecProperties; var AErr: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnAfterReceivingMQTT_PUBREC) or not Assigned(OnAfterReceivingMQTT_PUBREC^) then
+  {$ELSE}
+    if OnAfterReceivingMQTT_PUBREC = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnAfterReceivingMQTT_PUBREC^(ClientInstance, ATempPubRecFields, ATempPubRecProperties);
+end;
+
+
 procedure DoOnBeforeSending_MQTT_PUBREL(ClientInstance: DWord; var ATempPubRelFields: TMQTTPubRelFields; var ATempPubRelProperties: TMQTTPubRelProperties; var AErr: Word);
 begin
   {$IFDEF IsDesktop}
@@ -602,6 +658,39 @@ begin
 end;
 
 
+procedure DoOnAfterReceiving_MQTT_PUBREL(ClientInstance: DWord; var ATempPubRelFields: TMQTTPubRelFields; var ATempPubRelProperties: TMQTTPubRelProperties; var AErr: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnAfterReceivingMQTT_PUBREL) or not Assigned(OnAfterReceivingMQTT_PUBREL^) then
+  {$ELSE}
+    if OnAfterReceivingMQTT_PUBREL = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnAfterReceivingMQTT_PUBREL^(ClientInstance, ATempPubRelFields, ATempPubRelProperties);
+end;
+
+
+//Required, to tell user code to send the PUBREL, which is currently in bufer.
+procedure DoOnSend_MQTT_PUBREL(ClientInstance: DWord; var AErr: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnSendMQTT_PUBREL) or not Assigned(OnSendMQTT_PUBREL^) then
+  {$ELSE}
+    if OnSend_MQTT_PUBREL = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnSendMQTT_PUBREL^(ClientInstance);
+end;
+
+
 procedure DoOnBeforeSending_MQTT_PUBCOMP(ClientInstance: DWord; var ATempPubCompFields: TMQTTPubCompFields; var ATempPubCompProperties: TMQTTPubCompProperties; var AErr: Word);
 begin
   {$IFDEF IsDesktop}
@@ -615,6 +704,22 @@ begin
     end;
 
   OnBeforeSendingMQTT_PUBCOMP^(ClientInstance, ATempPubCompFields, ATempPubCompProperties);
+end;
+
+
+procedure DoOnAfterReceiving_MQTT_PUBCOMP(ClientInstance: DWord; var ATempPubCompFields: TMQTTPubCompFields; var ATempPubCompProperties: TMQTTPubCompProperties; var AErr: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnAfterReceivingMQTT_PUBCOMP) or not Assigned(OnAfterReceivingMQTT_PUBCOMP^) then
+  {$ELSE}
+    if OnAfterReceivingMQTT_PUBCOMP = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnAfterReceivingMQTT_PUBCOMP^(ClientInstance, ATempPubCompFields, ATempPubCompProperties);
 end;
 
 
@@ -1303,7 +1408,7 @@ begin
     PacketIdentifierIdx := IndexOfWordInArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, TempCommonFields.PacketIdentifier);
     //No sure what happens if the server sends a wrong Packet Identifier.
 
-    if PacketIdentifierIdx = -1 then
+    if PacketIdentifierIdx = -1 then    //$CE = 206    (maybe the PacketIdentifier got removed by Process_PUBREC
       DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServer, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
     else
     begin
@@ -1313,7 +1418,10 @@ begin
       begin
         Err := CMQTT_Success;
         if APacketType = CMQTT_PUBACK then
-          DoOnAfterReceiving_MQTT_PUBACK(ClientInstance, TempCommonFields, TempCommonProperties, Err); //If Err is not used to Result, then no handler is mandatory.
+          DoOnAfterReceiving_MQTT_PUBACK(ClientInstance, TempCommonFields, TempCommonProperties, Err) //If Err is not used to set Result, then no handler is mandatory.
+        else
+          if APacketType = CMQTT_PUBCOMP then
+            DoOnAfterReceiving_MQTT_PUBCOMP(ClientInstance, TempCommonFields, TempCommonProperties, Err); //Not mandatory
       end;
 
       RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx);
@@ -1343,6 +1451,7 @@ var
   TempPubRecProperties: TMQTTPubRecProperties;
   RespPubFields: TMQTTCommonFields;
   RespPubProperties: TMQTTCommonProperties;
+  Err: Word;
 begin
   MQTT_InitControlPacket(TempReceivedPacket);
   TempClientInstance := ClientInstance and CClientIndexMask;
@@ -1362,6 +1471,9 @@ begin
     PacketIdentifierIdx := IndexOfWordInArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, TempPubRecFields.PacketIdentifier);
     //If the server sends a wrong Packet Identifier, respond with some error code.////////////////////////////////////
 
+    Err := CMQTT_Success;
+    DoOnAfterReceiving_MQTT_PUBREC(ClientInstance, TempPubRecFields, TempPubRecProperties, Err); //Not mandatory
+
     // respond with PUBREL to server
     InitRespPubFieldsAndProperties(RespPubFields, RespPubProperties, TempPubRecFields.PacketIdentifier);
 
@@ -1375,7 +1487,7 @@ begin
     DoOnBeforeSending_MQTT_PUBREL(ClientInstance, RespPubFields, RespPubProperties, Result);
 
     if Result = CMQTT_Success then
-      if MQTT_PUBResponse_NoCallback(ClientInstance, CMQTT_PUBREL, RespPubFields, RespPubProperties) then
+      if MQTT_PUBResponse_NoCallback(ClientInstance, CMQTT_PUBREL or 2, RespPubFields, RespPubProperties) then
       begin
         MQTT_FreeCommonProperties(RespPubProperties);
         // The PacketIdentifier is removed here, not in MQTT_PUBResponse_NoCallback, because its index is already available here.
@@ -1385,8 +1497,12 @@ begin
             if not IncrementSendQuota(ClientInstance) then
               DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, CMQTT_PUBACK);   //too many acknowledgements
 
-          if not RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx) then
-            Result := CMQTT_OutOfMemory;
+          //The spec say that the PacketIdentifier should be removed on receiving PUBREC but it is still required in PUBCOMP
+          //if not RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx) then
+          //  Result := CMQTT_OutOfMemory;
+
+          if Result = CMQTT_Success then
+            DoOnSend_MQTT_PUBREL(ClientInstance, Err);    //mandatory
         end;
       end
       else
@@ -1410,6 +1526,7 @@ var
   TempPubRelProperties: TMQTTPubRelProperties;
   RespPubFields: TMQTTCommonFields;
   RespPubProperties: TMQTTCommonProperties;
+  Err: Word;
 begin
   MQTT_InitControlPacket(TempReceivedPacket);
   TempClientInstance := ClientInstance and CClientIndexMask;
@@ -1426,6 +1543,9 @@ begin
       DoOnMQTTError(TempClientInstance, CMQTT_ProtocolError or TempPubRelFields.ReasonCode shl 8, CMQTT_PUBREL);   //not sure what to do here. Disconnect?
 
     PacketIdentifierIdx := IndexOfWordInArrayOfWord(ServerToClientPacketIdentifiers.Content^[TempClientInstance]^, TempPubRelFields.PacketIdentifier);
+
+    Err := CMQTT_Success;
+    DoOnAfterReceiving_MQTT_PUBREL(ClientInstance, TempPubRelFields, TempPubRelProperties, Err); //Not mandatory
 
     // respond with PUBCOMP to server
     InitRespPubFieldsAndProperties(RespPubFields, RespPubProperties, TempPubRelFields.PacketIdentifier);
