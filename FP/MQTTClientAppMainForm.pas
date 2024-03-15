@@ -299,6 +299,7 @@ function HandleOnBeforeSendingMQTT_PUBLISH(ClientInstance: DWord;  //The lower w
                                            ACallbackID: Word): Boolean;
 var
   Msg: string;
+  QoS: Byte;
 begin
   Result := True;
   Msg := frmMQTTClientAppMain.lbeAppMsgToPublish.Text;
@@ -306,7 +307,8 @@ begin
   if frmMQTTClientAppMain.chkAddRnd.Checked then
     Msg := Msg + IntToStr(Random(10));
 
-  frmMQTTClientAppMain.AddToLog('Publishing ' + Msg);
+  QoS := (APublishFields.PublishCtrlFlags shr 1) and 3;
+  frmMQTTClientAppMain.AddToLog('Publishing "' + Msg + '" at QoS = ' + IntToStr(QoS));
 
   Result := Result and StringToDynArrayOfByte(Msg, APublishFields.ApplicationMessage);
   Result := Result and StringToDynArrayOfByte(frmMQTTClientAppMain.lbeTopicName.Text, APublishFields.TopicName);
@@ -319,7 +321,7 @@ end;
 //This handler is used when this client publishes a message to broker and the broker responds with PUBACK.
 procedure HandleOnBeforeSendingMQTT_PUBACK(ClientInstance: DWord; var APubAckFields: TMQTTPubAckFields; var APubAckProperties: TMQTTPubAckProperties);
 begin
-  frmMQTTClientAppMain.AddToLog('Received PUBACK');
+  frmMQTTClientAppMain.AddToLog('Acknowledging with PUBACK');
   frmMQTTClientAppMain.AddToLog('APubAckFields.EnabledProperties: ' + IntToStr(APubAckFields.EnabledProperties));
   frmMQTTClientAppMain.AddToLog('APubAckFields.IncludeReasonCode: ' + IntToStr(APubAckFields.IncludeReasonCode));
   frmMQTTClientAppMain.AddToLog('APubAckFields.PacketIdentifier: ' + IntToStr(APubAckFields.PacketIdentifier));
@@ -330,6 +332,21 @@ begin
 
   frmMQTTClientAppMain.AddToLog('');
   //This handler can be used to override what is being sent to server as a reply to PUBLISH
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_PUBACK(ClientInstance: DWord; var APubAckFields: TMQTTPubAckFields; var APubAckProperties: TMQTTPubAckProperties);
+begin
+  frmMQTTClientAppMain.AddToLog('Received PUBACK');
+  frmMQTTClientAppMain.AddToLog('APubAckFields.EnabledProperties: ' + IntToStr(APubAckFields.EnabledProperties));
+  frmMQTTClientAppMain.AddToLog('APubAckFields.IncludeReasonCode: ' + IntToStr(APubAckFields.IncludeReasonCode));
+  frmMQTTClientAppMain.AddToLog('APubAckFields.PacketIdentifier: ' + IntToStr(APubAckFields.PacketIdentifier));
+  frmMQTTClientAppMain.AddToLog('APubAckFields.ReasonCode: ' + IntToStr(APubAckFields.ReasonCode));
+
+  frmMQTTClientAppMain.AddToLog('APubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(APubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
+  frmMQTTClientAppMain.AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  frmMQTTClientAppMain.AddToLog('');
 end;
 
 
@@ -345,10 +362,10 @@ begin
   ID := APublishFields.PacketIdentifier;
   Topic := StringReplace(DynArrayOfByteToString(APublishFields.TopicName), #0, '#0', [rfReplaceAll]);
 
-  frmMQTTClientAppMain.AddToLog('Received PUBACK  PacketIdentifier: ' + IntToStr(ID) +
-                                               '  Msg: ' + Msg +
-                                               '  QoS: ' + IntToStr(QoS) +
-                                               '  TopicName: ' + Topic);
+  frmMQTTClientAppMain.AddToLog('Received PUBLISH  PacketIdentifier: ' + IntToStr(ID) +
+                                                 '  Msg: ' + Msg +
+                                                 '  QoS: ' + IntToStr(QoS) +
+                                                 '  TopicName: ' + Topic);
 
   frmMQTTClientAppMain.AddToLog('');
 end;
@@ -428,26 +445,28 @@ begin
     OnMQTTError^ := @HandleOnMQTTError;
     OnBeforeMQTT_CONNECT^ := @HandleOnBeforeMQTT_CONNECT;
     OnAfterMQTT_CONNACK^ := @HandleOnAfterMQTT_CONNACK;
-    OnBeforeSendingMQTT_SUBSCRIBE^ := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
-    OnAfterReceivingMQTT_SUBACK^ := @HandleOnAfterReceivingMQTT_SUBACK;
     OnBeforeSendingMQTT_PUBLISH^ := @HandleOnBeforeSendingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBACK^ := @HandleOnBeforeSendingMQTT_PUBACK;
+    OnAfterReceivingMQTT_PUBACK^ := @HandleOnAfterReceivingMQTT_PUBACK;
     OnAfterReceivingMQTT_PUBLISH^ := @HandleOnAfterReceivingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBREC^ := @HandleOnBeforeSending_MQTT_PUBREC;
     OnBeforeSendingMQTT_PUBREL^ := @HandleOnBeforeSending_MQTT_PUBREL;
     OnBeforeSendingMQTT_PUBCOMP^ := @HandleOnBeforeSending_MQTT_PUBCOMP;
+    OnBeforeSendingMQTT_SUBSCRIBE^ := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
+    OnAfterReceivingMQTT_SUBACK^ := @HandleOnAfterReceivingMQTT_SUBACK;
   {$ELSE}
     OnMQTTError := @HandleOnMQTTError;
     OnBeforeMQTT_CONNECT := @HandleOnBeforeMQTT_CONNECT;
     OnAfterMQTT_CONNACK := @HandleOnAfterMQTT_CONNACK;
-    OnBeforeSendingMQTT_SUBSCRIBE := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
-    OnAfterReceivingMQTT_SUBACK := @HandleOnAfterReceivingMQTT_SUBACK;
     OnBeforeSendingMQTT_PUBLISH := @HandleOnBeforeSendingMQTT_PUBLISH;
     OnBeforeSending_MQTT_PUBACK := @HandleOnBeforeSendingMQTT_PUBACK;
+    OnAfterReceivingMQTT_PUBACK := @HandleOnAfterReceivingMQTT_PUBACK;
     OnAfterReceivingMQTT_PUBLISH := @HandleOnAfterReceivingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBREC := @HandleOnBeforeSending_MQTT_PUBREC;
     OnBeforeSendingMQTT_PUBREL := @HandleOnBeforeSending_MQTT_PUBREL;
     OnBeforeSendingMQTT_PUBCOMP := @HandleOnBeforeSending_MQTT_PUBCOMP;
+    OnBeforeSendingMQTT_SUBSCRIBE := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
+    OnAfterReceivingMQTT_SUBACK := @HandleOnAfterReceivingMQTT_SUBACK;
   {$ENDIF}
 end;
 
@@ -482,11 +501,12 @@ end;
 procedure TMQTTReceiveThread.Execute;
 var
   TempReadBuf: TDynArrayOfByte;
-  ReadCount: Integer;
+  //ReadCount: Integer;
   TempByte: Byte;
+  PacketName: string;
 begin
   try
-    ReadCount := 0;
+    //ReadCount := 0;
     InitDynArrayToEmpty(TempReadBuf);
 
     try
@@ -499,21 +519,22 @@ begin
           begin
             if (E.Message = 'Read timed out.') and (TempReadBuf.Len > 0) then
             begin
-              AddToLog('done receiving: ' + E.Message + '   ReadCount: ' + IntToStr(ReadCount) + '   E.ClassName: ' + E.ClassName);
-              AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len));
+              MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
+              AddToLog('done receiving packet: ' + E.Message + {'   ReadCount: ' + IntToStr(ReadCount) +} '   E.ClassName: ' + E.ClassName);
+              AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
 
               PutReceivedBufferToMQTTLib(0, TempReadBuf);
               MQTT_Process(0);
 
               FreeDynArray(TempReadBuf);
-              ReadCount := 0; //reset for next packet
+              //ReadCount := 0; //reset for next packet
             end;
 
             Sleep(1);
           end;
         end;
 
-        Inc(ReadCount);
+        //Inc(ReadCount);
       until Terminated;
     finally
       AddToLog('Thread done..');

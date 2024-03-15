@@ -109,6 +109,12 @@ type
   POnBeforeSendingMQTT_PUBACK = ^TOnBeforeSendingMQTT_PUBACK;
 
 
+  TOnAfterReceivingMQTT_PUBACK = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
+                                           var APubAckFields: TMQTTPubAckFields;
+                                           var APubAckProperties: TMQTTPubAckProperties);
+  POnAfterReceivingMQTT_PUBACK = ^TOnAfterReceivingMQTT_PUBACK;
+
+
   TOnBeforeSendingMQTT_PUBREC = procedure(ClientInstance: DWord;  //The lower word identifies the client instance
                                           var APubRecFields: TMQTTPubRecFields;
                                           var APubRecProperties: TMQTTPubRecProperties);
@@ -208,6 +214,7 @@ var
   OnBeforeSendingMQTT_PUBLISH: POnBeforeSendingMQTT_PUBLISH;
   OnAfterReceivingMQTT_PUBLISH: POnAfterReceivingMQTT_PUBLISH;
   OnBeforeSendingMQTT_PUBACK: POnBeforeSendingMQTT_PUBACK;
+  OnAfterReceivingMQTT_PUBACK: POnAfterReceivingMQTT_PUBACK;
   OnBeforeSendingMQTT_PUBREC: POnBeforeSendingMQTT_PUBREC;
   OnBeforeSendingMQTT_PUBREL: POnBeforeSendingMQTT_PUBREL;
   OnBeforeSendingMQTT_PUBCOMP: POnBeforeSendingMQTT_PUBCOMP;
@@ -326,6 +333,7 @@ begin
     New(OnBeforeSendingMQTT_PUBLISH);
     New(OnAfterReceivingMQTT_PUBLISH);
     New(OnBeforeSendingMQTT_PUBACK);
+    New(OnAfterReceivingMQTT_PUBACK);
     New(OnBeforeSendingMQTT_PUBREC);
     New(OnBeforeSendingMQTT_PUBREL);
     New(OnBeforeSendingMQTT_PUBCOMP);
@@ -342,6 +350,7 @@ begin
     OnBeforeSendingMQTT_PUBLISH^ := nil;
     OnAfterReceivingMQTT_PUBLISH^ := nil;
     OnBeforeSendingMQTT_PUBACK^ := nil;
+    OnAfterReceivingMQTT_PUBACK^ := nil;
     OnBeforeSendingMQTT_PUBREC^ := nil;
     OnBeforeSendingMQTT_PUBREL^ := nil;
     OnBeforeSendingMQTT_PUBCOMP^ := nil;
@@ -358,6 +367,7 @@ begin
     OnBeforeSendingMQTT_PUBLISH := nil;
     OnAfterReceivingMQTT_PUBLISH := nil;
     OnBeforeSendingMQTT_PUBACK := nil;
+    OnAfterReceivingMQTT_PUBACK := nil;
     OnBeforeSendingMQTT_PUBREC := nil;
     OnBeforeSendingMQTT_PUBREL := nil;
     OnBeforeSendingMQTT_PUBCOMP := nil;
@@ -380,6 +390,7 @@ begin
     Dispose(OnBeforeSendingMQTT_PUBLISH);
     Dispose(OnAfterReceivingMQTT_PUBLISH);
     Dispose(OnBeforeSendingMQTT_PUBACK);
+    Dispose(OnAfterReceivingMQTT_PUBACK);
     Dispose(OnBeforeSendingMQTT_PUBREC);
     Dispose(OnBeforeSendingMQTT_PUBREL);
     Dispose(OnBeforeSendingMQTT_PUBCOMP);
@@ -397,6 +408,7 @@ begin
   OnBeforeSendingMQTT_PUBLISH := nil;
   OnAfterReceivingMQTT_PUBLISH := nil;
   OnBeforeSendingMQTT_PUBACK := nil;
+  OnAfterReceivingMQTT_PUBACK := nil;
   OnBeforeSendingMQTT_PUBREC := nil;
   OnBeforeSendingMQTT_PUBREL := nil;
   OnBeforeSendingMQTT_PUBCOMP := nil;
@@ -539,6 +551,22 @@ begin
     end;
 
   OnBeforeSendingMQTT_PUBACK^(ClientInstance, ATempPubAckFields, ATempPubAckProperties);
+end;
+
+
+procedure DoOnAfterReceiving_MQTT_PUBACK(ClientInstance: DWord; var ATempPubAckFields: TMQTTPubAckFields; var ATempPubAckProperties: TMQTTPubAckProperties; var AErr: Word);
+begin
+  {$IFDEF IsDesktop}
+    if not Assigned(OnAfterReceivingMQTT_PUBACK) or not Assigned(OnAfterReceivingMQTT_PUBACK^) then
+  {$ELSE}
+    if OnAfterReceivingMQTT_PUBACK = nil then
+  {$ENDIF}
+    begin
+      AErr := CMQTT_HandlerNotAssigned;
+      Exit;
+    end;
+
+  OnAfterReceivingMQTT_PUBACK^(ClientInstance, ATempPubAckFields, ATempPubAckProperties);
 end;
 
 
@@ -1256,6 +1284,7 @@ var
 
   TempCommonFields: TMQTTCommonFields;
   TempCommonProperties: TMQTTCommonProperties;
+  Err: Word;
 begin
   MQTT_InitControlPacket(TempReceivedPacket);
   TempClientInstance := ClientInstance and CClientIndexMask;
@@ -1279,7 +1308,13 @@ begin
     else
     begin
       if not IncrementSendQuota(ClientInstance) then
-        DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, APacketType);   //too many acknowledgements
+        DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, APacketType)   //too many acknowledgements
+      else
+      begin
+        Err := CMQTT_Success;
+        if APacketType = CMQTT_PUBACK then
+          DoOnAfterReceiving_MQTT_PUBACK(ClientInstance, TempCommonFields, TempCommonProperties, Err); //If Err is not used to Result, then no handler is mandatory.
+      end;
 
       RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx);
     end;

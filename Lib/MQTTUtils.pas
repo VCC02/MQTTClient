@@ -711,6 +711,8 @@ procedure MQTT_FreeAuthProperties(var AProperties: TMQTTAuthProperties);
   function CompareMem(AP1, AP2: PByte; ALength: LongInt): Boolean;
 {$ENDIF}
 
+procedure MQTTPacketToString(APacketType: Byte; var AResult: string);
+
 
 implementation
 
@@ -1407,5 +1409,28 @@ end;
       end;
   end;
 {$ENDIF}
+
+
+procedure MQTTPacketToString(APacketType: Byte; var AResult: string);
+begin
+  case APacketType and $F0 of
+    CMQTT_UNDEFINED : AResult := 'UNDEFINED'; //0
+    CMQTT_CONNECT : AResult := 'CONNECT'; //1
+    CMQTT_CONNACK : AResult := 'CONNACK'; //2
+    CMQTT_PUBLISH : AResult := 'PUBLISH'; //3
+    CMQTT_PUBACK : AResult := 'PUBACK'; //4
+    CMQTT_PUBREC : AResult := 'PUBREC'; //5
+    CMQTT_PUBREL : AResult := 'PUBREL'; //6
+    CMQTT_PUBCOMP : AResult := 'PUBCOMP'; //7
+    CMQTT_SUBSCRIBE : AResult := 'SUBSCRIBE'; //8
+    CMQTT_SUBACK : AResult := 'SUBACK'; //9
+    CMQTT_UNSUBSCRIBE : AResult := 'UNSUBSCRIBE'; //10
+    CMQTT_UNSUBACK : AResult := 'UNSUBACK'; //11
+    CMQTT_PINGREQ : AResult := 'PINGREQ'; //12
+    CMQTT_PINGRESP : AResult := 'PINGRESP'; //13
+    CMQTT_DISCONNECT : AResult := 'DISCONNECT'; //14
+    CMQTT_AUTH : AResult := 'AUTH'; //15
+  end;
+end;
 
 end.
