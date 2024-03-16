@@ -223,6 +223,9 @@ begin
     MQTT_FreeConnAckProperties(DecodedConnAckPropertiesArr[i]);
 
   SetLength(DecodedConnAckPropertiesArr, 0);
+
+  frmMQTTClientAppMain.btnPublish.Enabled := True;
+  frmMQTTClientAppMain.btnSubscribeTo.Enabled := True;
   frmMQTTClientAppMain.AddToLog('');
 end;
 
@@ -265,6 +268,27 @@ begin
     Exit;
   end;
 
+  //Result := FillIn_SubscribePayload('Extra_' + frmMQTTClientAppMain.lbeTopicName.Text, Options, ASubscribeFields.TopicFilters);  //call this again with a different string (i.e. TopicFilter), in order to add it to ASubscribeFields.TopicFilters
+  //if not Result then
+  //begin
+  //  frmMQTTClientAppMain.AddToLog('HandleOnBeforeSendingMQTT_SUBSCRIBE not enough memory to add TopicFilters.');
+  //  Exit;
+  //end;
+  //
+  //Result := FillIn_SubscribePayload('MoreExtra_' + frmMQTTClientAppMain.lbeTopicName.Text, 1, ASubscribeFields.TopicFilters);  //call this again with a different string (i.e. TopicFilter), in order to add it to ASubscribeFields.TopicFilters
+  //if not Result then
+  //begin
+  //  frmMQTTClientAppMain.AddToLog('HandleOnBeforeSendingMQTT_SUBSCRIBE not enough memory to add TopicFilters.');
+  //  Exit;
+  //end;
+  //
+  //Result := FillIn_SubscribePayload('LastExtra_' + frmMQTTClientAppMain.lbeTopicName.Text, 0, ASubscribeFields.TopicFilters);  //call this again with a different string (i.e. TopicFilter), in order to add it to ASubscribeFields.TopicFilters
+  //if not Result then
+  //begin
+  //  frmMQTTClientAppMain.AddToLog('HandleOnBeforeSendingMQTT_SUBSCRIBE not enough memory to add TopicFilters.');
+  //  Exit;
+  //end;
+
   ASubscribeFields.EnabledProperties := CMQTTSubscribe_EnSubscriptionIdentifier {or CMQTTSubscribe_EnUserProperty};
   frmMQTTClientAppMain.AddToLog('Subscribing with PacketIdentifier: ' + IntToStr(ASubscribeFields.PacketIdentifier));
   frmMQTTClientAppMain.AddToLog('Subscribing to: ' + StringReplace(DynArrayOfByteToString(ASubscribeFields.TopicFilters), #0, '#0', [rfReplaceAll]));
@@ -278,16 +302,20 @@ var
   i: Integer;
 begin
   frmMQTTClientAppMain.AddToLog('Received SUBACK');
-  frmMQTTClientAppMain.AddToLog('ASubAckFields.IncludeReasonCode: ' + IntToStr(ASubAckFields.IncludeReasonCode));
+  //frmMQTTClientAppMain.AddToLog('ASubAckFields.IncludeReasonCode: ' + IntToStr(ASubAckFields.IncludeReasonCode));  //not used
+  //frmMQTTClientAppMain.AddToLog('ASubAckFields.ReasonCode: ' + IntToStr(ASubAckFields.ReasonCode));              //not used
   frmMQTTClientAppMain.AddToLog('ASubAckFields.EnabledProperties: ' + IntToStr(ASubAckFields.EnabledProperties));
-  frmMQTTClientAppMain.AddToLog('ASubAckFields.PacketIdentifier: ' + IntToStr(ASubAckFields.PacketIdentifier));
-  frmMQTTClientAppMain.AddToLog('ASubAckFields.ReasonCode: ' + IntToStr(ASubAckFields.ReasonCode));
+  frmMQTTClientAppMain.AddToLog('ASubAckFields.PacketIdentifier: ' + IntToStr(ASubAckFields.PacketIdentifier));  //This must be the same as sent in SUBSCRIBE packet.
 
-  for i := 0 to ASubAckFields.SrcPayload.Len - 1 do
+  frmMQTTClientAppMain.AddToLog('ASubAckFields.Payload.Len: ' + IntToStr(ASubAckFields.SrcPayload.Len));
+
+  for i := 0 to ASubAckFields.SrcPayload.Len - 1 do         //these are QoS values for each TopicFilter (if ok), or error codes (if not ok).
     frmMQTTClientAppMain.AddToLog('ASubAckFields.ReasonCodes[' + IntToStr(i) + ']: ' + IntToStr(ASubAckFields.SrcPayload.Content^[i]));
 
   frmMQTTClientAppMain.AddToLog('ASubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(ASubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
   frmMQTTClientAppMain.AddToLog('ASubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(ASubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  frmMQTTClientAppMain.btnSubscribeTo.Enabled := True;
   frmMQTTClientAppMain.AddToLog('');
 end;
 
@@ -362,9 +390,9 @@ end;
 procedure HandleOnAfterReceivingMQTT_PUBLISH(ClientInstance: DWord; var APublishFields: TMQTTPublishFields; var APublishProperties: TMQTTPublishProperties);
 var
   QoS: Byte;
-  Msg: string;
   ID: Word;
-  Topic: string;
+  Topic, s, Msg: string;
+  i: Integer;
 begin
   QoS := (APublishFields.PublishCtrlFlags shr 1) and 3;
   Msg := StringReplace(DynArrayOfByteToString(APublishFields.ApplicationMessage), #0, '#0', [rfReplaceAll]);
@@ -375,6 +403,11 @@ begin
                                                  '  Msg: ' + Msg +
                                                  '  QoS: ' + IntToStr(QoS) +
                                                  '  TopicName: ' + Topic);
+
+  s := '';
+  for i := 0 to APublishProperties.SubscriptionIdentifier.Len - 1 do
+    s := s + IntToStr(APublishProperties.SubscriptionIdentifier.Content^[i]) + ', ';
+  frmMQTTClientAppMain.AddToLog('SubscriptionIdentifier(s): ' + s);
 
   frmMQTTClientAppMain.AddToLog('');
 end;
@@ -663,6 +696,7 @@ begin
     Exit;
   end;
 
+  frmMQTTClientAppMain.btnSubscribeTo.Enabled := False;
   SendPacketToServer(0);
 end;
 
@@ -683,17 +717,22 @@ end;
 procedure TfrmMQTTClientAppMain.tmrStartupTimer(Sender: TObject);
 var
   Content: TStringList;
+  Fnm: string;
 begin
   tmrStartup.Enabled := False;
+  FMQTTPassword := '';
 
   Content := TStringList.Create;
   try
-    Content.LoadFromFile(ExtractFilePath(ParamStr(0)) + '..\p.txt');
+    Fnm := ExtractFilePath(ParamStr(0)) + '..\p.txt';
 
-    if Content.Count > 0 then
-      FMQTTPassword := Content.Strings[0]
-    else
-      FMQTTPassword := '';
+    if FileExists(Fnm) then
+    begin
+      Content.LoadFromFile(Fnm);
+
+      if Content.Count > 0 then
+        FMQTTPassword := Content.Strings[0]
+    end;
   finally
     Content.Free;
   end;

@@ -3,7 +3,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
   Height = 317
   Top = 43
   Width = 667
-  Caption = 'frmMQTTClientAppMain'
+  Caption = 'MQTT Client App'
   ClientHeight = 317
   ClientWidth = 667
   LCLVersion = '8.2'
@@ -131,6 +131,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
       Top = 14
       Width = 59
       Caption = 'Publish'
+      Enabled = False
       TabOrder = 2
       OnClick = btnPublishClick
     end
@@ -189,6 +190,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
       Top = 16
       Width = 91
       Caption = 'Subscribe to'
+      Enabled = False
       TabOrder = 0
       OnClick = btnSubscribeToClick
     end

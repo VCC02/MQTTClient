@@ -385,6 +385,15 @@ begin
     Expect(@DecodedCommonProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
     Expect(@DecodedCommonProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
     Expect(@DecodedCommonProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+
+    if FPacketType in [CMQTT_SUBACK, CMQTT_UNSUBACK] then
+    begin
+      Expect(DecodedCommonFields.SrcPayload.Len).ToBe(4);
+      Expect(DecodedCommonFields.SrcPayload.Content^[0]).ToBe(243);
+      Expect(DecodedCommonFields.SrcPayload.Content^[1]).ToBe(244);
+      Expect(DecodedCommonFields.SrcPayload.Content^[2]).ToBe(245);
+      Expect(DecodedCommonFields.SrcPayload.Content^[3]).ToBe(246);
+    end;
   finally
     MQTT_FreeCommonProperties(DecodedCommonProperties);
   end;

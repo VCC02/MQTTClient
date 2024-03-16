@@ -296,7 +296,7 @@ function Decode_Common(var AReceivedPacket: TMQTTControlPacket;
 var
   CurrentBufferPointer, PropertyLen: DWord;
   TempArr4: T4ByteArray;
-  VarIntLen, TempPacketType: Byte;
+  VarIntLen, TempPacketType, IsSubAck: Byte;
   ConvErr: Boolean;
 begin
   ACommonFields.EnabledProperties := 0;
@@ -308,15 +308,20 @@ begin
   else
     ACommonFields.ReasonCode := AReceivedPacket.VarHeader.Content^[2];
 
-  if AReceivedPacket.VarHeader.Len < 4 then
+  TempPacketType := AReceivedPacket.Header.Content^[0];
+  IsSubAck := 0;
+  if (TempPacketType = CMQTT_SUBACK) or (TempPacketType = CMQTT_UNSUBACK) then
+    IsSubAck := 1;
+
+  if AReceivedPacket.VarHeader.Len < DWord(4 - IsSubAck) then   //This was 4, but it prevented valid SUBACK packets to be decoded. They can have a VarHeader.Len = 3.
   begin
     Result := CMQTTDecoderNoErr;
     //PropertyLen := 0;
     Exit;                //end of packet
   end;
 
-  TempPacketType := AReceivedPacket.Header.Content^[0];
-  if (TempPacketType = CMQTT_SUBACK) or (TempPacketType = CMQTT_UNSUBACK) then
+
+  if IsSubAck = 1 then
     CurrentBufferPointer := 2
   else
     CurrentBufferPointer := 3;
@@ -343,6 +348,15 @@ begin
   begin
     Result := CMQTTDecoderUnknownProperty;
     Exit;
+  end;
+
+  if IsSubAck = 1 then
+  begin
+    if not CopyFromDynArray(ACommonFields.SrcPayload, AReceivedPacket.Payload, 0, AReceivedPacket.Payload.Len) then   //the dest array is initialized by CopyFromDynArray
+    begin
+      Result := CMQTTDecoderOutOfMemory or CMQTT_OOM_PayloadAlloc;
+      Exit;
+    end;
   end;
 
   Result := CMQTTDecoderNoErr;

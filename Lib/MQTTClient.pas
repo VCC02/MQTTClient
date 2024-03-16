@@ -39,7 +39,7 @@ interface
 uses
   DynArrays, MQTTUtils,
   MQTTConnectCtrl, MQTTConnAckCtrl,
-  MQTTPublishCtrl, MQTTCommonCodecCtrl, MQTTPubAckCtrl, MQTTPubRecCtrl, MQTTPubRelCtrl, MQTTPubCompCtrl,
+  MQTTPublishCtrl, MQTTCommonCodecCtrl, MQTTPubRecCtrl, MQTTPubRelCtrl,
   MQTTSubscribeCtrl, MQTTSubAckCtrl
 
   {$IFDEF IsDesktop}
@@ -1408,7 +1408,7 @@ begin
     PacketIdentifierIdx := IndexOfWordInArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, TempCommonFields.PacketIdentifier);
     //No sure what happens if the server sends a wrong Packet Identifier.
 
-    if PacketIdentifierIdx = -1 then    //$CE = 206    (maybe the PacketIdentifier got removed by Process_PUBREC
+    if PacketIdentifierIdx = -1 then    // $CE = 206    (maybe the PacketIdentifier got removed by Process_PUBREC
       DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServer, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
     else
     begin
@@ -1497,7 +1497,10 @@ begin
             if not IncrementSendQuota(ClientInstance) then
               DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, CMQTT_PUBACK);   //too many acknowledgements
 
-          //The spec say that the PacketIdentifier should be removed on receiving PUBREC but it is still required in PUBCOMP
+          //The spec say that the PacketIdentifier should be removed on receiving PUBREC but it is still required in PUBCOMP.
+          //Since the following code is commented, if no PUBCOMP is received, this will result in a memory leak.
+          //When the client instance is destroyed, the allocated memory is released, so no leak occurs.
+
           //if not RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx) then
           //  Result := CMQTT_OutOfMemory;
 
@@ -1589,17 +1592,28 @@ end;
 function Process_SUBACK(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
 var
   TempReceivedPacket: TMQTTControlPacket;
-  PacketIdentifierIdx: TDynArrayLengthSig;
-  TempClientInstance: DWord;
+  //PacketIdentifierIdx: TDynArrayLengthSig;
+  //TempClientInstance: DWord;
   Err: Word;
 
   TempSubAckFields: TMQTTSubAckFields;
   TempSubAckProperties: TMQTTSubAckProperties;
+
+  //s, msg: string;
+  //i: Integer;
 begin
   Err := 0;
   MQTT_InitControlPacket(TempReceivedPacket);
-  TempClientInstance := ClientInstance and CClientIndexMask;
+  //TempClientInstance := ClientInstance and CClientIndexMask;
 
+  //msg := '';
+  //s := DynArrayOfByteToString(ABuffer);
+  //for i := 1 to Length(s) do
+  //  msg := msg + '$' + IntToHex(Ord(s[i])) + ', ';
+  //raise Exception.Create('Received SUBACK buffer: ' + msg);
+  //MessageBox(0, PChar(msg), 'msg', MB_ICONINFORMATION);
+                                     //ABuffer example: $90, $06, $00, $01, $00, $02, $02, $02,
+                                     //ABuffer example: $90, $07, $00, $01, $00, $02, $02, $01, $00  ($90=SUBACK, $07=NumberOfNextBytes, $00, $01 = PacketIdentifier (word), $00 = SUBACK Properties Len(No Reason String, No user prop),  $02, $02, $01, $00 = QoS[0], QoS[1], QoS[2], QoS[3]
   Result := Decode_SubAckToCtrlPacket(ABuffer, TempReceivedPacket, ASizeToFree);
   if Result = CMQTTDecoderNoErr then
   begin
@@ -1611,25 +1625,10 @@ begin
 
     MQTT_FreeControlPacket(TempReceivedPacket);
 
-    //if TempCommonFields.ReasonCode >= 128 then  //expecting CMQTT_Reason_PacketIdentifierNotFound
-    //  DoOnMQTTError(TempClientInstance, CMQTT_ProtocolError or TempCommonFields.ReasonCode shl 8, APacketType);   //not sure what to do here. Disconnect?
-    //
     //PacketIdentifierIdx := IndexOfWordInArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, TempCommonFields.PacketIdentifier);
-    ////No sure what happens if the server sends a wrong Packet Identifier.
-    //
-    //if PacketIdentifierIdx = -1 then
-    //  DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServer, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
-    //else
-    //begin
-    //  if not IncrementSendQuota(ClientInstance) then
-    //    DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, APacketType);   //too many acknowledgements
-    //
-    //  RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx);
-    //end;
 
     FreeDynArray(TempSubAckFields.SrcPayload);
     MQTT_FreeCommonProperties(TempSubAckProperties);
-
   end;
 end;
 
