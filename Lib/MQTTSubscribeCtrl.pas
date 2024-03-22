@@ -69,13 +69,10 @@ begin
   APropLen := AVarHeader.Len;
 
   if AEnabledProperties and CMQTTSubscribe_EnSubscriptionIdentifier = CMQTTSubscribe_EnSubscriptionIdentifier then
-  begin
-    if ASubscribeProperties.SubscriptionIdentifier.Len > 0 then   //only one identifier is expected for Subscribe packet
-    begin
-      Result := AddVarIntAsDWordToProperties(AVarHeader, ASubscribeProperties.SubscriptionIdentifier.Content^[0], CMQTT_SubscriptionIdentifier_PropID);
-      if not Result then
-        Exit;
-    end;
+  begin                                                       //only one identifier is expected for Subscribe packet
+    Result := AddVarIntAsDWordToProperties(AVarHeader, ASubscribeProperties.SubscriptionIdentifier, CMQTT_SubscriptionIdentifier_PropID);
+    if not Result then
+      Exit;
   end;
 
   if AEnabledProperties and CMQTTSubscribe_EnUserProperty = CMQTTSubscribe_EnUserProperty then
@@ -180,8 +177,7 @@ begin
       CMQTT_SubscriptionIdentifier_PropID: //
       begin
         AEnabledProperties := AEnabledProperties or CMQTTSubscribe_EnSubscriptionIdentifier;
-        SetDynOfDWordLength(ASubscribeProperties.SubscriptionIdentifier, 1); //use Len + 1, to detect if multiple identifier properties are received, then count them
-        MQTT_DecodeVarInt(AVarHeader, CurrentBufferPointer, ASubscribeProperties.SubscriptionIdentifier.Content^[0]);
+        MQTT_DecodeVarInt(AVarHeader, CurrentBufferPointer, ASubscribeProperties.SubscriptionIdentifier);
       end;
 
       CMQTT_UserProperty_PropID: //
@@ -435,6 +431,8 @@ begin
     Result := CMQTTDecoderUnknownProperty;
     Exit;
   end;
+
+  CopyFromDynArray(ASubscribeFields.TopicFilters, AReceivedPacket.Payload, 0, AReceivedPacket.Payload.Len);
 
   Result := CMQTTDecoderNoErr;
 end;

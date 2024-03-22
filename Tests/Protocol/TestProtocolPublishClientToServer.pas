@@ -42,6 +42,7 @@ type
   private
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(AQoS: Byte);
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuota(AQoS: Byte);
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuotaExceeded(AQoS: Byte);
 
   protected
     procedure SetUp; override;
@@ -53,6 +54,9 @@ type
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_SendQuota;
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_SendQuota;
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_SendQuota;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_SendQuotaExceeded;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_SendQuotaExceeded;
+    procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_SendQuotaExceeded;
 
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0To0_ModifiedPacketIdentifier;
     procedure TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0To1_ModifiedPacketIdentifier;
@@ -237,6 +241,52 @@ begin
 end;
 
 
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuotaExceeded(AQoS: Byte); //SendQuota should not be used on QoS=0
+var
+  BufferPointer: PMQTTBuffer;
+  Err: Word;
+  i: Integer;
+begin
+  Expect(MQTT_CONNECT(0, 0)).ToBe(True);
+
+  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True, 'Successful processing at 0');
+  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True, 'Successful processing at 1');
+  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True, 'Successful processing at 2');
+  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(not (AQoS > 0), 'Successful processing at 3');
+
+  BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  Expect(Decode_PublishToCtrlPacket(BufferPointer^, DecodedPublishPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
+
+  if AQoS > 0 then
+  begin
+    Expect(FoundError).ToBe(CMQTT_ReceiveMaximumExceeded, 'ReceiveMaximumExceeded');
+    Expect(GetSendQuota(0)).ToBe(0, 'Send quota is over.');
+  end
+  else
+    Expect(GetSendQuota(0)).ToBe(CMQTT_DefaultReceiveMaximum, 'No Send quota');
+
+  //ToDo  test CMQTT_ReceiveMaximumReset error, by receiving more acks than publishing
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_0_SendQuotaExceeded;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuotaExceeded(0);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_1_SendQuotaExceeded;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuotaExceeded(1);
+end;
+
+
+procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_2_SendQuotaExceeded;
+begin
+  TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_SendQuotaExceeded(2);
+end;
+
+
 procedure TTestProtocolSendPublishCase.TestClientToServerBufferContent_AfterPublish_OnePacket_QoS_Generic_PacketIdentifier(AQoS: Byte);
 var
   BufferPointer: PMQTTBuffer;
@@ -259,7 +309,7 @@ begin
 
   if NewQoS > 0 then
   begin
-    Expect(AllocatedPacketIdentifier).ToBe(1, 'AllocatedPacketIdentifier');
+    Expect(AllocatedPacketIdentifier).ToBe(CClientToServerPacketIdentifiersInitOffset, 'AllocatedPacketIdentifier');
     Expect(ClientToServerPacketIdentifierIsUsed(0, DecodedPublishFields.PacketIdentifier)).ToBe(True, 'PacketIdentifier is used on QoS>0 only.');  // for QoS > 0 only!!!
   end;
 end;

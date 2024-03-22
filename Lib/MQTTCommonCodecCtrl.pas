@@ -181,6 +181,8 @@ begin
   ADecodedBufferLen := FixedHeaderLen + ExpectedVarAndPayloadLen;
 
   ActualVarAndPayloadLen := ABuffer.Len - FixedHeaderLen;
+  if ActualVarAndPayloadLen > ExpectedVarAndPayloadLen then  ////////////////////////////////// Quick fix, in case the buffer contains multiple packets.
+    ActualVarAndPayloadLen := ExpectedVarAndPayloadLen;
 
   TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(ExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
   if TempErr <> CMQTTDecoderNoErr then

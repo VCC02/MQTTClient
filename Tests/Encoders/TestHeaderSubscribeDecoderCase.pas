@@ -114,9 +114,7 @@ begin
   Expect(FillIn_SubscribePayload('some simple payload entry', 73, TempSubscribeFields.TopicFilters)).ToBe(True);
   Expect(FillIn_SubscribePayload('another payload entry', 85, TempSubscribeFields.TopicFilters)).ToBe(True);
 
-  Expect(AddDWordToDynArraysOfDWord(SubscribeProperties.SubscriptionIdentifier, 1234)).ToBe(True);
-  Expect(AddDWordToDynArraysOfDWord(SubscribeProperties.SubscriptionIdentifier, 5678)).ToBe(True);
-  Expect(AddDWordToDynArraysOfDWord(SubscribeProperties.SubscriptionIdentifier, 9876)).ToBe(True);
+  SubscribeProperties.SubscriptionIdentifier := 1234;
   Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', SubscribeProperties.UserProperty)).ToBe(True);
 
   Expect(FillIn_Subscribe(TempSubscribeFields, SubscribeProperties, DestPacket)).ToBe(True);
@@ -299,10 +297,9 @@ begin
     Expect(DecodedSubscribeFields.PacketIdentifier).ToBe(1234);
     Expect(DecodedSubscribeFields.EnabledProperties).ToBe(TempSubscribeFields.EnabledProperties);
 
-    Expect(DecodedSubscribeProperties.SubscriptionIdentifier.Len).ToBe(1);
     Expect(DecodedSubscribeProperties.UserProperty.Len).ToBe(3);
     //
-    Expect(DecodedSubscribeProperties.SubscriptionIdentifier.Content^[0]).ToBe(DWord($08ABCDEF));
+    Expect(DecodedSubscribeProperties.SubscriptionIdentifier).ToBe(DWord($08ABCDEF));
     Expect(@DecodedSubscribeProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
     Expect(@DecodedSubscribeProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
     Expect(@DecodedSubscribeProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);

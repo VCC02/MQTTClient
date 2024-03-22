@@ -222,7 +222,7 @@ begin
   Result := True;
 
   if AEnabledProperties and CMQTTSubscribe_EnSubscriptionIdentifier = CMQTTSubscribe_EnSubscriptionIdentifier then
-    Result := Result and AddDWordToDynArraysOfDWord(ADestProperties.SubscriptionIdentifier, $08ABCDEF);
+    ADestProperties.SubscriptionIdentifier := $08ABCDEF;
 
   if AEnabledProperties and CMQTTSubscribe_EnUserProperty = CMQTTSubscribe_EnUserProperty then
   begin

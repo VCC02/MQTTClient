@@ -155,6 +155,12 @@ begin
 end;
 
 
+procedure HandleOnAfterReceiving_MQTT_PUBREL(ClientInstance: DWord; var ATempPubRelFields: TMQTTPubRelFields; var ATempPubRelProperties: TMQTTPubRelProperties);
+begin
+  //
+end;
+
+
 procedure HandleOnBeforeSending_MQTT_PUBCOMP(ClientInstance: DWord; var ATempPubCompFields: TMQTTPubCompFields; var ATempPubCompProperties: TMQTTPubCompProperties);
 begin
   Inc(CompCount);  //publish complete count
@@ -165,6 +171,13 @@ procedure HandleOnMQTTError(ClientInstance: DWord; AErr: Word; APacketType: Byte
 begin
   FoundError := AErr;
   ErrorOnPacketType := APacketType;
+  //Expect(ErrorOnPacketType).ToBe(0, 'Packet type error');
+end;
+
+
+procedure HandleOnSend_MQTT_Packet(ClientInstance: DWord; APacketType: Byte);
+begin
+
 end;
 
 
@@ -179,14 +192,18 @@ begin
     OnAfterReceivingMQTT_PUBLISH^ := @HandleOnAfterReceivingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBACK^ := @HandleOnBeforeSending_MQTT_PUBACK;
     OnBeforeSendingMQTT_PUBREC^ := @HandleOnBeforeSending_MQTT_PUBREC;
+    OnAfterReceivingMQTT_PUBREL^ := @HandleOnAfterReceiving_MQTT_PUBREL;
     OnBeforeSendingMQTT_PUBCOMP^ := @HandleOnBeforeSending_MQTT_PUBCOMP;
     OnMQTTError^ := @HandleOnMQTTError;
+    OnSendMQTT_Packet^ := @HandleOnSend_MQTT_Packet;
   {$ELSE}
     OnAfterReceivingMQTT_PUBLISH := @HandleOnAfterReceivingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBACK := @HandleOnBeforeSending_MQTT_PUBACK;
     OnBeforeSendingMQTT_PUBREC := @HandleOnBeforeSending_MQTT_PUBREC;
+    OnAfterReceivingMQTT_PUBREL := @HandleOnAfterReceiving_MQTT_PUBREL;
     OnBeforeSendingMQTT_PUBCOMP := @HandleOnBeforeSending_MQTT_PUBCOMP;
     OnMQTTError := @HandleOnMQTTError;
+    OnSendMQTT_Packet := @HandleOnSend_MQTT_Packet;
   {$ENDIF}
 
   ReceivedCount := 0;

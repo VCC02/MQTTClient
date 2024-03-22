@@ -2,13 +2,14 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
   Left = 387
   Height = 317
   Top = 43
-  Width = 667
+  Width = 900
   Caption = 'MQTT Client App'
   ClientHeight = 317
-  ClientWidth = 667
+  ClientWidth = 900
   LCLVersion = '8.2'
   OnClose = FormClose
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   object btnConnect: TButton
     Left = 152
     Height = 25
@@ -23,7 +24,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
     Left = 8
     Height = 186
     Top = 8
-    Width = 648
+    Width = 881
     Lines.Strings = (
       'memLog'
     )
@@ -128,7 +129,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
     object btnPublish: TButton
       Left = 192
       Height = 25
-      Top = 14
+      Top = 16
       Width = 59
       Caption = 'Publish'
       Enabled = False
@@ -173,13 +174,13 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
     end
   end
   object grpSubscription: TGroupBox
-    Left = 520
+    Left = 512
     Height = 113
     Top = 201
-    Width = 136
+    Width = 144
     Caption = 'Subscription'
     ClientHeight = 93
-    ClientWidth = 132
+    ClientWidth = 140
     Color = 16775135
     ParentBackground = False
     ParentColor = False
@@ -188,7 +189,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
       Left = 8
       Height = 25
       Top = 16
-      Width = 91
+      Width = 75
       Caption = 'Subscribe to'
       Enabled = False
       TabOrder = 0
@@ -198,27 +199,148 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
       Left = 8
       Height = 23
       Top = 64
-      Width = 113
+      Width = 128
       EditLabel.Height = 15
-      EditLabel.Width = 113
+      EditLabel.Width = 128
       EditLabel.Caption = 'Topic name'
       TabOrder = 1
       Text = 'SomeTopic'
     end
+    object btnUnSubscribeFrom: TButton
+      Left = 88
+      Height = 25
+      Top = 16
+      Width = 48
+      Caption = 'UnSub'
+      Enabled = False
+      TabOrder = 2
+      OnClick = btnUnSubscribeFromClick
+    end
+  end
+  object prbUsedMemory: TProgressBar
+    Left = 8
+    Height = 12
+    Top = 302
+    Width = 136
+    TabOrder = 9
+  end
+  object grpStatistics: TGroupBox
+    Left = 664
+    Height = 113
+    Top = 201
+    Width = 225
+    Caption = 'Statistics'
+    ClientHeight = 93
+    ClientWidth = 221
+    TabOrder = 10
+    object lblServerToClientBufferSizeInfo: TLabel
+      Left = 8
+      Height = 15
+      Top = 16
+      Width = 132
+      Caption = 'ServerToClientBufferSize:'
+    end
+    object lblServerToClientBufferSize: TLabel
+      Left = 184
+      Height = 15
+      Top = 16
+      Width = 18
+      Caption = '000'
+    end
+    object lblClientToServerPacketIDCountInfo: TLabel
+      Left = 8
+      Height = 15
+      Hint = 'One value is preallocated (i.e. 0).'
+      Top = 32
+      Width = 159
+      Caption = 'ClientToServerPacketIDCount:'
+      ParentShowHint = False
+      ShowHint = True
+    end
+    object lblClientToServerIDCount: TLabel
+      Left = 184
+      Height = 15
+      Top = 32
+      Width = 18
+      Caption = '000'
+    end
+    object lblServerToClientPacketIDCountInfo: TLabel
+      Left = 8
+      Height = 15
+      Top = 48
+      Width = 159
+      Caption = 'ServerToClientPacketIDCount:'
+    end
+    object lblServerToClientIDCount: TLabel
+      Left = 184
+      Height = 15
+      Top = 48
+      Width = 18
+      Caption = '000'
+    end
+    object lblClientToServerBufferSizeInfo: TLabel
+      Left = 8
+      Height = 15
+      Top = 0
+      Width = 132
+      Caption = 'ClientToServerBufferSize:'
+    end
+    object lblClientToServerBufferSize: TLabel
+      Left = 184
+      Height = 15
+      Top = 0
+      Width = 18
+      Caption = '000'
+    end
+  end
+  object btnPing: TButton
+    Left = 99
+    Height = 25
+    Top = 240
+    Width = 45
+    Caption = 'Ping'
+    TabOrder = 11
+    OnClick = btnPingClick
+  end
+  object btnAuth: TButton
+    Left = 99
+    Height = 25
+    Hint = 'Sends an AUTH packet.'
+    Top = 272
+    Width = 45
+    Caption = 'Auth'
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 12
+    OnClick = btnAuthClick
   end
   object IdTCPClient1: TIdTCPClient
     ConnectTimeout = 0
     Port = 0
     ReadTimeout = -1
     UseNagle = False
-    Left = 32
-    Top = 265
+    Left = 56
+    Top = 96
   end
   object tmrStartup: TTimer
     Enabled = False
     Interval = 10
     OnTimer = tmrStartupTimer
     Left = 240
+    Top = 96
+  end
+  object tmrProcessLog: TTimer
+    Enabled = False
+    Interval = 10
+    OnTimer = tmrProcessLogTimer
+    Left = 320
+    Top = 96
+  end
+  object tmrProcessRecData: TTimer
+    Enabled = False
+    Interval = 10
+    OnTimer = tmrProcessRecDataTimer
+    Left = 424
     Top = 96
   end
 end

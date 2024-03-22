@@ -55,6 +55,7 @@ type
   TMQTTProp_ContentType = TDynArrayOfByte; //UTF-8 string
   TMQTTProp_ResponseTopic = TDynArrayOfByte; //UTF-8 string
   TMQTTProp_CorrelationData = TDynArrayOfByte; //binary data
+  TMQTTProp_SingleSubscriptionIdentifier = DWord; //VarInt
   TMQTTProp_SubscriptionIdentifier = TDynArrayOfDWord; //VarInt   //These are VarInts on protocol only. The array stores DWords.
   TMQTTProp_SessionExpiryInterval = DWord; //[s]
   TMQTTProp_AssignedClientIdentifier = TDynArrayOfByte; //UTF-8 string
@@ -215,7 +216,7 @@ type
   /////////////////
 
   TMQTTSubscribeProperties = record
-    SubscriptionIdentifier: TMQTTProp_SubscriptionIdentifier;    //These are VarInts on protocol only. The array stores DWords.
+    SubscriptionIdentifier: TMQTTProp_SingleSubscriptionIdentifier;    //This is VarInt on protocol only.
     UserProperty: TMQTTProp_UserProperty; //UTF-8 string pairs
   end;
 
@@ -1327,14 +1328,14 @@ end;
 
 procedure MQTT_InitSubscribeProperties(var AProperties: TMQTTSubscribeProperties);
 begin
-  InitDynArrayOfDWordToEmpty(AProperties.SubscriptionIdentifier);
+  AProperties.SubscriptionIdentifier := 3; //some valid init value
   InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
 end;
 
 
 procedure MQTT_FreeSubscribeProperties(var AProperties: TMQTTSubscribeProperties);
 begin
-  FreeDynArrayOfDWord(AProperties.SubscriptionIdentifier);
+  AProperties.SubscriptionIdentifier := 3000; //something for debugging
   FreeDynOfDynOfByteArray(AProperties.UserProperty);
 end;
 

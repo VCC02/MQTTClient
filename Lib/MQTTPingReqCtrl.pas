@@ -54,7 +54,7 @@ begin
   if not SetDynLength(ADestPacket.Header, 2) then
     Exit;
 
-  ADestPacket.Header.Content^[0] := CMQTT_SUBSCRIBE;
+  ADestPacket.Header.Content^[0] := CMQTT_PINGREQ;
   ADestPacket.Header.Content^[1] := 0; //Remaining Length
 
   Result := True;

@@ -34,8 +34,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls,
-  IdTCPClient, IdGlobal,
-  DynArrays;
+  ComCtrls, IdTCPClient, IdGlobal, DynArrays, PollingFIFO;
 
 type
 
@@ -47,11 +46,22 @@ type
     btnSetToLocalhost: TButton;
     btnPublish: TButton;
     btnSubscribeTo: TButton;
+    btnUnSubscribeFrom: TButton;
+    btnPing: TButton;
+    btnAuth: TButton;
     chkAddInc: TCheckBox;
     cmbQoS: TComboBox;
+    grpStatistics: TGroupBox;
     grpSubscription: TGroupBox;
     grpPublish: TGroupBox;
     IdTCPClient1: TIdTCPClient;
+    lblClientToServerBufferSize: TLabel;
+    lblClientToServerBufferSizeInfo: TLabel;
+    lblServerToClientIDCount: TLabel;
+    lblServerToClientPacketIDCountInfo: TLabel;
+    lblServerToClientBufferSize: TLabel;
+    lblClientToServerIDCount: TLabel;
+    lblServerToClientBufferSizeInfo: TLabel;
     lblQoS: TLabel;
     lbeTopicName: TLabeledEdit;
     lbeTopicNameToPublish: TLabeledEdit;
@@ -59,18 +69,30 @@ type
     lbeUser: TLabeledEdit;
     lbeAddress: TLabeledEdit;
     lbePort: TLabeledEdit;
+    lblClientToServerPacketIDCountInfo: TLabel;
     memLog: TMemo;
+    prbUsedMemory: TProgressBar;
+    tmrProcessRecData: TTimer;
+    tmrProcessLog: TTimer;
     tmrStartup: TTimer;
+    procedure btnAuthClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnDisconnectClick(Sender: TObject);
+    procedure btnPingClick(Sender: TObject);
     procedure btnPublishClick(Sender: TObject);
     procedure btnSetToLocalhostClick(Sender: TObject);
     procedure btnSubscribeToClick(Sender: TObject);
+    procedure btnUnSubscribeFromClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var CloseAction: TCloseAction);
     procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure tmrProcessLogTimer(Sender: TObject);
+    procedure tmrProcessRecDataTimer(Sender: TObject);
     procedure tmrStartupTimer(Sender: TObject);
   private
     FMQTTPassword: string;
+    FLoggingFIFO: TPollingFIFO;
+    FRecBufFIFO: TPollingFIFO; //used by the reading thread to pass data to MQTT library
 
     procedure LogDynArrayOfByte(var AArr: TDynArrayOfByte; ADisplayName: string = '');
 
@@ -82,6 +104,8 @@ type
     procedure SendPacketToServer(ClientInstance: DWord);
 
     procedure AddToLog(AMsg: string);
+    procedure SyncReceivedBuffer(var AReadBuf: TDynArrayOfByte);
+    procedure ProcessReceivedBuffer;
 
     procedure InitHandlers;
   public
@@ -97,7 +121,7 @@ implementation
 {$R *.frm}
 
 uses
-  MQTTUtils, MQTTClient, MQTTConnectCtrl, MQTTConnAckCtrl, MQTTSubscribeCtrl;
+  MQTTUtils, MQTTClient, MQTTConnectCtrl, MQTTConnAckCtrl, MQTTSubscribeCtrl, MQTTUnsubscribeCtrl;
 
 
 var
@@ -118,14 +142,31 @@ begin
 end;
 
 
+procedure HandleOnSend_MQTT_Packet(ClientInstance: DWord; APacketType: Byte);
+var
+  PacketName: string;
+begin
+  MQTTPacketToString(APacketType, PacketName);
+  frmMQTTClientAppMain.AddToLog('Sending ' + PacketName + ' packet...');
+
+  try
+    frmMQTTClientAppMain.SendPacketToServer(ClientInstance);
+  except
+    on E: Exception do
+      frmMQTTClientAppMain.AddToLog('Cannot send ' + PacketName + ' packet... Ex: ' + E.Message);
+  end;
+end;
+
+
 function HandleOnBeforeMQTT_CONNECT(ClientInstance: DWord;  //The lower byte identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
                                     var AConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
                                     var AConnectProperties: TMQTTConnectProperties;
                                     ACallbackID: Word): Boolean;
 var
   TempWillProperties: TMQTTWillProperties;
-  ClientId, UserName, Password: string[20];
-  Id: Char;
+  UserName, Password: string;
+  //ClientId: string;
+  //Id: Char;
   ConnectFlags: Byte;
   EnabledProperties: Word;
 begin
@@ -149,7 +190,9 @@ begin
 
   EnabledProperties := CMQTTConnect_EnSessionExpiryInterval or
                        CMQTTConnect_EnRequestResponseInformation or
-                       CMQTTConnect_EnRequestProblemInformation;
+                       CMQTTConnect_EnRequestProblemInformation {or
+                       CMQTTConnect_EnAuthenticationMethod or
+                       CMQTTConnect_EnAuthenticationData};
 
   MQTT_InitWillProperties(TempWillProperties);
   TempWillProperties.WillDelayInterval := 30; //some value
@@ -172,13 +215,13 @@ begin
 
   AConnectProperties.SessionExpiryInterval := 3600; //[s]
   AConnectProperties.ReceiveMaximum := 7000;
-  AConnectProperties.MaximumPacketSize := 7000;
+  AConnectProperties.MaximumPacketSize := 10 * 1024 * 1024;
   AConnectProperties.TopicAliasMaximum := 100;
   AConnectProperties.RequestResponseInformation := 1;
   AConnectProperties.RequestProblemInformation := 1;
   AddStringToDynOfDynArrayOfByte('UserProp=Value', AConnectProperties.UserProperty);
-  StringToDynArrayOfByte('MyAuthMethod', AConnectProperties.AuthenticationMethod);
-  StringToDynArrayOfByte('MyAuthData', AConnectProperties.AuthenticationData);
+  StringToDynArrayOfByte('SCRAM-SHA-1', AConnectProperties.AuthenticationMethod);       //some example from spec, pag 108   the server may add to its log: "bad AUTH method"
+  StringToDynArrayOfByte('client-first-data', AConnectProperties.AuthenticationData);   //some example from spec, pag 108
 
   frmMQTTClientAppMain.AddToLog('Done preparing CONNECT data..');
   frmMQTTClientAppMain.AddToLog('');
@@ -226,6 +269,7 @@ begin
 
   frmMQTTClientAppMain.btnPublish.Enabled := True;
   frmMQTTClientAppMain.btnSubscribeTo.Enabled := True;
+  frmMQTTClientAppMain.btnUnSubscribeFrom.Enabled := True;
   frmMQTTClientAppMain.AddToLog('');
 end;
 
@@ -247,19 +291,11 @@ begin
   //Bits 4 and 5 of the Subscription Options represent the Retain Handling option.  - spec pag 73
   //Bits 6 and 7 of the Subscription Options byte are reserved for future use. - Must be set to 0.  - spec pag 73
 
-  SubId := CreateClientToServerSubscriptionIdentifier(ClientInstance); //This function has to be called here, in this handler only. The library caches the values added to ASubscribeProperties.SubscriptionIdentifier array.
-  frmMQTTClientAppMain.AddToLog('Subscribing with new SubscriptionIdentifier: ' + IntToStr(SubId)); //should be added to array automatically by lib
-
-  Result := AddDWordToDynArraysOfDWord(ASubscribeProperties.SubscriptionIdentifier, SubId);
-  if not Result then
-  begin
-    frmMQTTClientAppMain.AddToLog('HandleOnBeforeSendingMQTT_SUBSCRIBE not enough memory to add SubId.');
-    Exit;
-  end;
-
-  //frmMQTTClientAppMain.AddToLog('SubscriptionIdentifier len: ' + IntToStr(ASubscribeProperties.SubscriptionIdentifier.Len)); //should not be 0
-  //for i := 0 to ASubscribeProperties.SubscriptionIdentifier.Len - 1 do
-  //  frmMQTTClientAppMain.AddToLog('Subscribing with SubscriptionIdentifier[' + IntToStr(i) + ']: ' + IntToStr(ASubscribeProperties.SubscriptionIdentifier.Content^[i])); //must be >0
+                                                                       //Subscription identifiers are not mandatory (per spec).
+  SubId := CreateClientToServerSubscriptionIdentifier(ClientInstance); //This function has to be called here, in this handler only. The library does not call this function other than for init purposes.
+                                                                       //If SubscriptionIdentifiers are used, then user code should free them when resubscribing or when unsubscribing.
+  ASubscribeProperties.SubscriptionIdentifier := SubId;  //For now, the user code should keep track of these identifiers and free them on resubscribing or unsubscribing.
+  frmMQTTClientAppMain.AddToLog('Subscribing with new SubscriptionIdentifier: ' + IntToStr(SubId));
 
   Result := FillIn_SubscribePayload(frmMQTTClientAppMain.lbeTopicName.Text, Options, ASubscribeFields.TopicFilters);  //call this again with a different string (i.e. TopicFilter), in order to add it to ASubscribeFields.TopicFilters
   if not Result then
@@ -289,7 +325,11 @@ begin
   //  Exit;
   //end;
 
+  //Enable SubscriptionIdentifier only if required (allocated above with CreateClientToServerSubscriptionIdentifier) !!!
+  //The library initializes EnabledProperties to 0.
+  //A subscription is allowed to be made without a SubscriptionIdentifier.
   ASubscribeFields.EnabledProperties := CMQTTSubscribe_EnSubscriptionIdentifier {or CMQTTSubscribe_EnUserProperty};
+
   frmMQTTClientAppMain.AddToLog('Subscribing with PacketIdentifier: ' + IntToStr(ASubscribeFields.PacketIdentifier));
   frmMQTTClientAppMain.AddToLog('Subscribing to: ' + StringReplace(DynArrayOfByteToString(ASubscribeFields.TopicFilters), #0, '#0', [rfReplaceAll]));
 
@@ -316,6 +356,47 @@ begin
   frmMQTTClientAppMain.AddToLog('ASubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(ASubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
 
   frmMQTTClientAppMain.btnSubscribeTo.Enabled := True;
+  frmMQTTClientAppMain.AddToLog('');
+end;
+
+
+function HandleOnBeforeSendingMQTT_UNSUBSCRIBE(ClientInstance: DWord;  //The lower word identifies the client instance
+                                               var AUnsubscribeFields: TMQTTUnsubscribeFields;
+                                               var AUnsubscribeProperties: TMQTTUnsubscribeProperties;
+                                               ACallbackID: Word): Boolean;
+begin
+  Result := FillIn_UnsubscribePayload(frmMQTTClientAppMain.lbeTopicName.Text, AUnsubscribeFields.TopicFilters);  //call this again with a different string (i.e. TopicFilter), in order to add it to AUnsubscribeFields.TopicFilters
+  if not Result then
+  begin
+    frmMQTTClientAppMain.AddToLog('HandleOnBeforeSendingMQTT_UNSUBSCRIBE not enough memory to add TopicFilters.');
+    Exit;
+  end;
+
+  frmMQTTClientAppMain.AddToLog('Unsubscribing from "' + frmMQTTClientAppMain.lbeTopicName.Text + '"...');
+
+  //the user code should call RemoveClientToServerSubscriptionIdentifier to remove the allocate identifier.
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_UNSUBACK(ClientInstance: DWord; var AUnsubAckFields: TMQTTUnsubAckFields; var AUnsubAckProperties: TMQTTUnsubAckProperties);
+var
+  i: Integer;
+begin
+  frmMQTTClientAppMain.AddToLog('Received UNSUBACK');
+  //frmMQTTClientAppMain.AddToLog('AUnsubAckFields.IncludeReasonCode: ' + IntToStr(ASubAckFields.IncludeReasonCode));  //not used
+  //frmMQTTClientAppMain.AddToLog('AUnsubAckFields.ReasonCode: ' + IntToStr(ASubAckFields.ReasonCode));              //not used
+  frmMQTTClientAppMain.AddToLog('AUnsubAckFields.EnabledProperties: ' + IntToStr(AUnsubAckFields.EnabledProperties));
+  frmMQTTClientAppMain.AddToLog('AUnsubAckFields.PacketIdentifier: ' + IntToStr(AUnsubAckFields.PacketIdentifier));  //This must be the same as sent in SUBSCRIBE packet.
+
+  frmMQTTClientAppMain.AddToLog('AUnsubAckFields.Payload.Len: ' + IntToStr(AUnsubAckFields.SrcPayload.Len));
+
+  for i := 0 to AUnsubAckFields.SrcPayload.Len - 1 do         //these are QoS values for each TopicFilter (if ok), or error codes (if not ok).
+    frmMQTTClientAppMain.AddToLog('AUnsubAckFields.ReasonCodes[' + IntToStr(i) + ']: ' + IntToStr(AUnsubAckFields.SrcPayload.Content^[i]));
+
+  frmMQTTClientAppMain.AddToLog('AUnsubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(AUnsubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
+  frmMQTTClientAppMain.AddToLog('AUnsubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AUnsubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  frmMQTTClientAppMain.btnUnSubscribeFrom.Enabled := True;
   frmMQTTClientAppMain.AddToLog('');
 end;
 
@@ -399,7 +480,7 @@ begin
   ID := APublishFields.PacketIdentifier;
   Topic := StringReplace(DynArrayOfByteToString(APublishFields.TopicName), #0, '#0', [rfReplaceAll]);
 
-  frmMQTTClientAppMain.AddToLog('Received PUBLISH  PacketIdentifier: ' + IntToStr(ID) +
+  frmMQTTClientAppMain.AddToLog('Received PUBLISH  ServerPacketIdentifier: ' + IntToStr(ID) +
                                                  '  Msg: ' + Msg +
                                                  '  QoS: ' + IntToStr(QoS) +
                                                  '  TopicName: ' + Topic);
@@ -415,7 +496,7 @@ end;
 
 procedure HandleOnBeforeSending_MQTT_PUBREC(ClientInstance: DWord; var ATempPubRecFields: TMQTTPubRecFields; var ATempPubRecProperties: TMQTTPubRecProperties);
 begin
-  frmMQTTClientAppMain.AddToLog('Acknowledging with PUBREC for PacketID: ' + IntToStr(ATempPubRecFields.PacketIdentifier));
+  frmMQTTClientAppMain.AddToLog('Acknowledging with PUBREC for ServerPacketID: ' + IntToStr(ATempPubRecFields.PacketIdentifier));
 end;
 
 
@@ -434,14 +515,7 @@ end;
 
 procedure HandleOnAfterReceiving_MQTT_PUBREL(ClientInstance: DWord; var ATempPubRelFields: TMQTTPubRelFields; var ATempPubRelProperties: TMQTTPubRelProperties);
 begin
-  frmMQTTClientAppMain.AddToLog('Received PUBREL for PacketID: ' + IntToStr(ATempPubRelFields.PacketIdentifier));
-end;
-
-
-procedure HandleOnSend_MQTT_PUBREL(ClientInstance: DWord);
-begin
-  frmMQTTClientAppMain.AddToLog('Sending PUBREL packet...');
-  frmMQTTClientAppMain.SendPacketToServer(ClientInstance);
+  frmMQTTClientAppMain.AddToLog('Received PUBREL for ServerPacketID: ' + IntToStr(ATempPubRelFields.PacketIdentifier));
 end;
 
 
@@ -454,15 +528,116 @@ end;
 procedure HandleOnAfterReceiving_MQTT_PUBCOMP(ClientInstance: DWord; var ATempPubCompFields: TMQTTPubCompFields; var ATempPubCompProperties: TMQTTPubCompProperties);
 begin
   frmMQTTClientAppMain.btnPublish.Enabled := True;
-  frmMQTTClientAppMain.AddToLog('Received PUBCOMP for PacketID: ' + IntToStr(ATempPubCompFields.PacketIdentifier));
+  frmMQTTClientAppMain.AddToLog('Received PUBCOMP for ServerPacketID: ' + IntToStr(ATempPubCompFields.PacketIdentifier));
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_PINGRESP(ClientInstance: DWord);
+begin
+  frmMQTTClientAppMain.AddToLog('Received PINGRESP');
+end;
+
+
+procedure HandleOnBeforeSendingMQTT_DISCONNECT(ClientInstance: DWord;  //The lower word identifies the client instance
+                                               var ADisconnectFields: TMQTTDisconnectFields;
+                                               var ADisconnectProperties: TMQTTDisconnectProperties;
+                                               ACallbackID: Word);
+begin
+  frmMQTTClientAppMain.AddToLog('Sending DISCONNECT');
+  //ADisconnectFields.EnabledProperties := CMQTTDisconnect_EnSessionExpiryInterval;   //uncomment if needed
+  //ADisconnectProperties.SessionExpiryInterval := 1;
+
+  //From spec, pag 89:
+  //If the Session Expiry Interval is absent, the Session Expiry Interval in the CONNECT packet is used.
+  //If the Session Expiry Interval in the CONNECT packet was zero, then it is a Protocol Error to set a non-
+  //zero Session Expiry Interval in the DISCONNECT packet sent by the Client.
+
+  //From spec, pag 89:
+  //After sending a DISCONNECT packet the sender
+  //  MUST NOT send any more MQTT Control Packets on that Network Connection
+  //  MUST close the Network Connection
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_DISCONNECT(ClientInstance: DWord;  //The lower word identifies the client instance
+                                                var ADisconnectFields: TMQTTDisconnectFields;
+                                                var ADisconnectProperties: TMQTTDisconnectProperties);
+begin
+  frmMQTTClientAppMain.AddToLog('Received DISCONNECT');
+
+  frmMQTTClientAppMain.AddToLog('ADisconnectFields.EnabledProperties' + IntToStr(ADisconnectFields.EnabledProperties));
+  frmMQTTClientAppMain.AddToLog('ADisconnectFields.DisconnectReasonCode' + IntToStr(ADisconnectFields.DisconnectReasonCode));
+
+  frmMQTTClientAppMain.AddToLog('ADisconnectProperties.SessionExpiryInterval' + IntToStr(ADisconnectProperties.SessionExpiryInterval));
+  frmMQTTClientAppMain.AddToLog('ADisconnectProperties.ReasonString' + StringReplace(DynArrayOfByteToString(ADisconnectProperties.ReasonString), #0, '#0', [rfReplaceAll]));
+  frmMQTTClientAppMain.AddToLog('ADisconnectProperties.ServerReference' + StringReplace(DynArrayOfByteToString(ADisconnectProperties.ServerReference), #0, '#0', [rfReplaceAll]));
+  frmMQTTClientAppMain.AddToLog('ADisconnectProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(ADisconnectProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+end;
+
+
+procedure HandleOnBeforeSendingMQTT_AUTH(ClientInstance: DWord;  //The lower word identifies the client instance
+                                         var AAuthFields: TMQTTAuthFields;
+                                         var AAuthProperties: TMQTTAuthProperties;
+                                         ACallbackID: Word);
+begin
+  frmMQTTClientAppMain.AddToLog('Sending AUTH');
+  AAuthFields.AuthReasonCode := $19; //Example: reauth   - see spec, pag 108.
+
+  StringToDynArrayOfByte('SCRAM-SHA-1', AAuthProperties.AuthenticationMethod);       //some example from spec, pag 108
+  StringToDynArrayOfByte('client-second-data', AAuthProperties.AuthenticationData);   //some modified example from spec, pag 108
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_AUTH(ClientInstance: DWord;  //The lower word identifies the client instance
+                                          var AAuthFields: TMQTTAuthFields;
+                                          var AAuthProperties: TMQTTAuthProperties);
+begin
+  frmMQTTClientAppMain.AddToLog('Received AUTH');
+
+  frmMQTTClientAppMain.AddToLog('AAuthFields.EnabledProperties' + IntToStr(AAuthFields.EnabledProperties));
+  frmMQTTClientAppMain.AddToLog('AAuthFields.AuthReasonCode' + IntToStr(AAuthFields.AuthReasonCode));
+
+  frmMQTTClientAppMain.AddToLog('AAuthProperties.ReasonString' + StringReplace(DynArrayOfByteToString(AAuthProperties.ReasonString), #0, '#0', [rfReplaceAll]));
+  frmMQTTClientAppMain.AddToLog('AAuthProperties.ServerReference' + StringReplace(DynArrayOfByteToString(AAuthProperties.AuthenticationMethod), #0, '#0', [rfReplaceAll]));
+  frmMQTTClientAppMain.AddToLog('AAuthProperties.ServerReference' + StringReplace(DynArrayOfByteToString(AAuthProperties.AuthenticationData), #0, '#0', [rfReplaceAll]));
+  frmMQTTClientAppMain.AddToLog('AAuthProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(AAuthProperties.UserProperty), #0, '#0', [rfReplaceAll]));
 end;
 
 
 { TfrmMQTTClientAppMain }
 
-procedure TfrmMQTTClientAppMain.AddToLog(AMsg: string);
+procedure TfrmMQTTClientAppMain.AddToLog(AMsg: string);  //thread safe
 begin
-  memLog.Lines.Add(DateTimeToStr(Now) + '  ' + AMsg);
+  FLoggingFIFO.Put(AMsg);
+end;
+
+
+procedure TfrmMQTTClientAppMain.SyncReceivedBuffer(var AReadBuf: TDynArrayOfByte); //thread safe
+begin
+  FRecBufFIFO.Put(DynArrayOfByteToString(AReadBuf));
+end;
+
+
+procedure TfrmMQTTClientAppMain.ProcessReceivedBuffer;  //called by a timer, to process received data
+var
+  TempReadBuf: TDynArrayOfByte;
+  NewData: string;
+begin
+  if FRecBufFIFO.Pop(NewData) then
+  begin
+    InitDynArrayToEmpty(TempReadBuf);
+    try
+      if StringToDynArrayOfByte(NewData, TempReadBuf) then
+      begin
+        PutReceivedBufferToMQTTLib(0, TempReadBuf);
+        MQTT_Process(0);
+      end
+      else
+        AddToLog('Out of memory in ProcessReceivedBuffer.');
+    finally
+      FreeDynArray(TempReadBuf);
+    end;
+  end;
 end;
 
 
@@ -511,6 +686,7 @@ procedure TfrmMQTTClientAppMain.InitHandlers;
 begin
   {$IFDEF IsDesktop}
     OnMQTTError^ := @HandleOnMQTTError;
+    OnSendMQTT_Packet^ := @HandleOnSend_MQTT_Packet;
     OnBeforeMQTT_CONNECT^ := @HandleOnBeforeMQTT_CONNECT;
     OnAfterMQTT_CONNACK^ := @HandleOnAfterMQTT_CONNACK;
     OnBeforeSendingMQTT_PUBLISH^ := @HandleOnBeforeSendingMQTT_PUBLISH;
@@ -521,17 +697,24 @@ begin
     OnAfterReceivingMQTT_PUBREC^ := @HandleOnAfterReceiving_MQTT_PUBREC;
     OnBeforeSendingMQTT_PUBREL^ := @HandleOnBeforeSending_MQTT_PUBREL;
     OnAfterReceivingMQTT_PUBREL^ := @HandleOnAfterReceiving_MQTT_PUBREL;
-    OnSendMQTT_PUBREL^ := @HandleOnSend_MQTT_PUBREL;
     OnBeforeSendingMQTT_PUBCOMP^ := @HandleOnBeforeSending_MQTT_PUBCOMP;
     OnAfterReceivingMQTT_PUBCOMP^ := @HandleOnAfterReceiving_MQTT_PUBCOMP;
     OnBeforeSendingMQTT_SUBSCRIBE^ := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
     OnAfterReceivingMQTT_SUBACK^ := @HandleOnAfterReceivingMQTT_SUBACK;
+    OnBeforeSendingMQTT_UNSUBSCRIBE^ := @HandleOnBeforeSendingMQTT_UNSUBSCRIBE;
+    OnAfterReceivingMQTT_UNSUBACK^ := @HandleOnAfterReceivingMQTT_UNSUBACK;
+    OnAfterReceivingMQTT_PINGRESP^ := @HandleOnAfterReceivingMQTT_PINGRESP;
+    OnBeforeSendingMQTT_DISCONNECT^ := @HandleOnBeforeSendingMQTT_DISCONNECT;
+    OnAfterReceivingMQTT_DISCONNECT^ := @HandleOnAfterReceivingMQTT_DISCONNECT;
+    OnBeforeSendingMQTT_AUTH^ := @HandleOnBeforeSendingMQTT_AUTH;
+    OnAfterReceivingMQTT_AUTH^ := @HandleOnAfterReceivingMQTT_AUTH;
   {$ELSE}
     OnMQTTError := @HandleOnMQTTError;
+    OnSendMQTT_Packet := @HandleOnSend_MQTT_Packet;
     OnBeforeMQTT_CONNECT := @HandleOnBeforeMQTT_CONNECT;
     OnAfterMQTT_CONNACK := @HandleOnAfterMQTT_CONNACK;
     OnBeforeSendingMQTT_PUBLISH := @HandleOnBeforeSendingMQTT_PUBLISH;
-    OnBeforeSending_MQTT_PUBACK := @HandleOnBeforeSendingMQTT_PUBACK;
+    OnBeforeSendingMQTT_PUBACK := @HandleOnBeforeSendingMQTT_PUBACK;
     OnAfterReceivingMQTT_PUBACK := @HandleOnAfterReceivingMQTT_PUBACK;
     OnAfterReceivingMQTT_PUBLISH := @HandleOnAfterReceivingMQTT_PUBLISH;
     OnBeforeSendingMQTT_PUBREC := @HandleOnBeforeSending_MQTT_PUBREC;
@@ -542,6 +725,13 @@ begin
     OnAfterReceivingMQTT_PUBCOMP := @HandleOnAfterReceiving_MQTT_PUBCOMP;
     OnBeforeSendingMQTT_SUBSCRIBE := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
     OnAfterReceivingMQTT_SUBACK := @HandleOnAfterReceivingMQTT_SUBACK;
+    OnBeforeSendingMQTT_UNSUBSCRIBE := @HandleOnBeforeSendingMQTT_UNSUBSCRIBE;
+    OnAfterReceivingMQTT_UNSUBACK := @HandleOnAfterReceivingMQTT_UNSUBACK;
+    OnAfterReceivingMQTT_PINGRESP := @HandleOnAfterReceivingMQTT_PINGRESP;
+    OnBeforeSendingMQTT_DISCONNECT := @HandleOnBeforeSendingMQTT_DISCONNECT;
+    OnAfterReceivingMQTT_DISCONNECT := @HandleOnAfterReceivingMQTT_DISCONNECT;
+    OnBeforeSendingMQTT_AUTH := @HandleOnBeforeSendingMQTT_AUTH;
+    OnAfterReceivingMQTT_AUTH := @HandleOnAfterReceivingMQTT_AUTH;
   {$ENDIF}
 end;
 
@@ -579,12 +769,14 @@ var
   //ReadCount: Integer;
   TempByte: Byte;
   PacketName: string;
+  LoggedDisconnection: Boolean;
 begin
   try
     //ReadCount := 0;
     InitDynArrayToEmpty(TempReadBuf);
 
     try
+      LoggedDisconnection := False;
       repeat
         try
           TempByte := frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadByte;
@@ -598,12 +790,18 @@ begin
               AddToLog('done receiving packet: ' + E.Message + {'   ReadCount: ' + IntToStr(ReadCount) +} '   E.ClassName: ' + E.ClassName);
               AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
 
-              PutReceivedBufferToMQTTLib(0, TempReadBuf);
-              MQTT_Process(0);
+              frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);
 
               FreeDynArray(TempReadBuf);
               //ReadCount := 0; //reset for next packet
-            end;
+            end
+            else
+              if E.Message = 'Connection Closed Gracefully.' then
+                if not LoggedDisconnection then
+                begin
+                  LoggedDisconnection := True;
+                  AddToLog('Disconnected from server. Cannot receive more data. Ex: ' + E.Message);
+                end;
 
             Sleep(1);
           end;
@@ -626,59 +824,101 @@ var
 
 
 procedure TfrmMQTTClientAppMain.btnConnectClick(Sender: TObject);
+var
+  tk: QWord;
 begin
   IdTCPClient1.OnConnected := @HandleClientOnConnected;
   IdTCPClient1.OnDisconnected := @HandleClientOnDisconnected;
 
+  btnConnect.Enabled := False;
   try
-    IdTCPClient1.Connect(lbeAddress.Text, StrToIntDef(lbePort.Text, 1883));
-    IdTCPClient1.IOHandler.ReadTimeout := 1000;
-    //AddToLog('Connected to broker...');
+    try
+      IdTCPClient1.Connect(lbeAddress.Text, StrToIntDef(lbePort.Text, 1883));
+      IdTCPClient1.IOHandler.ReadTimeout := 100;
+      //AddToLog('Connected to broker...');
 
-    Th := TMQTTReceiveThread.Create(True);
-    Th.FreeOnTerminate := False;
-    Th.Start;
+      if Th <> nil then
+      begin
+        Th.Terminate;
+        tk := GetTickCount64;
+        repeat
+          Application.ProcessMessages;
+          Sleep(10);
+        until (GetTickCount64 - tk > 1500) or Th.Terminated;
+        Th := nil;
+      end;
 
-    if not MQTT_CONNECT(0, 0) then
-    begin
-      AddToLog('Can''t prepare MQTTConnect packet.');
-      Exit;
+      Th := TMQTTReceiveThread.Create(True);
+      Th.FreeOnTerminate := False;
+      Th.Start;
+
+      if not MQTT_CONNECT(0, 0) then
+      begin
+        AddToLog('Can''t prepare MQTTConnect packet.');
+        Exit;
+      end;
+    except
+      on E: Exception do
+        AddToLog('Can''t connect.  ' + E.Message + '   Class: ' + E.ClassName);
     end;
-
-    SendPacketToServer(0);
-  except
-    on E: Exception do
-      AddToLog('Can''t connect.  ' + E.Message + '   Class: ' + E.ClassName);
+  finally
+    btnConnect.Enabled := True;
   end;
+end;
+
+
+procedure TfrmMQTTClientAppMain.btnAuthClick(Sender: TObject);
+begin
+  if not MQTT_AUTH(0, 0) then
+    AddToLog('Can''t prepare MQTT_AUTH packet.');
 end;
 
 
 procedure TfrmMQTTClientAppMain.btnDisconnectClick(Sender: TObject);
 var
   tk: QWord;
+  ClientToServerBuf: {$IFDEF SingleOutputBuffer} PMQTTBuffer; {$ELSE} PMQTTMultiBuffer; {$ENDIF}
+  Err: Word;
 begin
-  Th.Terminate;
+  if not MQTT_DISCONNECT(0, 0) then
+  begin
+    AddToLog('Can''t prepare MQTTDisconnect packet.');
+    Exit;
+  end;
 
+  tk := GetTickCount64;
+  repeat
+    ClientToServerBuf := GetClientToServerBuffer(0, Err);
+    Application.ProcessMessages;
+    Sleep(10);
+  until (GetTickCount64 - tk > 1500) or ((ClientToServerBuf <> nil) and (ClientToServerBuf^.Len = 0));
+
+  Th.Terminate;
   tk := GetTickCount64;
   repeat
     Application.ProcessMessages;
     Sleep(10);
   until (GetTickCount64 - tk > 1500) or Th.Terminated;
+  Th := nil;
 
-  IdTCPClient1.Disconnect(True);
+  IdTCPClient1.Disconnect(False);
+end;
+
+
+procedure TfrmMQTTClientAppMain.btnPingClick(Sender: TObject);
+begin
+  if not MQTT_PINGREQ(0) then
+    AddToLog('Can''t prepare MQTT_PINGREQ packet.');
 end;
 
 
 procedure TfrmMQTTClientAppMain.btnPublishClick(Sender: TObject);
 begin
-  btnPublish.Enabled := False;
-  if not MQTT_PUBLISH(0, 0, cmbQoS.ItemIndex) then
-  begin
-    AddToLog('Can''t prepare MQTT_PUBLISH packet.');
-    Exit;
-  end;
+  if cmbQoS.ItemIndex > 0 then   //for QoS = 0, there is no expected ACK
+    btnPublish.Enabled := False;
 
-  SendPacketToServer(0);
+  if not MQTT_PUBLISH(0, 0, cmbQoS.ItemIndex) then
+    AddToLog('Can''t prepare MQTT_PUBLISH packet.');
 end;
 
 
@@ -697,7 +937,18 @@ begin
   end;
 
   frmMQTTClientAppMain.btnSubscribeTo.Enabled := False;
-  SendPacketToServer(0);
+end;
+
+
+procedure TfrmMQTTClientAppMain.btnUnSubscribeFromClick(Sender: TObject);
+begin
+  if not MQTT_UNSUBSCRIBE(0, 0) then
+  begin
+    AddToLog('Can''t prepare MQTT_UNSUBSCRIBE packet.');
+    Exit;
+  end;
+
+  frmMQTTClientAppMain.btnUnSubscribeFrom.Enabled := False;
 end;
 
 
@@ -710,7 +961,69 @@ end;
 
 procedure TfrmMQTTClientAppMain.FormCreate(Sender: TObject);
 begin
+  Th := nil;
+  FLoggingFIFO := TPollingFIFO.Create;
+  FRecBufFIFO := TPollingFIFO.Create;
+
   tmrStartup.Enabled := True;
+end;
+
+
+procedure TfrmMQTTClientAppMain.FormDestroy(Sender: TObject);
+begin
+  FreeAndNil(FLoggingFIFO);
+  FreeAndNil(FRecBufFIFO);
+  Th := nil;
+end;
+
+
+procedure TfrmMQTTClientAppMain.tmrProcessLogTimer(Sender: TObject);
+var
+  Msg: string;
+begin
+  if FLoggingFIFO.Pop(Msg) then
+    memLog.Lines.Add(DateTimeToStr(Now) + '  ' + (Msg));
+end;
+
+
+procedure TfrmMQTTClientAppMain.tmrProcessRecDataTimer(Sender: TObject);
+var
+  ClientToServerBuf: {$IFDEF SingleOutputBuffer} PMQTTBuffer; {$ELSE} PMQTTMultiBuffer; {$ENDIF}
+  ServerToClientBuf: PMQTTBuffer;
+  Err: Word;
+begin
+  ProcessReceivedBuffer;
+
+  ClientToServerBuf := GetClientToServerBuffer(0, Err);
+  if Err <> CMQTT_Success then
+    lblClientToServerBufferSize.Caption := 'Err ' + IntToStr(Err)
+  else
+  begin
+    try
+      lblClientToServerBufferSize.Caption := IntToStr(ClientToServerBuf^.Len);
+    except
+      lblClientToServerBufferSize.Caption := 'Ex inst';
+    end;
+  end;
+
+  ServerToClientBuf := GetServerToClientBuffer(0, Err);
+  if Err <> CMQTT_Success then
+    lblServerToClientBufferSize.Caption := 'Err ' + IntToStr(Err)
+  else
+  begin
+    try
+      lblServerToClientBufferSize.Caption := IntToStr(ServerToClientBuf^.Len);
+    except
+      lblServerToClientBufferSize.Caption := 'Ex inst';
+    end;
+  end;
+
+  try
+    lblClientToServerIDCount.Caption := IntToStr(GetClientToServerPacketIdentifiersCount(0));
+    lblServerToClientIDCount.Caption := IntToStr(GetServerToClientPacketIdentifiersCount(0));
+  except
+    lblClientToServerIDCount.Caption := 'Ex inst';
+  end;
 end;
 
 
@@ -720,6 +1033,9 @@ var
   Fnm: string;
 begin
   tmrStartup.Enabled := False;
+  tmrProcessLog.Enabled := True;
+  tmrProcessRecData.Enabled := True;
+
   FMQTTPassword := '';
 
   Content := TStringList.Create;
@@ -732,7 +1048,9 @@ begin
 
       if Content.Count > 0 then
         FMQTTPassword := Content.Strings[0]
-    end;
+    end
+    else
+      AddToLog('Password file not found. Using empty password..');
   finally
     Content.Free;
   end;
