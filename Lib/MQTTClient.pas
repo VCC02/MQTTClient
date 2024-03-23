@@ -230,6 +230,7 @@ function MQTT_GetClientCount: TDynArrayLength; //Can be used in for loops, which
 {$ELSE}
   function GetClientToServerBuffer(ClientInstance: DWord; var AErr: Word): PMQTTMultiBuffer;  //Err is 0 for success
 {$ENDIF}
+function GetClientToServerResendBuffer(ClientInstance: DWord; var AErr: Word): PMQTTMultiBuffer;  //Err is 0 for success
 function GetServerToClientBuffer(ClientInstance: DWord; var AErr: Word): PMQTTBuffer;  //Err is 0 for success
 
 function MQTT_Process(ClientInstance: DWord): Word; //Should be called in the main loop (not necessarily at every iteration), to do packet processing and trigger events. It should be called for every client. If it returns OutOfMemory, then the application has to be adjusted to call MQTT_Process more often and/or reserve more heap memory for MQTT library.
@@ -274,17 +275,20 @@ function MQTT_DISCONNECT(ClientInstance: DWord; ACallbackID: Word): Boolean;
 function MQTT_AUTH(ClientInstance: DWord; ACallbackID: Word): Boolean;
 
 
-////////////////////////////////////////////////////////// Multiple functions require calls to Free, both in happy flow and error cases.
-////////////////////////////////////////////////////////// all decoder functions (e.g. Decode_ConnAckToCtrlPacket) should return the decoded length. Not sure how to compute in case of an error. Probably, it's what the protocol spec says, to disconnect.
-////////////////////////////////////////////////////////// all decoder functions should not compute lengths based on ActualVarAndPayloadLen, because ActualVarAndPayloadLen depends on initial buffer, which may contain multiple packets
-
-
 //Testing functions (should not be called by user code)
 function GetServerToClientPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
 function GetServerToClientPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of ClientToServerPacketIdentifiers array
 function GetClientToServerPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
 function GetClientToServerPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of ClientToServerPacketIdentifiers array
 function GetSendQuota(ClientInstance: DWord): Word;
+
+//From spec, pag 96:
+//When a Client reconnects with Clean Start set to 0 and a session is present, both the Client and Server
+//MUST resend any unacknowledged PUBLISH packets (where QoS > 0) and PUBREL packets using their
+//original Packet Identifiers.
+
+//ResendUnacknowledged should be called by user code after a CONNACK, if TempConnAckFields.SessionPresentFlag is 1, and CMQTT_CleanStartInConnectFlagsBitMask is not present in CONNECT
+function ResendUnacknowledged(ClientInstance: DWord): Boolean;
 
 
 //Some of the following events are optional, i.e. the user code doesn't have to assign handlers to them.
@@ -346,6 +350,7 @@ const
   CMQTT_NoMoreSubscriptionIdentifiersAvailable = 212; //Likely a bad state or a memory leak would lead to this error. Usually, the library should not end up here.
   CMQTT_CannotReserveBadSubscriptionIdentifier = 213; //The library cannot preallocate the value 0 (which is a current limitation of DynArrays lib).
   CMQTT_CannotReserveBadPacketIdentifier = 214; //see 213
+  CMQTT_PacketIdentifierNotFound_ClientToServerResend = 215;
 
 
   //The following values are start values for various identifiers. The allocated identifiers are incremented by the library (if required) on every new allocation.
@@ -386,10 +391,12 @@ var
     //- The Ethernet library sends individual packets
     ClientToServerBuffer: TDynArrayOfPDynArrayOfTDynArrayOfByte;
   {$ENDIF}
+  ClientToServerResendBuffer: TDynArrayOfPDynArrayOfTDynArrayOfByte;
+  ClientToServerResendPacketIdentifier: TDynArrayOfTDynArrayOfWord;  //for every array of byte in the ClientToServerResendBuffer array, there is one packet identifier
   ServerToClientBuffer: TDynArrayOfTDynArrayOfByte;   //indexed by ClientInstance parameter from main functions
   ServerToClientPacketIdentifiers: TDynArrayOfTDynArrayOfWord;  //used when Servers send Publish.   Used on QoS = 2.  Process_PUBLISH adds items to this array.
   ClientToServerPacketIdentifiers: TDynArrayOfTDynArrayOfWord;  //used when Clients send Publish.
-  //ClientToServerUnAckPacketIdentifiers: TDynArrayOfTDynArrayOfByte;  //should be kept in sync with ClientToServerPacketIdentifiers array. Uncomment if needed.
+  //ClientToServerUnAckPacketIdentifiers: TDynArrayOfTDynArrayOfByte;  //should be kept in sync with ClientToServerPacketIdentifiers array. Uncomment when implementing retransmission.
   ClientToServerPacketIdentifiersInit: TDynArrayOfWord;  //one word for every Client
   MaximumQoS: TDynArrayOfTDynArrayOfByte; //used when initiating connections.  This keeps track of the requested and server-updated value of QoS. Updated by SubAck. For each client, there might be multiple topics or subscriptions (which can be a QoS or an error code).
   ClientToServerSendQuota: TDynArrayOfWord; //used on Publish, initialized by Connect, updated by Publish and PubAck/PubRec
@@ -408,6 +415,8 @@ begin
     InitDynArrayOfPDynArrayOfTDynArrayOfByteToEmpty(ClientToServerBuffer);
   {$ENDIF}
 
+  InitDynArrayOfPDynArrayOfTDynArrayOfByteToEmpty(ClientToServerResendBuffer);
+  InitDynOfDynOfWordToEmpty(ClientToServerResendPacketIdentifier);
   InitDynOfDynOfByteToEmpty(ServerToClientBuffer);
   InitDynOfDynOfWordToEmpty(ServerToClientPacketIdentifiers);
   InitDynOfDynOfWordToEmpty(ClientToServerPacketIdentifiers);
@@ -429,6 +438,8 @@ begin
     FreeDynArrayOfPDynArrayOfTDynArrayOfByte(ClientToServerBuffer);
   {$ENDIF}
 
+  FreeDynArrayOfPDynArrayOfTDynArrayOfByte(ClientToServerResendBuffer);
+  FreeDynOfDynOfWordArray(ClientToServerResendPacketIdentifier);
   FreeDynOfDynOfByteArray(ServerToClientBuffer);
   FreeDynOfDynOfWordArray(ServerToClientPacketIdentifiers);
   FreeDynOfDynOfWordArray(ClientToServerPacketIdentifiers);
@@ -632,7 +643,7 @@ begin
 end;
 
 
-//Called in case of a protocol error, to notify user application that is should disconnect from server.
+//Called in case of a protocol error, to notify user application that it should disconnect from server.
 procedure DoOnMQTTClientRequestsDisconnection(ClientInstance: DWord; AErr: Word);
 begin
   {$IFDEF IsDesktop}
@@ -992,6 +1003,7 @@ end;
 /////////////////////////////////
 
 
+//ClientToServer functions
 function CreateClientToServerPacketIdentifierWithStart(ClientInstance: DWord; AStartAt: Word): Word;   // Returns $FFFF if it can't find a new available number to allocate
 var
   TempClientInstance: DWord;
@@ -1058,7 +1070,113 @@ begin
 end;
 
 
-/////////////
+function GetClientToServerPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
+begin
+  if ClientInstance > ClientToServerPacketIdentifiers.Len - 1 then
+  {$IFnDEF IsDesktop}
+    begin
+      Result := 0
+      Exit;
+    end;
+  {$ELSE}
+    raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
+  {$ENDIF}
+
+  Result := ClientToServerPacketIdentifiers.Content^[ClientInstance]^.Len;
+end;
+
+
+function GetClientToServerPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of PacketIdentifiers array
+begin
+  if ClientInstance > ClientToServerPacketIdentifiers.Len - 1 then
+  {$IFnDEF IsDesktop}
+    begin
+      Result := 0
+      Exit;
+    end;
+  {$ELSE}
+    raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
+  {$ENDIF}
+
+  if AIndex > ClientToServerPacketIdentifiers.Content^[ClientInstance]^.Len - 1 then
+  {$IFnDEF IsDesktop}
+    begin
+      Result := 0
+      Exit;
+    end;
+  {$ELSE}
+    raise Exception.Create('AIndex out of bounds: ' + IntToStr(AIndex));
+  {$ENDIF}
+
+
+  Result := ClientToServerPacketIdentifiers.Content^[ClientInstance]^.Content^[AIndex];
+end;
+
+
+{$IFnDEF SingleOutputBuffer}
+  function RemovePacketFromClientToServerBuffer(ClientInstance: DWord): Boolean;
+  begin
+    Result := True;
+    if ClientToServerBuffer.Len = 0 then
+      Exit;
+
+    Result := DeleteItemFromDynOfDynOfByte(ClientToServerBuffer.Content^[ClientInstance and CClientIndexMask]^, 0);
+  end;
+{$ENDIF}
+
+
+function RemovePacketFromClientToServerResendBufferByIndex(ClientInstance: DWord; AIndex: Word): Boolean;
+var
+  TempClientInstance: DWord;
+begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+
+  Result := DeleteItemFromDynOfDynOfByte(ClientToServerResendBuffer.Content^[TempClientInstance]^, AIndex);
+  Result := Result and DeleteItemFromDynArrayOfWord(ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^, AIndex);
+end;
+
+
+//ServerToClient functions
+function GetServerToClientPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
+begin
+  if ClientInstance > ServerToClientPacketIdentifiers.Len - 1 then
+  {$IFnDEF IsDesktop}
+    begin
+      Result := 0
+      Exit;
+    end;
+  {$ELSE}
+    raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
+  {$ENDIF}
+
+  Result := ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Len;
+end;
+
+
+function GetServerToClientPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of PacketIdentifiers array
+begin
+  if ClientInstance > ServerToClientPacketIdentifiers.Len - 1 then
+  {$IFnDEF IsDesktop}
+    begin
+      Result := 0
+      Exit;
+    end;
+  {$ELSE}
+    raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
+  {$ENDIF}
+
+  if AIndex > ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Len - 1 then
+  {$IFnDEF IsDesktop}
+    begin
+      Result := 0
+      Exit;
+    end;
+  {$ELSE}
+    raise Exception.Create('AIndex out of bounds: ' + IntToStr(AIndex));
+  {$ENDIF}
+
+  Result := ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Content^[AIndex];
+end;
 
 
 function CreateServerToClientPacketIdentifier(ClientInstance: DWord): Word;   // Returns $FFFF if it can't find a new available number to allocate
@@ -1114,6 +1232,7 @@ begin
 end;
 
 
+//Quota functions
 function DecrementSendQuota(ClientInstance: DWord): Boolean;
 var
   TempClientInstance: DWord;
@@ -1144,9 +1263,19 @@ begin
 end;
 
 
+function GetSendQuota(ClientInstance: DWord): Word;
+var
+  TempClientInstance: DWord;
+begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+  Result := ClientToServerSendQuota.Content^[TempClientInstance];
+end;
+
+
 /////////////////////
 
 
+//SubscriptionIdentifier functions
 function CreateClientToServerSubscriptionIdentifierWithStart(ClientInstance: DWord; AStartAt: Word): Word;   // Returns $FFFF if it can't find a new available number to allocate
 var
   TempClientInstance: DWord;
@@ -1204,7 +1333,10 @@ begin
   if Result then
   begin
     NewLen := ServerToClientBuffer.Len + 1;
-    Result := SetDynOfDynOfByteLength(ServerToClientBuffer, NewLen);
+
+    Result := SetDynOfPDynArrayOfTDynArrayOfByteLength(ClientToServerResendBuffer, NewLen);
+    Result := Result and SetDynOfDynOfWordLength(ClientToServerResendPacketIdentifier, NewLen);
+    Result := Result and SetDynOfDynOfByteLength(ServerToClientBuffer, NewLen);
     Result := Result and SetDynOfDynOfWordLength(ServerToClientPacketIdentifiers, NewLen);
     Result := Result and SetDynOfDynOfWordLength(ClientToServerPacketIdentifiers, NewLen);
     //Result := Result and SetDynOfDynOfByteLength(ClientToServerUnAckPacketIdentifiers, NewLen);
@@ -1260,7 +1392,9 @@ begin
 
     ClientInstance := ClientInstance and CClientIndexMask;
 
-    Result := DeleteItemFromDynOfDynOfByte(ServerToClientBuffer, ClientInstance);
+    Result := DeleteItemFromDynArrayOfPDynArrayOfTDynArrayOfByte(ClientToServerResendBuffer, ClientInstance);
+    Result := Result and DeleteItemFromDynOfDynOfWord(ClientToServerResendPacketIdentifier, ClientInstance);
+    Result := Result and DeleteItemFromDynOfDynOfByte(ServerToClientBuffer, ClientInstance);
     Result := Result and DeleteItemFromDynOfDynOfWord(ServerToClientPacketIdentifiers, ClientInstance);
     Result := Result and DeleteItemFromDynOfDynOfWord(ClientToServerPacketIdentifiers, ClientInstance);
     //Result := Result and DeleteItemFromDynOfDynOfByte(ClientToServerUnAckPacketIdentifiers, ClientInstance);
@@ -1298,6 +1432,20 @@ begin
 end;
 
 
+function GetClientToServerResendBuffer(ClientInstance: DWord; var AErr: Word): PMQTTMultiBuffer;  //Err is 0 for success
+begin
+  AErr := CMQTT_Success;
+
+  if IsValidClientInstance(ClientInstance) then
+    Result := ClientToServerResendBuffer.Content^[ClientInstance and CClientIndexMask]
+  else
+  begin
+    Result := nil;
+    AErr := CMQTT_BadClientIndex;
+  end;
+end;
+
+
 function GetServerToClientBuffer(ClientInstance: DWord; var AErr: Word): PMQTTBuffer;  //AErr is 0 for success
 begin
   AErr := CMQTT_Success;
@@ -1313,37 +1461,45 @@ end;
 
 /////////////////////////////////
 
-function AddMQTTControlPacket_ToBuffer(var ABuffer: TDynArrayOfByte; var APacket: TMQTTControlPacket): Boolean;
+function AddMQTTControlPacket_ToBuffer(var ABuffer: TDynArrayOfByte; var ASrcPacket: TMQTTControlPacket): Boolean;
 begin
-  Result := ConcatDynArrays(ABuffer, APacket.Header);
+  Result := ConcatDynArrays(ABuffer, ASrcPacket.Header);      //Concats ABuffer with ASrcPacket.<Array>. Places new array in ABuffer.
 
   if Result then
-    Result := ConcatDynArrays(ABuffer, APacket.VarHeader);
+    Result := ConcatDynArrays(ABuffer, ASrcPacket.VarHeader);
 
   if Result then
-    Result := ConcatDynArrays(ABuffer, APacket.Payload);
+    Result := ConcatDynArrays(ABuffer, ASrcPacket.Payload);
 end;
 
 
 function AddCONNECT_ToBuffer(var ABuffer: TDynArrayOfByte;
                              var AConnectFields: TMQTTConnectFields;
-                             var AConnectProperties: TMQTTConnectProperties;
-                             var ADestPacket: TMQTTControlPacket): Boolean;
+                             var AConnectProperties: TMQTTConnectProperties): Boolean;
+var
+  TempDestPacket: TMQTTControlPacket;
 begin
-  Result := FillIn_Connect(AConnectFields, AConnectProperties, ADestPacket);
+  Result := FillIn_Connect(AConnectFields, AConnectProperties, TempDestPacket);
   if Result then
-    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, TempDestPacket);
+
+  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
 function AddPUBLISH_ToBuffer(var ABuffer: TDynArrayOfByte;
                              var APublishFields: TMQTTPublishFields;
                              var APublishProperties: TMQTTPublishProperties;
-                             var ADestPacket: TMQTTControlPacket): Boolean;
+                             AIncludePacketIdentifier: Boolean): Boolean;
+var
+  TempDestPacket: TMQTTControlPacket;
 begin
-  Result := FillIn_Publish(APublishFields, APublishProperties, ADestPacket);
+  Result := FillIn_Publish(APublishFields, APublishProperties, TempDestPacket);
+
   if Result then
-    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, TempDestPacket);
+
+  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
@@ -1351,64 +1507,84 @@ function AddPUBResponse_ToBuffer(var ABuffer: TDynArrayOfByte;
                                  var APubRespFields: TMQTTCommonFields;
                                  var APubRespProperties: TMQTTCommonProperties;
                                  APacketType: Byte; //valid values are CMQTT_PUBACK, CMQTT_PUBREC, CMQTT_PUBREL and CMQTT_PUBCOMP  (other packets are not compatible)
-                                 var ADestPacket: TMQTTControlPacket): Boolean;
+                                 AIncludePacketIdentifier: Boolean): Boolean;
+var
+  TempDestPacket: TMQTTControlPacket;
 begin
-  Result := FillIn_Common(APubRespFields, APubRespProperties, APacketType, ADestPacket);
+  Result := FillIn_Common(APubRespFields, APubRespProperties, APacketType, TempDestPacket);
+
   if Result then
-    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, TempDestPacket);
+
+  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
 function AddSUBSCRIBE_ToBuffer(var ABuffer: TDynArrayOfByte;
                                var ASubscribeFields: TMQTTSubscribeFields;
-                               var ASubscribeProperties: TMQTTSubscribeProperties;
-                               var ADestPacket: TMQTTControlPacket): Boolean;
+                               var ASubscribeProperties: TMQTTSubscribeProperties): Boolean;
+var
+  TempDestPacket: TMQTTControlPacket;
 begin
-  Result := FillIn_Subscribe(ASubscribeFields, ASubscribeProperties, ADestPacket);
+  Result := FillIn_Subscribe(ASubscribeFields, ASubscribeProperties, TempDestPacket);
   if Result then
-    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, TempDestPacket);
+
+  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
 function AddUNSUBSCRIBE_ToBuffer(var ABuffer: TDynArrayOfByte;
                                  var AUnsubscribeFields: TMQTTUnsubscribeFields;
-                                 var AUnsubscribeProperties: TMQTTUnsubscribeProperties;
-                                 var ADestPacket: TMQTTControlPacket): Boolean;
+                                 var AUnsubscribeProperties: TMQTTUnsubscribeProperties): Boolean;
+var
+  TempDestPacket: TMQTTControlPacket;
 begin
-  Result := FillIn_Unsubscribe(AUnsubscribeFields, AUnsubscribeProperties, ADestPacket);
+  Result := FillIn_Unsubscribe(AUnsubscribeFields, AUnsubscribeProperties, TempDestPacket);
   if Result then
-    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, TempDestPacket);
+
+  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
-function AddPINGREQ_ToBuffer(var ABuffer: TDynArrayOfByte;
-                             var ADestPacket: TMQTTControlPacket): Boolean;
+function AddPINGREQ_ToBuffer(var ABuffer: TDynArrayOfByte): Boolean;
+var
+  TempDestPacket: TMQTTControlPacket;
 begin
-  Result := FillIn_PingReq(ADestPacket);
+  Result := FillIn_PingReq(TempDestPacket);
   if Result then
-    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, TempDestPacket);
+
+  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
 function AddDISCONNECT_ToBuffer(var ABuffer: TDynArrayOfByte;
                                 var ADisconnectFields: TMQTTDisconnectFields;
-                                var ADisconnectProperties: TMQTTDisconnectProperties;
-                                var ADestPacket: TMQTTControlPacket): Boolean;
+                                var ADisconnectProperties: TMQTTDisconnectProperties): Boolean;
+var
+  TempDestPacket: TMQTTControlPacket;
 begin
-  Result := FillIn_Disconnect(ADisconnectFields, ADisconnectProperties, ADestPacket);
+  Result := FillIn_Disconnect(ADisconnectFields, ADisconnectProperties, TempDestPacket);
   if Result then
-    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, TempDestPacket);
+
+  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
 function AddAUTH_ToBuffer(var ABuffer: TDynArrayOfByte;
                           var AAuthFields: TMQTTAuthFields;
-                          var AAuthProperties: TMQTTAuthProperties;
-                          var ADestPacket: TMQTTControlPacket): Boolean;
+                          var AAuthProperties: TMQTTAuthProperties): Boolean;
+var
+  TempDestPacket: TMQTTControlPacket;
 begin
-  Result := FillIn_Auth(AAuthFields, AAuthProperties, ADestPacket);
+  Result := FillIn_Auth(AAuthFields, AAuthProperties, TempDestPacket);
   if Result then
-    Result := AddMQTTControlPacket_ToBuffer(ABuffer, ADestPacket);
+    Result := AddMQTTControlPacket_ToBuffer(ABuffer, TempDestPacket);
+
+  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
@@ -1419,7 +1595,6 @@ function MQTT_CONNECT_NoCallback(ClientInstance: DWord;  //ClientInstance identi
                                  var AConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
                                  var AConnectProperties: TMQTTConnectProperties): Boolean;  //user code has to fill-in this parameter
 var
-  TempDestPacket: TMQTTControlPacket;
   {$IFnDEF SingleOutputBuffer}
     n: LongInt;
   {$ENDIF}
@@ -1429,15 +1604,13 @@ begin
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, AConnectFields, AConnectProperties, TempDestPacket);
+    Result := AddCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, AConnectFields, AConnectProperties);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
-      Result := AddCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, AConnectFields, AConnectProperties, TempDestPacket);
+      Result := AddCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, AConnectFields, AConnectProperties);
   {$ENDIF}
-
-  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
@@ -1445,7 +1618,6 @@ function MQTT_PUBLISH_NoCallback(ClientInstance: DWord;  //ClientInstance identi
                                  var APublishFields: TMQTTPublishFields;                    //user code has to fill-in this parameter
                                  var APublishProperties: TMQTTPublishProperties): Boolean;  //user code has to fill-in this parameter
 var
-  TempDestPacket: TMQTTControlPacket;
   {$IFnDEF SingleOutputBuffer}
     n: LongInt;
   {$ENDIF}
@@ -1455,24 +1627,33 @@ begin
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddPUBLISH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APublishFields, APublishProperties, TempDestPacket);
+    Result := AddPUBLISH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APublishFields, APublishProperties);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
-      Result := AddPUBLISH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, APublishFields, APublishProperties, TempDestPacket);
+      Result := AddPUBLISH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, APublishFields, APublishProperties, False);
   {$ENDIF}
 
-  MQTT_FreeControlPacket(TempDestPacket);
+  if (APublishFields.PublishCtrlFlags shr 1) > 0 then  //QoS > 0
+    if Result then
+    begin
+      n := ClientToServerResendBuffer.Content^[TempClientInstance]^.Len;
+      Result := SetDynOfDynOfByteLength(ClientToServerResendBuffer.Content^[TempClientInstance]^, n + 1);
+      if Result then
+        Result := AddPUBLISH_ToBuffer(ClientToServerResendBuffer.Content^[TempClientInstance]^.Content^[n]^, APublishFields, APublishProperties, True);
+
+      if Result then
+        Result := AddWordToDynArraysOfWord(ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^, APublishFields.PacketIdentifier);
+    end;
 end;
 
 
 function MQTT_PUBResponse_NoCallback(ClientInstance: DWord;  //ClientInstance identifies the client instance (the library is able to implement multiple MQTT clients / device)
                                      APacketType: Byte; //valid values are CMQTT_PUBACK, CMQTT_PUBREC, CMQTT_PUBREL and CMQTT_PUBCOMP  (other packets are not compatible)
-                                     var APubAckFields: TMQTTPubAckFields;                    //user code has to fill-in this parameter
-                                     var APubAckProperties: TMQTTPubAckProperties): Boolean;  //user code has to fill-in this parameter
+                                     var APubAckFields: TMQTTCommonFields;                    //user code has to fill-in this parameter
+                                     var APubAckProperties: TMQTTCommonProperties): Boolean;  //user code has to fill-in this parameter
 var
-  TempDestPacket: TMQTTControlPacket;
   {$IFnDEF SingleOutputBuffer}
     n: LongInt;
   {$ENDIF}
@@ -1482,15 +1663,25 @@ begin
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddPUBResponse_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APubAckFields, APubAckProperties, TempDestPacket);
+    Result := AddPUBResponse_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APubAckFields, APubAckProperties);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
-      Result := AddPUBResponse_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, APubAckFields, APubAckProperties, APacketType, TempDestPacket);
+      Result := AddPUBResponse_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, APubAckFields, APubAckProperties, APacketType, False);
   {$ENDIF}
 
-  MQTT_FreeControlPacket(TempDestPacket);
+  if Result then
+    if APacketType and $F0 = CMQTT_PUBREL then
+    begin
+      n := ClientToServerResendBuffer.Content^[TempClientInstance]^.Len;
+      Result := SetDynOfDynOfByteLength(ClientToServerResendBuffer.Content^[TempClientInstance]^, n + 1);
+      if Result then
+        Result := AddPUBResponse_ToBuffer(ClientToServerResendBuffer.Content^[TempClientInstance]^.Content^[n]^, APubAckFields, APubAckProperties, APacketType, True);
+
+      if Result then
+        Result := AddWordToDynArraysOfWord(ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^, APubAckFields.PacketIdentifier);
+    end;
 end;
 
 
@@ -1498,7 +1689,6 @@ function MQTT_SUBSCRIBE_NoCallback(ClientInstance: DWord;  //ClientInstance iden
                                    var ASubscribeFields: TMQTTSubscribeFields;                    //user code has to fill-in this parameter
                                    var ASubscribeProperties: TMQTTSubscribeProperties): Boolean;  //user code has to fill-in this parameter
 var
-  TempDestPacket: TMQTTControlPacket;
   {$IFnDEF SingleOutputBuffer}
     n: LongInt;
   {$ENDIF}
@@ -1508,13 +1698,13 @@ begin
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, ASubscribeFields, ASubscribeProperties, TempDestPacket);
+    Result := AddSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, ASubscribeFields, ASubscribeProperties);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
     begin
-      Result := AddSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, ASubscribeFields, ASubscribeProperties, TempDestPacket);
+      Result := AddSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, ASubscribeFields, ASubscribeProperties);
       //ToDo: Cache topic filters ///////////////////////////////////////////////////////////  in MQTT_SUBSCRIBE_NoCallback
       //The Subscription Identifiers should not be cached for Session State. See spec pag 76:
       //  "The Subscription Identifiers do not form part of the Client’s Session State in the Client."
@@ -1524,8 +1714,6 @@ begin
       //The library assumes that the user code calls CreateClientToServerSubscriptionIdentifier in OnBeforeSendingMQTT_SUBSCRIBE handler.
     end;
     {$ENDIF}
-
-  MQTT_FreeControlPacket(TempDestPacket);
 end;
 
 
@@ -1533,7 +1721,6 @@ function MQTT_UNSUBSCRIBE_NoCallback(ClientInstance: DWord;  //ClientInstance id
                                      var AUnsubscribeFields: TMQTTUnsubscribeFields;                    //user code has to fill-in this parameter
                                      var AUnsubscribeProperties: TMQTTUnsubscribeProperties): Boolean;  //user code has to fill-in this parameter
 var
-  TempDestPacket: TMQTTControlPacket;
   {$IFnDEF SingleOutputBuffer}
     n: LongInt;
   {$ENDIF}
@@ -1543,18 +1730,16 @@ begin
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddUNSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, AUnsubscribeFields, AUnsubscribeProperties, TempDestPacket);
+    Result := AddUNSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, AUnsubscribeFields, AUnsubscribeProperties);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
     begin
-      Result := AddUNSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, AUnsubscribeFields, AUnsubscribeProperties, TempDestPacket);
+      Result := AddUNSUBSCRIBE_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, AUnsubscribeFields, AUnsubscribeProperties);
       //The library assumes that the user code calls RemoveClientToServerSubscriptionIdentifier in OnBeforeSendingMQTT_UNSUBSCRIBE handler.
     end;
-    {$ENDIF}
-
-  MQTT_FreeControlPacket(TempDestPacket);
+  {$ENDIF}
 end;
 
 
@@ -1562,7 +1747,6 @@ function MQTT_DISCONNECT_NoCallback(ClientInstance: DWord;  //ClientInstance ide
                                     var ADisconnectFields: TMQTTDisconnectFields;                    //user code has to fill-in this parameter
                                     var ADisconnectProperties: TMQTTDisconnectProperties): Boolean;  //user code has to fill-in this parameter
 var
-  TempDestPacket: TMQTTControlPacket;
   {$IFnDEF SingleOutputBuffer}
     n: LongInt;
   {$ENDIF}
@@ -1572,15 +1756,13 @@ begin
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddDISCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, ADisconnectFields, ADisconnectProperties, TempDestPacket);
+    Result := AddDISCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, ADisconnectFields, ADisconnectProperties);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
-      Result := AddDISCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, ADisconnectFields, ADisconnectProperties, TempDestPacket);
-    {$ENDIF}
-
-  MQTT_FreeControlPacket(TempDestPacket);
+      Result := AddDISCONNECT_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, ADisconnectFields, ADisconnectProperties);
+  {$ENDIF}
 end;
 
 
@@ -1588,7 +1770,6 @@ function MQTT_AUTH_NoCallback(ClientInstance: DWord;  //ClientInstance identifie
                               var AAuthFields: TMQTTAuthFields;                    //user code has to fill-in this parameter
                               var AAuthProperties: TMQTTAuthProperties): Boolean;  //user code has to fill-in this parameter
 var
-  TempDestPacket: TMQTTControlPacket;
   {$IFnDEF SingleOutputBuffer}
     n: LongInt;
   {$ENDIF}
@@ -1598,15 +1779,13 @@ begin
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddAUTH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, AAuthFields, AAuthProperties, TempDestPacket);
+    Result := AddAUTH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, AAuthFields, AAuthProperties);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
-      Result := AddAUTH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, AAuthFields, AAuthProperties, TempDestPacket);
-    {$ENDIF}
-
-  MQTT_FreeControlPacket(TempDestPacket);
+      Result := AddAUTH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, AAuthFields, AAuthProperties);
+  {$ENDIF}
 end;
 
 /////////////////////////////////
@@ -1733,7 +1912,7 @@ begin
   case QoS of
     0 : //  Expected Response: None
     begin
-      ////////////////////////////////////////////////////////////////////////////////////////////////////
+      //
     end;
 
     1 : //  Expected response to server: PUBACK packet           QoS=1 allows duplicates, so PacketIdentifier is not added to ServerToClientPacketIdentifiers array
@@ -1797,7 +1976,7 @@ end;
 function Process_PUBACK_OR_PUBCOMP(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord; APacketType: Byte): Word;
 var
   TempReceivedPacket: TMQTTControlPacket;
-  PacketIdentifierIdx: TDynArrayLengthSig;
+  PacketIdentifierIdx, PacketIdentifierIdxInResend: TDynArrayLengthSig;
   TempClientInstance: DWord;
 
   TempCommonFields: TMQTTCommonFields;
@@ -1825,6 +2004,9 @@ begin
       DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServer, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
     else
     begin
+      //PacketIdentifierIdxInResend is set here, because TempCommonFields can be altered in user code, from DoOnAfterReceiving_MQTT_*.
+      PacketIdentifierIdxInResend := IndexOfWordInArrayOfWord(ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^, TempCommonFields.PacketIdentifier);
+
       if not IncrementSendQuota(ClientInstance) then
       begin
         DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, APacketType);   //too many acknowledgements
@@ -1841,7 +2023,15 @@ begin
       end;
 
       RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx);
-    end;
+
+      if PacketIdentifierIdxInResend <> -1 then
+      begin
+        if not RemovePacketFromClientToServerResendBufferByIndex(ClientInstance, PacketIdentifierIdxInResend) then
+          Result := CMQTT_OutOfMemory;
+      end
+      else
+        DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServerResend, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
+    end;  //PacketIdentifierIdx <> -1
   end;
 end;
 
@@ -1861,6 +2051,7 @@ function Process_PUBREC(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var
 var
   TempReceivedPacket: TMQTTControlPacket;
   PacketIdentifierIdx: TDynArrayLengthSig;
+  PacketIdentifierIdxInResend: TDynArrayLengthSig;
   TempClientInstance: DWord;
 
   TempPubRecFields: TMQTTPubRecFields;
@@ -1908,6 +2099,9 @@ begin
       // The PacketIdentifier is removed here, not in MQTT_PUBResponse_NoCallback, because its index is already available here.
       if PacketIdentifierIdx <> -1 then
       begin
+        //PacketIdentifierIdxInResend is set here, because TempCommonFields can be altered in user code, from DoOnAfterReceiving_MQTT_*.
+        PacketIdentifierIdxInResend := IndexOfWordInArrayOfWord(ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^, TempPubRecFields.PacketIdentifier);
+
         if TempPubRecFields.ReasonCode >= 128 then  //Verify response error for PUBREC only !!! Other packets should not have this check.
           if not IncrementSendQuota(ClientInstance) then
             DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, CMQTT_PUBREC);   //too many acknowledgements
@@ -1921,7 +2115,16 @@ begin
 
         if Result = CMQTT_Success then
           DoOnSend_MQTT_Packet(ClientInstance, CMQTT_PUBREL, Result);    //mandatory
-      end;
+
+        if PacketIdentifierIdxInResend <> -1 then
+        begin
+          if not RemovePacketFromClientToServerResendBufferByIndex(ClientInstance, PacketIdentifierIdxInResend) then
+            Result := CMQTT_OutOfMemory;
+        end
+        else
+          DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServerResend, CMQTT_PUBREC);
+
+      end; //PacketIdentifierIdx <> -1
     end
     else
       Result := CMQTT_OutOfMemory;    //probably nothing gets sent to server
@@ -2013,7 +2216,6 @@ var
   TempReceivedPacket: TMQTTControlPacket;
   PacketIdentifierIdx: TDynArrayLengthSig;
   TempClientInstance: DWord;
-  Err: Word;
 
   TempSubAckFields: TMQTTSubAckFields;
   TempSubAckProperties: TMQTTSubAckProperties;
@@ -2021,7 +2223,6 @@ var
   //s, msg: string;
   //i: Integer;
 begin
-  Err := CMQTT_Success;
   MQTT_InitControlPacket(TempReceivedPacket);
   TempClientInstance := ClientInstance and CClientIndexMask;
 
@@ -2073,12 +2274,10 @@ var
   TempReceivedPacket: TMQTTControlPacket;
   PacketIdentifierIdx: TDynArrayLengthSig;
   TempClientInstance: DWord;
-  Err: Word;
 
   TempUnsubAckFields: TMQTTUnsubAckFields;
   TempUnsubAckProperties: TMQTTUnsubAckProperties;
 begin
-  Err := CMQTT_Success;
   MQTT_InitControlPacket(TempReceivedPacket);
   TempClientInstance := ClientInstance and CClientIndexMask;
 
@@ -2178,7 +2377,6 @@ begin
     MQTT_FreeAuthProperties(TempAuthProperties);
   end;
 end;
-
 
 
 type
@@ -2405,18 +2603,13 @@ begin
   //From spec: "A Packet Identifier cannot be used by more than one command at any time." - spec, pag 24.
   //This means that CreateClientToServerPacketIdentifier should be used to allocate a new Packet identifier.
 
-  //if AQoS > 0 then
+  NewPacketIdentifier := CreateClientToServerPacketIdentifier(ClientInstance);
+  if NewPacketIdentifier = $FFFF then
   begin
-    NewPacketIdentifier := CreateClientToServerPacketIdentifier(ClientInstance);
-    if NewPacketIdentifier = $FFFF then
-    begin
-      DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_SUBSCRIBE);  //
-      Result := False;
-      Exit;
-    end;
+    DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_SUBSCRIBE);  //
+    Result := False;
+    Exit;
   end;
-  //else
-  //  NewPacketIdentifier := 0; //just set a default, but do not add it to the array of identifiers
 
   InitDynArrayToEmpty(TempSubscribeFields.TopicFilters);
   TempSubscribeFields.PacketIdentifier := NewPacketIdentifier;
@@ -2464,18 +2657,13 @@ begin
 
   //From spec: "A Packet Identifier cannot be used by more than one command at any time." - spec, pag 24.
 
-  //if AQoS > 0 then
+  NewPacketIdentifier := CreateClientToServerPacketIdentifier(ClientInstance); //////////////////////////////////////////  make sure it is removed on ACK
+  if NewPacketIdentifier = $FFFF then
   begin
-    NewPacketIdentifier := CreateClientToServerPacketIdentifier(ClientInstance); //////////////////////////////////////////  make sure it is removed on ACK
-    if NewPacketIdentifier = $FFFF then
-    begin
-      DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_SUBSCRIBE);  //
-      Result := False;
-      Exit;
-    end;
+    DoOnMQTTError(ClientInstance, CMQTT_NoMorePacketIdentifiersAvailable, CMQTT_SUBSCRIBE);  //
+    Result := False;
+    Exit;
   end;
-  //else
-  //  NewPacketIdentifier := 0; //just set a default, but do not add it to the array of identifiers
 
   InitDynArrayToEmpty(TempUnsubscribeFields.TopicFilters);
   TempUnsubscribeFields.PacketIdentifier := NewPacketIdentifier;
@@ -2510,7 +2698,6 @@ end;
 
 function MQTT_PINGREQ(ClientInstance: DWord): Boolean;
 var
-  TempDestPacket: TMQTTControlPacket;
   {$IFnDEF SingleOutputBuffer}
     n: LongInt;
   {$ENDIF}
@@ -2519,15 +2706,13 @@ var
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddPINGREQ_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, TempDestPacket);
+    Result := AddPINGREQ_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
     if Result then
-      Result := AddPINGREQ_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^, TempDestPacket);
+      Result := AddPINGREQ_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^.Content^[n]^);
   {$ENDIF}
-
-  MQTT_FreeControlPacket(TempDestPacket);
 
   if Result then
     DoOnSend_MQTT_Packet(ClientInstance, CMQTT_PINGREQ, Err);    //mandatory
@@ -2586,114 +2771,46 @@ begin
 end;
 
 
-{$IFnDEF SingleOutputBuffer}
-  function RemovePacketFromClientToServerBuffer(ClientInstance: DWord): Boolean;
-  begin
-    Result := True;
-    if ClientToServerBuffer.Len = 0 then
-      Exit;
-
-    Result := DeleteItemFromDynOfDynOfByte(ClientToServerBuffer.Content^[ClientInstance and CClientIndexMask]^, 0);
-  end;
-{$ENDIF}
-
-
-//Testing functions (should not be called by user code)
-function GetServerToClientPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
-begin
-  if ClientInstance > ServerToClientPacketIdentifiers.Len - 1 then
-  {$IFnDEF IsDesktop}
-    begin
-      Result := 0
-      Exit;
-    end;
-  {$ELSE}
-    raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
-  {$ENDIF}
-
-  Result := ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Len;
-end;
-
-
-function GetServerToClientPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of PacketIdentifiers array
-begin
-  if ClientInstance > ServerToClientPacketIdentifiers.Len - 1 then
-  {$IFnDEF IsDesktop}
-    begin
-      Result := 0
-      Exit;
-    end;
-  {$ELSE}
-    raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
-  {$ENDIF}
-
-  if AIndex > ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Len - 1 then
-  {$IFnDEF IsDesktop}
-    begin
-      Result := 0
-      Exit;
-    end;
-  {$ELSE}
-    raise Exception.Create('AIndex out of bounds: ' + IntToStr(AIndex));
-  {$ENDIF}
-
-
-  Result := ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Content^[AIndex];
-end;
-
-
-//Testing functions (should not be called by user code)
-function GetClientToServerPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
-begin
-  if ClientInstance > ClientToServerPacketIdentifiers.Len - 1 then
-  {$IFnDEF IsDesktop}
-    begin
-      Result := 0
-      Exit;
-    end;
-  {$ELSE}
-    raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
-  {$ENDIF}
-
-  Result := ClientToServerPacketIdentifiers.Content^[ClientInstance]^.Len;
-end;
-
-
-function GetClientToServerPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of PacketIdentifiers array
-begin
-  if ClientInstance > ClientToServerPacketIdentifiers.Len - 1 then
-  {$IFnDEF IsDesktop}
-    begin
-      Result := 0
-      Exit;
-    end;
-  {$ELSE}
-    raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
-  {$ENDIF}
-
-  if AIndex > ClientToServerPacketIdentifiers.Content^[ClientInstance]^.Len - 1 then
-  {$IFnDEF IsDesktop}
-    begin
-      Result := 0
-      Exit;
-    end;
-  {$ELSE}
-    raise Exception.Create('AIndex out of bounds: ' + IntToStr(AIndex));
-  {$ENDIF}
-
-
-  Result := ClientToServerPacketIdentifiers.Content^[ClientInstance]^.Content^[AIndex];
-end;
-
-
-function GetSendQuota(ClientInstance: DWord): Word;
+function ResendUnacknowledged(ClientInstance: DWord): Boolean;
 var
+  i, ResendBuffItemCountM1: TDynArrayLengthSig;
   TempClientInstance: DWord;
+  TempArr: TDynArrayOfByte;
+  ResendBufferPointer: PDynArrayOfByte;
+  Err: Word;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
-  Result := ClientToServerSendQuota.Content^[TempClientInstance];
-end;
+  ResendBuffItemCountM1 := ClientToServerResendBuffer.Content^[TempClientInstance]^.Len - 1;
+  Result := True;
 
+  for i := 0 to ResendBuffItemCountM1 do
+  begin
+    InitDynArrayToEmpty(TempArr);
+    ResendBufferPointer := ClientToServerResendBuffer.Content^[TempClientInstance]^.Content^[i];
+    CopyFromDynArray(TempArr, ResendBufferPointer^, 0, ResendBufferPointer^.Len);
+
+    {$IFDEF SingleOutputBuffer}
+      Result := ConcatDynArrays(ClientToServerBuffer.Content^[TempClientInstance]^, TempArr);
+    {$ELSE}
+      //n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
+      //Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
+      if Result then
+        Result := AddDynArrayOfByteToDynOfDynOfByte(ClientToServerBuffer.Content^[TempClientInstance]^, TempArr);
+    {$ENDIF}
+
+    if Result then
+      if TempArr.Len > 0 then
+      begin
+        DoOnSend_MQTT_Packet(ClientInstance, TempArr.Content^[0], Err);  //Publish or PubRel
+        Result := Err = CMQTT_Success;      //it is fine to return the result from the last iteration
+      end;
+
+    FreeDynArray(TempArr);
+  end;
+
+  for i := 0 to ResendBuffItemCountM1 do
+    RemovePacketFromClientToServerResendBufferByIndex(TempClientInstance, 0);
+end;
 
 end.
 

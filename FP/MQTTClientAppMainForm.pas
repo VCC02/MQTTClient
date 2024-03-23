@@ -49,6 +49,7 @@ type
     btnUnSubscribeFrom: TButton;
     btnPing: TButton;
     btnAuth: TButton;
+    btnResendUnAck: TButton;
     chkAddInc: TCheckBox;
     cmbQoS: TComboBox;
     grpStatistics: TGroupBox;
@@ -56,7 +57,9 @@ type
     grpPublish: TGroupBox;
     IdTCPClient1: TIdTCPClient;
     lblClientToServerBufferSize: TLabel;
+    lblClientToServerResendBufferSize: TLabel;
     lblClientToServerBufferSizeInfo: TLabel;
+    lblClientToServerResendBufferSizeInfo: TLabel;
     lblServerToClientIDCount: TLabel;
     lblServerToClientPacketIDCountInfo: TLabel;
     lblServerToClientBufferSize: TLabel;
@@ -80,6 +83,7 @@ type
     procedure btnDisconnectClick(Sender: TObject);
     procedure btnPingClick(Sender: TObject);
     procedure btnPublishClick(Sender: TObject);
+    procedure btnResendUnAckClick(Sender: TObject);
     procedure btnSetToLocalhostClick(Sender: TObject);
     procedure btnSubscribeToClick(Sender: TObject);
     procedure btnUnSubscribeFromClick(Sender: TObject);
@@ -129,16 +133,21 @@ var
 
 
 procedure HandleOnMQTTError(ClientInstance: DWord; AErr: Word; APacketType: Byte);
+var
+  PacketTypeStr: string;
 begin
-  frmMQTTClientAppMain.AddToLog('Client: ' + IntToHex(ClientInstance, 8) + '  Err: $' + IntToHex(AErr) + '  PacketType: $' + IntToHex(APacketType));
-  //The error is made of an upper byte and a lower byte.
+  MQTTPacketToString(APacketType, PacketTypeStr);
+  frmMQTTClientAppMain.AddToLog('Client: ' + IntToHex(ClientInstance, 8) + '  Err: $' + IntToHex(AErr) + '  PacketType: $' + IntToHex(APacketType) + ' (' + PacketTypeStr + ').');  //The error is made of an upper byte and a lower byte.
 
-  if Hi(AErr) = $87 then
+  if Hi(AErr) = CMQTT_Reason_NotAuthorized then   // $87
   begin
-    frmMQTTClientAppMain.AddToLog('Error: Not authorized.');
+    frmMQTTClientAppMain.AddToLog('Server error: Not authorized.');
     if APacketType = CMQTT_CONNACK then
       frmMQTTClientAppMain.AddToLog('             on receiving CONNACK.');
   end;
+
+  if Lo(AErr) = CMQTT_PacketIdentifierNotFound_ClientToServer then   // $CE
+    frmMQTTClientAppMain.AddToLog('Client error: PacketIdentifierNotFound.');
 end;
 
 
@@ -271,6 +280,10 @@ begin
   frmMQTTClientAppMain.btnSubscribeTo.Enabled := True;
   frmMQTTClientAppMain.btnUnSubscribeFrom.Enabled := True;
   frmMQTTClientAppMain.AddToLog('');
+
+
+  ///////////////////////////////////////// when the server returns SessionPresentFlag set to 1, the library resends unacknowledged Publish and PubRel packets.
+  //AConnAckFields.SessionPresentFlag := 1;
 end;
 
 
@@ -427,7 +440,7 @@ begin
   frmMQTTClientAppMain.AddToLog('Publishing "' + Msg + '" at QoS = ' + IntToStr(QoS));
 
   Result := Result and StringToDynArrayOfByte(Msg, APublishFields.ApplicationMessage);
-  Result := Result and StringToDynArrayOfByte(frmMQTTClientAppMain.lbeTopicName.Text, APublishFields.TopicName);
+  Result := Result and StringToDynArrayOfByte(frmMQTTClientAppMain.lbeTopicNameToPublish.Text, APublishFields.TopicName);
 
   frmMQTTClientAppMain.AddToLog('');
   //QoS can be overriden here. If users override QoS in this handler, then a a different PacketIdentifier might be allocated (depending on what is available)
@@ -743,8 +756,13 @@ var
 begin
   BufferPointer := GetClientToServerBuffer(ClientInstance, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   SendDynArrayOfByte(BufferPointer^);
-  if not RemovePacketFromClientToServerBuffer(ClientInstance) then
-    AddToLog('Can''t remove latest packet from send buffer.');
+
+  {$IFnDEF SingleOutputBuffer}
+    if not RemovePacketFromClientToServerBuffer(ClientInstance) then
+      AddToLog('Can''t remove latest packet from send buffer.');
+  {$ELSE}
+    raise Exception.Create('RemovePacketFromClientToServerBuffer no implemented for SingleOutputBuffer.');
+  {$ENDIF}
 end;
 
 
@@ -922,6 +940,12 @@ begin
 end;
 
 
+procedure TfrmMQTTClientAppMain.btnResendUnAckClick(Sender: TObject);
+begin
+  ResendUnacknowledged(0);
+end;
+
+
 procedure TfrmMQTTClientAppMain.btnSetToLocalhostClick(Sender: TObject);
 begin
   lbeAddress.Text := '127.0.0.1';
@@ -989,6 +1013,7 @@ end;
 procedure TfrmMQTTClientAppMain.tmrProcessRecDataTimer(Sender: TObject);
 var
   ClientToServerBuf: {$IFDEF SingleOutputBuffer} PMQTTBuffer; {$ELSE} PMQTTMultiBuffer; {$ENDIF}
+  ClientToServerResendBuf: PMQTTMultiBuffer;
   ServerToClientBuf: PMQTTBuffer;
   Err: Word;
 begin
@@ -1005,6 +1030,19 @@ begin
       lblClientToServerBufferSize.Caption := 'Ex inst';
     end;
   end;
+
+  ClientToServerResendBuf := GetClientToServerResendBuffer(0, Err);
+  if Err <> CMQTT_Success then
+    lblClientToServerResendBufferSize.Caption := 'Err ' + IntToStr(Err)
+  else
+  begin
+    try
+      lblClientToServerResendBufferSize.Caption := IntToStr(ClientToServerResendBuf^.Len);
+    except
+      lblClientToServerResendBufferSize.Caption := 'Ex inst';
+    end;
+  end;
+
 
   ServerToClientBuf := GetServerToClientBuffer(0, Err);
   if Err <> CMQTT_Success then

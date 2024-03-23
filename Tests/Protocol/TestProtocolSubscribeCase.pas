@@ -41,10 +41,10 @@ type
     procedure SetUp; override;
     procedure TearDown; override;
 
-    procedure TestClientToServerBufferContent_BeforeSubscribe_WithCallback_GenericPacketCount(ACount: Integer);
+    procedure TestClientToServerBufferContent_BeforeSubscribe_WithCallback_Generic;
   published
-    procedure TestClientToServerBufferContent_BeforeSubscribe_WithCallback_OnePacket;
-    procedure TestClientToServerBufferContent_BeforeSubscribe_WithCallback_OnePacket_NoID;
+    procedure TestClientToServerBufferContent_BeforeSubscribe_WithCallback;
+    procedure TestClientToServerBufferContent_BeforeSubscribe_WithCallback_NoID;
   end;
 
 
@@ -56,7 +56,6 @@ uses
 
 
 var
-  //EncodedSubscribeBuffer: TDynArrayOfByte;
   DecodedSubscribePacket: TMQTTControlPacket;
   DecodedBufferLen: DWord;
   FoundError: Word;
@@ -113,7 +112,6 @@ begin
     OnMQTTError := @HandleOnMQTTError;
   {$ENDIF}
 
-  //InitDynArrayToEmpty(EncodedSubscribeBuffer);
   MQTT_InitControlPacket(DecodedSubscribePacket);
   DecodedBufferLen := 0;
 
@@ -125,7 +123,6 @@ end;
 
 procedure TTestProtocolSubscribeCase.TearDown;
 begin
-  //FreeDynArray(EncodedSubscribeBuffer);
   MQTT_FreeControlPacket(DecodedSubscribePacket);
 
   MQTT_DestroyClient(0);
@@ -133,7 +130,7 @@ begin
 end;
 
 
-procedure TTestProtocolSubscribeCase.TestClientToServerBufferContent_BeforeSubscribe_WithCallback_GenericPacketCount(ACount: Integer);
+procedure TTestProtocolSubscribeCase.TestClientToServerBufferContent_BeforeSubscribe_WithCallback_Generic;
 var
   BufferPointer: PMQTTBuffer;
   Err: Word;
@@ -159,14 +156,16 @@ begin
     Decode_Subscribe(DecodedSubscribePacket, SubscribeFields, SubscribeProperties);
 
     if IncludeSubscriptionIdentifier then
-      Expect(SubscribeProperties.SubscriptionIdentifier).ToBe(CClientToServerSubscriptionIdentifiersInitOffset, 'Allocated SubscriptionIdentifier');
+      Expect(SubscribeProperties.SubscriptionIdentifier).ToBe(CClientToServerSubscriptionIdentifiersInitOffset, 'Allocated SubscriptionIdentifier')
+    else
+      Expect(SubscribeProperties.SubscriptionIdentifier).ToBe(3, 'Default SubscriptionIdentifier');
 
     InitDynOfDynOfByteToEmpty(DecodedTopics);
     InitDynArrayToEmpty(DecodedSubscriptionOptions);
     try
       Expect(Decode_SubscribePayload(SubscribeFields.TopicFilters, DecodedTopics, DecodedSubscriptionOptions)).ToBe(CMQTTDecoderNoErr);
       Expect(DecodedTopics.Len).ToBe(2, 'Expected two topics');
-      Expect(DecodedSubscriptionOptions.Len).ToBe(2, 'Expected two topic optionss');
+      Expect(DecodedSubscriptionOptions.Len).ToBe(2, 'Expected two topic options');
 
       Expect(DynArrayOfByteToString(DecodedTopics.Content^[0]^)).ToBe('abc/def');
       Expect(DynArrayOfByteToString(DecodedTopics.Content^[1]^)).ToBe('123/456/789');
@@ -184,17 +183,17 @@ begin
 end;
 
 
-procedure TTestProtocolSubscribeCase.TestClientToServerBufferContent_BeforeSubscribe_WithCallback_OnePacket;
+procedure TTestProtocolSubscribeCase.TestClientToServerBufferContent_BeforeSubscribe_WithCallback;
 begin
   IncludeSubscriptionIdentifier := True;
-  TestClientToServerBufferContent_BeforeSubscribe_WithCallback_GenericPacketCount(0);
+  TestClientToServerBufferContent_BeforeSubscribe_WithCallback_Generic;
 end;
 
 
-procedure TTestProtocolSubscribeCase.TestClientToServerBufferContent_BeforeSubscribe_WithCallback_OnePacket_NoID;
+procedure TTestProtocolSubscribeCase.TestClientToServerBufferContent_BeforeSubscribe_WithCallback_NoID;
 begin
-  IncludeSubscriptionIdentifier := False;  //not very useful
-  TestClientToServerBufferContent_BeforeSubscribe_WithCallback_GenericPacketCount(0);
+  IncludeSubscriptionIdentifier := False;
+  TestClientToServerBufferContent_BeforeSubscribe_WithCallback_Generic;
 end;
 
 

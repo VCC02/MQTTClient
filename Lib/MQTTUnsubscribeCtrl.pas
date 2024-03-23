@@ -259,6 +259,8 @@ begin
     Exit;
   end;
 
+  CopyFromDynArray(AUnsubscribeFields.TopicFilters, AReceivedPacket.Payload, 0, AReceivedPacket.Payload.Len);
+
   Result := CMQTTDecoderNoErr;
 end;
 

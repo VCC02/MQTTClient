@@ -71,7 +71,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
     EditLabel.ParentFont = False
     ParentFont = False
     TabOrder = 4
-    Text = 'VCC'
+    Text = 'Username'
   end
   object btnDisconnect: TButton
     Left = 152
@@ -172,6 +172,15 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
       Width = 22
       Caption = 'QoS'
     end
+    object btnResendUnAck: TButton
+      Left = 168
+      Height = 25
+      Top = 40
+      Width = 91
+      Caption = 'Resend UnAck'
+      TabOrder = 5
+      OnClick = btnResendUnAckClick
+    end
   end
   object grpSubscription: TGroupBox
     Left = 512
@@ -236,14 +245,14 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
     object lblServerToClientBufferSizeInfo: TLabel
       Left = 8
       Height = 15
-      Top = 16
+      Top = 32
       Width = 132
       Caption = 'ServerToClientBufferSize:'
     end
     object lblServerToClientBufferSize: TLabel
       Left = 184
       Height = 15
-      Top = 16
+      Top = 32
       Width = 18
       Caption = '000'
     end
@@ -251,7 +260,7 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
       Left = 8
       Height = 15
       Hint = 'One value is preallocated (i.e. 0).'
-      Top = 32
+      Top = 48
       Width = 159
       Caption = 'ClientToServerPacketIDCount:'
       ParentShowHint = False
@@ -260,21 +269,21 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
     object lblClientToServerIDCount: TLabel
       Left = 184
       Height = 15
-      Top = 32
+      Top = 48
       Width = 18
       Caption = '000'
     end
     object lblServerToClientPacketIDCountInfo: TLabel
       Left = 8
       Height = 15
-      Top = 48
+      Top = 64
       Width = 159
       Caption = 'ServerToClientPacketIDCount:'
     end
     object lblServerToClientIDCount: TLabel
       Left = 184
       Height = 15
-      Top = 48
+      Top = 64
       Width = 18
       Caption = '000'
     end
@@ -289,6 +298,20 @@ object frmMQTTClientAppMain: TfrmMQTTClientAppMain
       Left = 184
       Height = 15
       Top = 0
+      Width = 18
+      Caption = '000'
+    end
+    object lblClientToServerResendBufferSizeInfo: TLabel
+      Left = 8
+      Height = 15
+      Top = 16
+      Width = 170
+      Caption = 'ClientToServerResendBufferSize:'
+    end
+    object lblClientToServerResendBufferSize: TLabel
+      Left = 184
+      Height = 15
+      Top = 16
       Width = 18
       Caption = '000'
     end
