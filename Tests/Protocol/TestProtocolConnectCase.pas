@@ -152,7 +152,7 @@ var
 begin
   Expect(MQTT_CONNECT(0, 0)).ToBe(True);  //add a CONNECT packet to ClientToServer buffer
   //verify buffer content
-  BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  BufferPointer := MQTT_GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Err).ToBe(CMQTT_Success);
 
   Expect(Decode_ConnectToCtrlPacket(BufferPointer^, DecodedConnectPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
@@ -169,7 +169,7 @@ begin
   Expect(MQTT_CONNECT(0, 0)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
   Expect(MQTT_CONNECT(0, 1)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
   //verify buffer content
-  BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  BufferPointer := MQTT_GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Err).ToBe(CMQTT_Success);
 
   Expect(Decode_ConnectToCtrlPacket(BufferPointer^, DecodedConnectPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
@@ -183,12 +183,12 @@ var
   BufferPointer: PMQTTBuffer;
   Err, i: Word;
 begin
-  Expect(GetClientToServerBuffer(0, Err)^.Len).ToBe(ACount);
+  Expect(MQTT_GetClientToServerBuffer(0, Err)^.Len).ToBe(ACount);
 
   {$IFnDEF SingleOutputBuffer}
     for i := 0 to ACount - 1 do
     begin
-      BufferPointer := GetClientToServerBuffer(0, Err)^.Content^[i];
+      BufferPointer := MQTT_GetClientToServerBuffer(0, Err)^.Content^[i];
       Expect(Err).ToBe(CMQTT_Success);
 
       Expect(Decode_ConnectToCtrlPacket(BufferPointer^, DecodedConnectPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
@@ -238,7 +238,7 @@ begin
     Expect(MQTT_CONNECT(0, i)).ToBe(True);    //add a CONNECT packet to ClientToServer buffer
 
   {$IFnDEF SingleOutputBuffer}
-    Expect(RemovePacketFromClientToServerBuffer(0)).ToBe(True);
+    Expect(MQTT_RemovePacketFromClientToServerBuffer(0)).ToBe(True);
     TestClientToServerBufferContent_AfterConnect_WithCallback_GenericPacketCount(CPacketCount - 1);
   {$ENDIF}
 end;

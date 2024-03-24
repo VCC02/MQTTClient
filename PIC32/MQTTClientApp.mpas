@@ -1,0 +1,498 @@
+{
+    Copyright (C) 2024 VCC
+    creation date: 26 Sep 2023
+    initial release date: 24 Mar 2024
+
+    author: VCC
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+    DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+    OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+}
+
+
+program MQTTClientApp;
+
+uses
+  MQTTUtils, MQTTClient;
+  
+  
+procedure AddToLog(var AMsg: string[100000]);
+begin
+  UART1_Write_Text(AMsg);
+end;
+
+
+procedure SendDynArrayOfByte(var AArr: TDynArrayOfByte);
+begin
+  //Send AArr.Content^ buffer of AArr.Len length
+end;
+
+
+procedure SendPacketToServer(ClientInstance: DWord);
+var
+  BufferPointer: PMQTTBuffer;
+  Err: Word;
+begin
+  BufferPointer := MQTT_GetClientToServerBuffer(ClientInstance, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  SendDynArrayOfByte(BufferPointer^);
+
+  {$IFnDEF SingleOutputBuffer}
+    if not MQTT_RemovePacketFromClientToServerBuffer(ClientInstance) then
+      AddToLog('Can''t remove latest packet from send buffer.');
+  {$ELSE}
+    AddToLog('MQTT_RemovePacketFromClientToServerBuffer not implemented for SingleOutputBuffer.');
+  {$ENDIF}
+end;
+
+
+procedure HandleOnMQTTError(ClientInstance: DWord; AErr: Word; APacketType: Byte);
+var
+  PacketTypeStr: string[13];
+begin
+  MQTTPacketToString(APacketType, PacketTypeStr);
+  AddToLog('  PacketType: (' + PacketTypeStr + ').');
+
+  if Hi(AErr) = CMQTT_Reason_NotAuthorized then   // $87
+  begin
+    AddToLog('Server error: Not authorized.');
+    if APacketType = CMQTT_CONNACK then
+      AddToLog(' on receiving CONNACK.');
+  end;
+
+  if Lo(AErr) = CMQTT_PacketIdentifierNotFound_ClientToServer then   // $CE
+    AddToLog('Client error: PacketIdentifierNotFound.');
+end;
+
+
+procedure HandleOnSend_MQTT_Packet(ClientInstance: DWord; APacketType: Byte);
+var
+  PacketName: string[13];
+begin
+  MQTTPacketToString(APacketType, PacketName);
+  AddToLog('Sending ' + PacketName + ' packet...');
+
+  SendPacketToServer(ClientInstance);
+end;
+
+
+function HandleOnBeforeMQTT_CONNECT(ClientInstance: DWord;  //The lower byte identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
+                                    var AConnectFields: TMQTTConnectFields;                    //user code has to fill-in this parameter
+                                    var AConnectProperties: TMQTTConnectProperties;
+                                    ACallbackID: Word): Boolean;
+var
+  TempWillProperties: TMQTTWillProperties;
+  UserName, Password: string[30];
+  //ClientId: string;
+  //Id: Char;
+  ConnectFlags: Byte;
+  EnabledProperties: Word;
+begin
+  Result := True;
+
+  AddToLog('Preparing CONNECT data..');
+
+  //Id := Chr((ClientInstance and $FF) + 48);
+  //ClientId := 'MyClient' + Id;
+  UserName := 'MyUsername';
+  Password := 'MyPassword';
+
+  //StringToDynArrayOfByte(ClientId, AConnectFields.PayloadContent.ClientID);
+  StringToDynArrayOfByte(UserName, AConnectFields.PayloadContent.UserName);
+  StringToDynArrayOfByte(Password, AConnectFields.PayloadContent.Password);
+
+  ConnectFlags := CMQTT_UsernameInConnectFlagsBitMask or
+                  CMQTT_PasswordInConnectFlagsBitMask or
+                  CMQTT_CleanStartInConnectFlagsBitMask {or
+                  CMQTT_WillQoSB1InConnectFlagsBitMask};
+
+  EnabledProperties := CMQTTConnect_EnSessionExpiryInterval or
+                       CMQTTConnect_EnRequestResponseInformation or
+                       CMQTTConnect_EnRequestProblemInformation {or
+                       CMQTTConnect_EnAuthenticationMethod or
+                       CMQTTConnect_EnAuthenticationData};
+
+  MQTT_InitWillProperties(TempWillProperties);
+  TempWillProperties.WillDelayInterval := 30; //some value
+  TempWillProperties.PayloadFormatIndicator := 1;  //0 = do not send.  1 = UTF-8 string
+  TempWillProperties.MessageExpiryInterval := 3600;
+  StringToDynArrayOfByte('SomeType', TempWillProperties.ContentType);
+  StringToDynArrayOfByte('SomeTopicName', TempWillProperties.ResponseTopic);
+  StringToDynArrayOfByte('MyCorrelationData', TempWillProperties.CorrelationData);
+  AddStringToDynOfDynArrayOfByte('Key=Value', TempWillProperties.UserProperty);
+  AddStringToDynOfDynArrayOfByte('NewKey=NewValue', TempWillProperties.UserProperty);
+
+  FillIn_PayloadWillProperties(TempWillProperties, AConnectFields.PayloadContent.WillProperties);
+  MQTT_FreeWillProperties(TempWillProperties);
+  StringToDynArrayOfByte('WillTopic', AConnectFields.PayloadContent.WillTopic);
+
+  //Please set the Will Flag in ConnectFlags below, then uncomment above code, if "Will" properties are required.
+  AConnectFields.ConnectFlags := ConnectFlags;  //bits 7-0:  User Name, Password, Will Retain, Will QoS, Will Flag, Clean Start, Reserved
+  AConnectFields.EnabledProperties := EnabledProperties;
+  AConnectFields.KeepAlive := 0; //any positive values require pinging the server if no other packet is being sent
+
+  AConnectProperties.SessionExpiryInterval := 3600; //[s]
+  AConnectProperties.ReceiveMaximum := 7000;
+  AConnectProperties.MaximumPacketSize := 10 * 1024 * 1024;
+  AConnectProperties.TopicAliasMaximum := 100;
+  AConnectProperties.RequestResponseInformation := 1;
+  AConnectProperties.RequestProblemInformation := 1;
+  AddStringToDynOfDynArrayOfByte('UserProp=Value', AConnectProperties.UserProperty);
+  StringToDynArrayOfByte('SCRAM-SHA-1', AConnectProperties.AuthenticationMethod);       //some example from spec, pag 108   the server may add to its log: "bad AUTH method"
+  StringToDynArrayOfByte('client-first-data', AConnectProperties.AuthenticationData);   //some example from spec, pag 108
+
+  AddToLog('Done preparing CONNECT data..');
+  AddToLog('');
+end;
+
+
+procedure HandleOnAfterMQTT_CONNACK(ClientInstance: DWord; var AConnAckFields: TMQTTConnAckFields; var AConnAckProperties: TMQTTConnAckProperties);
+var
+  n, i: Integer;
+begin
+  AddToLog('Received CONNACK');
+
+end;
+
+
+function HandleOnBeforeSendingMQTT_SUBSCRIBE(ClientInstance: DWord;  //The lower word identifies the client instance
+                                             var ASubscribeFields: TMQTTSubscribeFields;
+                                             var ASubscribeProperties: TMQTTSubscribeProperties;
+                                             ACallbackID: Word): Boolean;
+var
+  Options, QoS: Byte;
+  SubId: Word;
+begin
+  Options := 0;
+  QoS := 2;
+
+  Options := Options or QoS; //bits 1 and 0
+  //Bit 2 of the Subscription Options represents the No Local option.  - spec pag 73
+  //Bit 3 of the Subscription Options represents the Retain As Published option.  - spec pag 73
+  //Bits 4 and 5 of the Subscription Options represent the Retain Handling option.  - spec pag 73
+  //Bits 6 and 7 of the Subscription Options byte are reserved for future use. - Must be set to 0.  - spec pag 73
+
+                                                                            //Subscription identifiers are not mandatory (per spec).
+  SubId := MQTT_CreateClientToServerSubscriptionIdentifier(ClientInstance); //This function has to be called here, in this handler only. The library does not call this function other than for init purposes.
+                                                                            //If SubscriptionIdentifiers are used, then user code should free them when resubscribing or when unsubscribing.
+  ASubscribeProperties.SubscriptionIdentifier := SubId;  //For now, the user code should keep track of these identifiers and free them on resubscribing or unsubscribing.
+
+  Result := FillIn_SubscribePayload('abc', Options, ASubscribeFields.TopicFilters);  //call this again with a different string (i.e. TopicFilter), in order to add it to ASubscribeFields.TopicFilters
+  if not Result then
+  begin
+    AddToLog('HandleOnBeforeSendingMQTT_SUBSCRIBE not enough memory to add TopicFilters.');
+    Exit;
+  end;
+
+  //Enable SubscriptionIdentifier only if required (allocated above with CreateClientToServerSubscriptionIdentifier) !!!
+  //The library initializes EnabledProperties to 0.
+  //A subscription is allowed to be made without a SubscriptionIdentifier.
+  ASubscribeFields.EnabledProperties := CMQTTSubscribe_EnSubscriptionIdentifier {or CMQTTSubscribe_EnUserProperty};
+
+  AddToLog('');
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_SUBACK(ClientInstance: DWord; var ASubAckFields: TMQTTSubAckFields; var ASubAckProperties: TMQTTSubAckProperties);
+var
+  i: Integer;
+begin
+  AddToLog('Received SUBACK');
+
+  AddToLog('');
+end;
+
+
+function HandleOnBeforeSendingMQTT_UNSUBSCRIBE(ClientInstance: DWord;  //The lower word identifies the client instance
+                                               var AUnsubscribeFields: TMQTTUnsubscribeFields;
+                                               var AUnsubscribeProperties: TMQTTUnsubscribeProperties;
+                                               ACallbackID: Word): Boolean;
+begin
+  Result := FillIn_UnsubscribePayload('abc', AUnsubscribeFields.TopicFilters);  //call this again with a different string (i.e. TopicFilter), in order to add it to AUnsubscribeFields.TopicFilters
+  if not Result then
+  begin
+    AddToLog('HandleOnBeforeSendingMQTT_UNSUBSCRIBE not enough memory to add TopicFilters.');
+    Exit;
+  end;
+
+  //the user code should call RemoveClientToServerSubscriptionIdentifier to remove the allocate identifier.
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_UNSUBACK(ClientInstance: DWord; var AUnsubAckFields: TMQTTUnsubAckFields; var AUnsubAckProperties: TMQTTUnsubAckProperties);
+var
+  i: Integer;
+begin
+  AddToLog('Received UNSUBACK');
+
+  AddToLog('');
+end;
+
+
+//This handler is used when this client publishes a message to broker.
+function HandleOnBeforeSendingMQTT_PUBLISH(ClientInstance: DWord;  //The lower word identifies the client instance (the library is able to implement multiple MQTT clients / device). The higher byte can identify the call in user handlers for various events (e.g. TOnBeforeMQTT_CONNECT).
+                                           var APublishFields: TMQTTPublishFields;                    //user code has to fill-in this parameter
+                                           var APublishProperties: TMQTTPublishProperties;            //user code has to fill-in this parameter
+                                           ACallbackID: Word): Boolean;
+var
+  Msg: string[20];
+  QoS: Byte;
+begin
+  Result := True;
+  Msg := 'SomeMessage';
+
+  QoS := 2;
+
+  Result := Result and StringToDynArrayOfByte(Msg, APublishFields.ApplicationMessage);
+  Result := Result and StringToDynArrayOfByte('abc', APublishFields.TopicName);
+
+  AddToLog('');
+  //QoS can be overriden here. If users override QoS in this handler, then a a different PacketIdentifier might be allocated (depending on what is available)
+end;
+
+
+//This handler is used when this client publishes a message to broker and the broker responds with PUBACK.
+procedure HandleOnBeforeSendingMQTT_PUBACK(ClientInstance: DWord; var APubAckFields: TMQTTPubAckFields; var APubAckProperties: TMQTTPubAckProperties);
+begin
+  AddToLog('Acknowledging with PUBACK');
+
+  AddToLog('');
+  //This handler can be used to override what is being sent to server as a reply to PUBLISH
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_PUBACK(ClientInstance: DWord; var APubAckFields: TMQTTPubAckFields; var APubAckProperties: TMQTTPubAckProperties);
+begin
+  AddToLog('Received PUBACK');
+
+  AddToLog('');
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_PUBLISH(ClientInstance: DWord; var APublishFields: TMQTTPublishFields; var APublishProperties: TMQTTPublishProperties);
+var
+  QoS: Byte;
+  ID: Word;
+  Topic, Msg: string[300];
+  IDstr: string[6];
+  QoSStr: string[3];
+  i: Integer;
+begin
+  QoS := (APublishFields.PublishCtrlFlags shr 1) and 3;
+  ByteToStr(QoS, QoSStr);
+  DynArrayOfByteToString(APublishFields.ApplicationMessage, Msg);
+  
+  ID := APublishFields.PacketIdentifier;
+  WordToStr(ID, IDstr);
+  
+  DynArrayOfByteToString(APublishFields.TopicName, Topic);
+
+  AddToLog('Received PUBLISH  ServerPacketIdentifier: ' + IDstr +
+                                                 '  Msg: ' + Msg +
+                                                 '  QoS: ' + QoSStr +
+                                                 '  TopicName: ' + Topic);
+
+  AddToLog('');
+end;
+
+
+procedure HandleOnBeforeSending_MQTT_PUBREC(ClientInstance: DWord; var ATempPubRecFields: TMQTTPubRecFields; var ATempPubRecProperties: TMQTTPubRecProperties);
+begin
+  AddToLog('Acknowledging with PUBREC');
+end;
+
+
+procedure HandleOnAfterReceiving_MQTT_PUBREC(ClientInstance: DWord; var ATempPubRecFields: TMQTTPubRecFields; var ATempPubRecProperties: TMQTTPubRecProperties);
+begin
+  AddToLog('Received PUBREC' );
+end;
+
+
+//Sending PUBREL after the PUBREC response from server, after the client has sent a PUBLISH packet with QoS=2.
+procedure HandleOnBeforeSending_MQTT_PUBREL(ClientInstance: DWord; var ATempPubRelFields: TMQTTPubRelFields; var ATempPubRelProperties: TMQTTPubRelProperties);
+begin
+  AddToLog('Acknowledging with PUBREL');
+end;
+
+
+procedure HandleOnAfterReceiving_MQTT_PUBREL(ClientInstance: DWord; var ATempPubRelFields: TMQTTPubRelFields; var ATempPubRelProperties: TMQTTPubRelProperties);
+begin
+  AddToLog('Received PUBREL');
+end;
+
+
+procedure HandleOnBeforeSending_MQTT_PUBCOMP(ClientInstance: DWord; var ATempPubCompFields: TMQTTPubCompFields; var ATempPubCompProperties: TMQTTPubCompProperties);
+begin
+  AddToLog('Acknowledging with PUBCOMP');
+end;
+
+
+procedure HandleOnAfterReceiving_MQTT_PUBCOMP(ClientInstance: DWord; var ATempPubCompFields: TMQTTPubCompFields; var ATempPubCompProperties: TMQTTPubCompProperties);
+begin
+  AddToLog('Received PUBCOMP');
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_PINGRESP(ClientInstance: DWord);
+begin
+  AddToLog('Received PINGRESP');
+end;
+
+
+procedure HandleOnBeforeSendingMQTT_DISCONNECT(ClientInstance: DWord;  //The lower word identifies the client instance
+                                               var ADisconnectFields: TMQTTDisconnectFields;
+                                               var ADisconnectProperties: TMQTTDisconnectProperties;
+                                               ACallbackID: Word);
+begin
+  AddToLog('Sending DISCONNECT');
+  //ADisconnectFields.EnabledProperties := CMQTTDisconnect_EnSessionExpiryInterval;   //uncomment if needed
+  //ADisconnectProperties.SessionExpiryInterval := 1;
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_DISCONNECT(ClientInstance: DWord;  //The lower word identifies the client instance
+                                                var ADisconnectFields: TMQTTDisconnectFields;
+                                                var ADisconnectProperties: TMQTTDisconnectProperties);
+begin
+  AddToLog('Received DISCONNECT');
+end;
+
+
+procedure HandleOnBeforeSendingMQTT_AUTH(ClientInstance: DWord;  //The lower word identifies the client instance
+                                         var AAuthFields: TMQTTAuthFields;
+                                         var AAuthProperties: TMQTTAuthProperties;
+                                         ACallbackID: Word);
+begin
+  AddToLog('Sending AUTH');
+  AAuthFields.AuthReasonCode := $19; //Example: reauth   - see spec, pag 108.
+
+  StringToDynArrayOfByte('SCRAM-SHA-1', AAuthProperties.AuthenticationMethod);       //some example from spec, pag 108
+  StringToDynArrayOfByte('client-second-data', AAuthProperties.AuthenticationData);   //some modified example from spec, pag 108
+end;
+
+
+procedure HandleOnAfterReceivingMQTT_AUTH(ClientInstance: DWord;  //The lower word identifies the client instance
+                                          var AAuthFields: TMQTTAuthFields;
+                                          var AAuthProperties: TMQTTAuthProperties);
+begin
+  AddToLog('Received AUTH');
+end;
+
+
+
+procedure InitHandlers;
+begin
+  {$IFDEF IsDesktop}
+    OnMQTTError^ := @HandleOnMQTTError;
+    OnSendMQTT_Packet^ := @HandleOnSend_MQTT_Packet;
+    OnBeforeMQTT_CONNECT^ := @HandleOnBeforeMQTT_CONNECT;
+    OnAfterMQTT_CONNACK^ := @HandleOnAfterMQTT_CONNACK;
+    OnBeforeSendingMQTT_PUBLISH^ := @HandleOnBeforeSendingMQTT_PUBLISH;
+    OnBeforeSendingMQTT_PUBACK^ := @HandleOnBeforeSendingMQTT_PUBACK;
+    OnAfterReceivingMQTT_PUBACK^ := @HandleOnAfterReceivingMQTT_PUBACK;
+    OnAfterReceivingMQTT_PUBLISH^ := @HandleOnAfterReceivingMQTT_PUBLISH;
+    OnBeforeSendingMQTT_PUBREC^ := @HandleOnBeforeSending_MQTT_PUBREC;
+    OnAfterReceivingMQTT_PUBREC^ := @HandleOnAfterReceiving_MQTT_PUBREC;
+    OnBeforeSendingMQTT_PUBREL^ := @HandleOnBeforeSending_MQTT_PUBREL;
+    OnAfterReceivingMQTT_PUBREL^ := @HandleOnAfterReceiving_MQTT_PUBREL;
+    OnBeforeSendingMQTT_PUBCOMP^ := @HandleOnBeforeSending_MQTT_PUBCOMP;
+    OnAfterReceivingMQTT_PUBCOMP^ := @HandleOnAfterReceiving_MQTT_PUBCOMP;
+    OnBeforeSendingMQTT_SUBSCRIBE^ := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
+    OnAfterReceivingMQTT_SUBACK^ := @HandleOnAfterReceivingMQTT_SUBACK;
+    OnBeforeSendingMQTT_UNSUBSCRIBE^ := @HandleOnBeforeSendingMQTT_UNSUBSCRIBE;
+    OnAfterReceivingMQTT_UNSUBACK^ := @HandleOnAfterReceivingMQTT_UNSUBACK;
+    OnAfterReceivingMQTT_PINGRESP^ := @HandleOnAfterReceivingMQTT_PINGRESP;
+    OnBeforeSendingMQTT_DISCONNECT^ := @HandleOnBeforeSendingMQTT_DISCONNECT;
+    OnAfterReceivingMQTT_DISCONNECT^ := @HandleOnAfterReceivingMQTT_DISCONNECT;
+    OnBeforeSendingMQTT_AUTH^ := @HandleOnBeforeSendingMQTT_AUTH;
+    OnAfterReceivingMQTT_AUTH^ := @HandleOnAfterReceivingMQTT_AUTH;
+  {$ELSE}
+    OnMQTTError := @HandleOnMQTTError;
+    OnSendMQTT_Packet := @HandleOnSend_MQTT_Packet;
+    OnBeforeMQTT_CONNECT := @HandleOnBeforeMQTT_CONNECT;
+    OnAfterMQTT_CONNACK := @HandleOnAfterMQTT_CONNACK;
+    OnBeforeSendingMQTT_PUBLISH := @HandleOnBeforeSendingMQTT_PUBLISH;
+    OnBeforeSendingMQTT_PUBACK := @HandleOnBeforeSendingMQTT_PUBACK;
+    OnAfterReceivingMQTT_PUBACK := @HandleOnAfterReceivingMQTT_PUBACK;
+    OnAfterReceivingMQTT_PUBLISH := @HandleOnAfterReceivingMQTT_PUBLISH;
+    OnBeforeSendingMQTT_PUBREC := @HandleOnBeforeSending_MQTT_PUBREC;
+    OnAfterReceivingMQTT_PUBREC := @HandleOnAfterReceiving_MQTT_PUBREC;
+    OnBeforeSendingMQTT_PUBREL := @HandleOnBeforeSending_MQTT_PUBREL;
+    OnAfterReceivingMQTT_PUBREL := @HandleOnAfterReceiving_MQTT_PUBREL;
+    OnBeforeSendingMQTT_PUBCOMP := @HandleOnBeforeSending_MQTT_PUBCOMP;
+    OnAfterReceivingMQTT_PUBCOMP := @HandleOnAfterReceiving_MQTT_PUBCOMP;
+    OnBeforeSendingMQTT_SUBSCRIBE := @HandleOnBeforeSendingMQTT_SUBSCRIBE;
+    OnAfterReceivingMQTT_SUBACK := @HandleOnAfterReceivingMQTT_SUBACK;
+    OnBeforeSendingMQTT_UNSUBSCRIBE := @HandleOnBeforeSendingMQTT_UNSUBSCRIBE;
+    OnAfterReceivingMQTT_UNSUBACK := @HandleOnAfterReceivingMQTT_UNSUBACK;
+    OnAfterReceivingMQTT_PINGRESP := @HandleOnAfterReceivingMQTT_PINGRESP;
+    OnBeforeSendingMQTT_DISCONNECT := @HandleOnBeforeSendingMQTT_DISCONNECT;
+    OnAfterReceivingMQTT_DISCONNECT := @HandleOnAfterReceivingMQTT_DISCONNECT;
+    OnBeforeSendingMQTT_AUTH := @HandleOnBeforeSendingMQTT_AUTH;
+    OnAfterReceivingMQTT_AUTH := @HandleOnAfterReceivingMQTT_AUTH;
+  {$ENDIF}
+end;
+
+
+const 
+  HEAP_START: DWord = $A0000FDC;
+  HEAP_SIZE: DWord = 30000;
+  
+var
+  SomeCondition: Boolean;
+  TempReadBuf: TDynArrayOfByte;
+  
+begin
+  MM_Init;
+  
+  MQTT_Init;
+  if not MQTT_CreateClient then
+    AddToLog('Can''t create client...');
+
+  InitHandlers;
+  
+  //init some Eth lib
+  
+  SomeCondition := True;
+  
+  repeat
+    if SomeCondition then
+    begin
+      SomeCondition := False;
+      
+      if not MQTT_CONNECT(0, 0) then
+        AddToLog('Can''t prepare MQTTConnect packet.');
+    
+      if not MQTT_SUBSCRIBE(0, 0) then
+        AddToLog('Can''t prepare MQTT_SUBSCRIBE packet.');
+    
+      if not MQTT_UNSUBSCRIBE(0, 0) then
+        AddToLog('Can''t prepare MQTT_UNSUBSCRIBE packet.');
+    
+      if not MQTT_PUBLISH(0, 0, 2) then
+        AddToLog('Can''t prepare MQTT_PUBLISH packet.');
+    
+      if not MQTT_DISCONNECT(0, 0) then
+        AddToLog('Can''t prepare MQTTDisconnect packet.');
+    end;
+    
+    InitDynArrayToEmpty(TempReadBuf);
+    //AddByteToDynArray(TempByte, TempReadBuf);  //call this or something similar in Eth callback when receiving data
+    MQTT_PutReceivedBufferToMQTTLib(0, TempReadBuf);  //optionally, pass TempReadBuf through a FIFO
+    MQTT_Process(0);  //0 is the client instance
+    FreeDynArray(TempReadBuf);
+  until False;
+    
+  MQTT_Done;
+end.

@@ -712,7 +712,7 @@ procedure MQTT_FreeAuthProperties(var AProperties: TMQTTAuthProperties);
   function CompareMem(AP1, AP2: PByte; ALength: LongInt): Boolean;
 {$ENDIF}
 
-procedure MQTTPacketToString(APacketType: Byte; var AResult: string);
+procedure MQTTPacketToString(APacketType: Byte; var AResult: string {$IFnDEF IsDesktop}[12]{$ENDIF});
 
 
 implementation
@@ -1412,7 +1412,7 @@ end;
 {$ENDIF}
 
 
-procedure MQTTPacketToString(APacketType: Byte; var AResult: string);
+procedure MQTTPacketToString(APacketType: Byte; var AResult: string {$IFnDEF IsDesktop}[12]{$ENDIF});
 begin
   case APacketType and $F0 of
     CMQTT_UNDEFINED : AResult := 'UNDEFINED'; //0

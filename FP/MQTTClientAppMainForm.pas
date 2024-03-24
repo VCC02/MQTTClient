@@ -304,9 +304,9 @@ begin
   //Bits 4 and 5 of the Subscription Options represent the Retain Handling option.  - spec pag 73
   //Bits 6 and 7 of the Subscription Options byte are reserved for future use. - Must be set to 0.  - spec pag 73
 
-                                                                       //Subscription identifiers are not mandatory (per spec).
-  SubId := CreateClientToServerSubscriptionIdentifier(ClientInstance); //This function has to be called here, in this handler only. The library does not call this function other than for init purposes.
-                                                                       //If SubscriptionIdentifiers are used, then user code should free them when resubscribing or when unsubscribing.
+                                                                            //Subscription identifiers are not mandatory (per spec).
+  SubId := MQTT_CreateClientToServerSubscriptionIdentifier(ClientInstance); //This function has to be called here, in this handler only. The library does not call this function other than for init purposes.
+                                                                            //If SubscriptionIdentifiers are used, then user code should free them when resubscribing or when unsubscribing.
   ASubscribeProperties.SubscriptionIdentifier := SubId;  //For now, the user code should keep track of these identifiers and free them on resubscribing or unsubscribing.
   frmMQTTClientAppMain.AddToLog('Subscribing with new SubscriptionIdentifier: ' + IntToStr(SubId));
 
@@ -642,7 +642,7 @@ begin
     try
       if StringToDynArrayOfByte(NewData, TempReadBuf) then
       begin
-        PutReceivedBufferToMQTTLib(0, TempReadBuf);
+        MQTT_PutReceivedBufferToMQTTLib(0, TempReadBuf);
         MQTT_Process(0);
       end
       else
@@ -754,14 +754,14 @@ var
   BufferPointer: PMQTTBuffer;
   Err: Word;
 begin
-  BufferPointer := GetClientToServerBuffer(ClientInstance, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  BufferPointer := MQTT_GetClientToServerBuffer(ClientInstance, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   SendDynArrayOfByte(BufferPointer^);
 
   {$IFnDEF SingleOutputBuffer}
-    if not RemovePacketFromClientToServerBuffer(ClientInstance) then
+    if not MQTT_RemovePacketFromClientToServerBuffer(ClientInstance) then
       AddToLog('Can''t remove latest packet from send buffer.');
   {$ELSE}
-    raise Exception.Create('RemovePacketFromClientToServerBuffer no implemented for SingleOutputBuffer.');
+    raise Exception.Create('MQTT_RemovePacketFromClientToServerBuffer not implemented for SingleOutputBuffer.');
   {$ENDIF}
 end;
 
@@ -906,7 +906,7 @@ begin
 
   tk := GetTickCount64;
   repeat
-    ClientToServerBuf := GetClientToServerBuffer(0, Err);
+    ClientToServerBuf := MQTT_GetClientToServerBuffer(0, Err);
     Application.ProcessMessages;
     Sleep(10);
   until (GetTickCount64 - tk > 1500) or ((ClientToServerBuf <> nil) and (ClientToServerBuf^.Len = 0));
@@ -942,7 +942,7 @@ end;
 
 procedure TfrmMQTTClientAppMain.btnResendUnAckClick(Sender: TObject);
 begin
-  ResendUnacknowledged(0);
+  MQTT_ResendUnacknowledged(0);
 end;
 
 
@@ -998,6 +998,7 @@ begin
   FreeAndNil(FLoggingFIFO);
   FreeAndNil(FRecBufFIFO);
   Th := nil;
+  MQTT_Done;
 end;
 
 
@@ -1019,7 +1020,7 @@ var
 begin
   ProcessReceivedBuffer;
 
-  ClientToServerBuf := GetClientToServerBuffer(0, Err);
+  ClientToServerBuf := MQTT_GetClientToServerBuffer(0, Err);
   if Err <> CMQTT_Success then
     lblClientToServerBufferSize.Caption := 'Err ' + IntToStr(Err)
   else
@@ -1031,7 +1032,7 @@ begin
     end;
   end;
 
-  ClientToServerResendBuf := GetClientToServerResendBuffer(0, Err);
+  ClientToServerResendBuf := MQTT_GetClientToServerResendBuffer(0, Err);
   if Err <> CMQTT_Success then
     lblClientToServerResendBufferSize.Caption := 'Err ' + IntToStr(Err)
   else
@@ -1044,7 +1045,7 @@ begin
   end;
 
 
-  ServerToClientBuf := GetServerToClientBuffer(0, Err);
+  ServerToClientBuf := MQTT_GetServerToClientBuffer(0, Err);
   if Err <> CMQTT_Success then
     lblServerToClientBufferSize.Caption := 'Err ' + IntToStr(Err)
   else
@@ -1057,8 +1058,8 @@ begin
   end;
 
   try
-    lblClientToServerIDCount.Caption := IntToStr(GetClientToServerPacketIdentifiersCount(0));
-    lblServerToClientIDCount.Caption := IntToStr(GetServerToClientPacketIdentifiersCount(0));
+    lblClientToServerIDCount.Caption := IntToStr(MQTT_GetClientToServerPacketIdentifiersCount(0));
+    lblServerToClientIDCount.Caption := IntToStr(MQTT_GetServerToClientPacketIdentifiersCount(0));
   except
     lblClientToServerIDCount.Caption := 'Ex inst';
   end;

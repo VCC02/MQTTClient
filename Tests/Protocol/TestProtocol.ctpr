@@ -38,11 +38,11 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="TestProtocolConnectCase.pas"/>
+        <Filename Value="..\..\Lib\MQTTClient.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\..\Lib\MQTTClient.pas"/>
+        <Filename Value="..\..\Lib\MQTTPublishCtrl.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
@@ -54,6 +54,14 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
+        <Filename Value="..\..\Lib\MQTTConnAckCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTPubAckCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
         <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
@@ -62,11 +70,27 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
+        <Filename Value="..\..\..\MiscUtils\ExpectationsDynArrays.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestProtocolConnectCase.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
         <Filename Value="TestProtocolConnAckCase.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\..\Lib\MQTTConnAckCtrl.pas"/>
+        <Filename Value="TestProtocolPubAckCase.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestProtocolPublishClientToServer.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestProtocolPublishServerToClient.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
@@ -74,11 +98,23 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\..\..\MiscUtils\ExpectationsDynArrays.pas"/>
+        <Filename Value="..\..\Lib\MQTTPubRelCtrl.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\..\Lib\MQTTPublishCtrl.pas"/>
+        <Filename Value="..\..\Lib\MQTTPubCompCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTSubscribeCtrl.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestProtocolSubscribeCase.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestProtocolUnsubscribeCase.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
     </Units>
@@ -96,7 +132,6 @@
     </SearchPaths>
     <Linking>
       <Debugging>
-        <GenerateDebugInfo Value="False"/>
         <UseHeaptrc Value="True"/>
       </Debugging>
       <Options>

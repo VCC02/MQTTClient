@@ -269,7 +269,7 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(1);
 
@@ -287,7 +287,7 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(1);
 
@@ -311,12 +311,12 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing 1');
   Expect(ReceivedCount).ToBe(1);
   Expect(RecCount).ToBe(1);
-  Expect(GetServerToClientPacketIdentifiersCount(0)).ToBe(1, 'PacketIdentifier created.');
-  Expect(GetServerToClientPacketIdentifierByIndex(0, 0)).ToBe(20);
+  Expect(MQTT_GetServerToClientPacketIdentifiersCount(0)).ToBe(1, 'PacketIdentifier created.');
+  Expect(MQTT_GetServerToClientPacketIdentifierByIndex(0, 0)).ToBe(20);
 
   //send second part of the ping-pong
   MQTT_FreeControlPacket(DestPacket);
@@ -326,10 +326,10 @@ begin
   FillIn_PubRel(ReceivedPubRelFields, ReceivedPubRelProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing 2');
   Expect(CompCount).ToBe(1);
-  Expect(GetServerToClientPacketIdentifiersCount(0)).ToBe(AExpectedIdentifiersCount, 'PacketIdentifier removed.');
+  Expect(MQTT_GetServerToClientPacketIdentifiersCount(0)).ToBe(AExpectedIdentifiersCount, 'PacketIdentifier removed.');
 
   Expect(FoundError).ToBe(AExpectedFoundError);
   Expect(ErrorOnPacketType).ToBe(AExpectedErrorOnPacketType);
@@ -356,7 +356,7 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
 
   //a second packet:
   MQTT_FreeControlPacket(DestPacket);
@@ -366,13 +366,13 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing 1');
   Expect(ReceivedCount).ToBe(2, 'Second ReceivedCount');
   Expect(RecCount).ToBe(1 + Ord(APacketIdentifier <> ASecondPacketIdentifier), 'Second RecCount');  ////////////////// also possible that the Modified args will have to be part of the formula
-  Expect(GetServerToClientPacketIdentifiersCount(0)).ToBe(2, 'PacketIdentifier created.');
-  Expect(GetServerToClientPacketIdentifierByIndex(0, 0)).ToBe(APacketIdentifier);
-  Expect(GetServerToClientPacketIdentifierByIndex(0, 1)).ToBe(ASecondPacketIdentifier);
+  Expect(MQTT_GetServerToClientPacketIdentifiersCount(0)).ToBe(2, 'PacketIdentifier created.');
+  Expect(MQTT_GetServerToClientPacketIdentifierByIndex(0, 0)).ToBe(APacketIdentifier);
+  Expect(MQTT_GetServerToClientPacketIdentifierByIndex(0, 1)).ToBe(ASecondPacketIdentifier);
 
   //send second part of the ping-pong
   MQTT_FreeControlPacket(DestPacket);
@@ -382,10 +382,10 @@ begin
   FillIn_PubRel(ReceivedPubRelFields, ReceivedPubRelProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing 2.1');
   Expect(CompCount).ToBe(1, 'CompCount');   //only one CompCount after first call to MQTT_Process
-  Expect(GetServerToClientPacketIdentifiersCount(0)).ToBe(AExpectedIdentifiersCount + 1, 'PacketIdentifier removed 1.');
+  Expect(MQTT_GetServerToClientPacketIdentifiersCount(0)).ToBe(AExpectedIdentifiersCount + 1, 'PacketIdentifier removed 1.');
 
   Expect(FoundError).ToBe(AExpectedFoundError);
   Expect(ErrorOnPacketType).ToBe(AExpectedErrorOnPacketType);
@@ -398,10 +398,10 @@ begin
   FillIn_PubRel(ReceivedPubRelFields, ReceivedPubRelProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing 2.2');
   Expect(CompCount).ToBe(2, 'CompCount');
-  Expect(GetServerToClientPacketIdentifiersCount(0)).ToBe(AExpectedIdentifiersCount + Ord(APacketIdentifier <> AModifiedPacketIdentifier), 'PacketIdentifier removed 2.');
+  Expect(MQTT_GetServerToClientPacketIdentifiersCount(0)).ToBe(AExpectedIdentifiersCount + Ord(APacketIdentifier <> AModifiedPacketIdentifier), 'PacketIdentifier removed 2.');
 
   Expect(FoundError).ToBe(AExpectedFoundError);
   Expect(ErrorOnPacketType).ToBe(AExpectedErrorOnPacketType);
@@ -450,8 +450,8 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(2);
 
@@ -469,8 +469,8 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(2);
 

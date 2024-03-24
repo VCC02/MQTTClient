@@ -119,7 +119,6 @@ procedure HandleOnAfterReceiving_MQTT_PUBACK(ClientInstance: DWord; var ATempPub
 begin
   Inc(ReceivedCount);
 
-  //ReceivedPubAckFields
   if Length(FakePacketIDs) > 0 then
     ATempPubAckFields.PacketIdentifier := FakePacketIDs[Length(FakePacketIDs) - 1];
 end;
@@ -216,7 +215,7 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(1);
   Expect(ResponseCount).ToBe(0);
@@ -235,7 +234,7 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(1);
   Expect(ResponseCount).ToBe(1);
@@ -256,8 +255,8 @@ begin
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(2);
   Expect(ResponseCount).ToBe(0);
@@ -277,7 +276,7 @@ begin
   ReceivedPublishFields.PacketIdentifier := 789;
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
 
   MQTT_FreeControlPacket(DestPacket);
   FreeDynArray(TempBuffer);
@@ -285,7 +284,7 @@ begin
   ReceivedPublishFields.PacketIdentifier := 987;
   FillIn_Publish(ReceivedPublishFields, ReceivedPublishProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
 
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(2);
@@ -308,14 +307,12 @@ begin
   Expect(MQTT_CONNECT(0, 0)).ToBe(True);
   Expect(MQTT_PUBLISH(0, 0, 0)).ToBe(True);  //this calls DecrementSendQuota
 
-  SetLength(FakePacketIDs, Length(FakePacketIDs) + 1);
-  FakePacketIDs[Length(FakePacketIDs) - 1] := CreateClientToServerPacketIdentifier(0);
-  ReceivedPubAckFields.PacketIdentifier := FakePacketIDs[Length(FakePacketIDs) - 1];
+  ReceivedPubAckFields.PacketIdentifier := 0; //just an init value, it is not verified, because there is no ACK
   FillIn_PubAck(ReceivedPubAckFields, ReceivedPubAckProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
   ReceivedCount := 0; //reset because of PUBLISH
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_ReceiveMaximumReset, 'Received too many unexpected packets');
   Expect(ReceivedCount).ToBe(0, 'No PUBACK is expected on QoS 0.');
   Expect(ResponseCount).ToBe(0);
@@ -336,14 +333,12 @@ begin
   Expect(MQTT_CONNECT(0, 0)).ToBe(True);
   Expect(MQTT_PUBLISH(0, 0, 1)).ToBe(True);  //this calls DecrementSendQuota
 
-  SetLength(FakePacketIDs, Length(FakePacketIDs) + 1);
-  FakePacketIDs[Length(FakePacketIDs) - 1] := CreateClientToServerPacketIdentifier(0);
-  ReceivedPubAckFields.PacketIdentifier := FakePacketIDs[Length(FakePacketIDs) - 1];
+  ReceivedPubAckFields.PacketIdentifier := MQTT_GetClientToServerPacketIdentifierByIndex(0, 1);  //using index 1, because 0 is preallocated
   FillIn_PubAck(ReceivedPubAckFields, ReceivedPubAckProperties, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
   ReceivedCount := 0; //reset because of PUBLISH
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
   Expect(ReceivedCount).ToBe(1, 'Received PUBACK');
   Expect(ResponseCount).ToBe(0);
@@ -369,13 +364,13 @@ begin
   for i := 1 to CMQTT_DefaultReceiveMaximum + 1 do
   begin
     SetLength(FakePacketIDs, Length(FakePacketIDs) + 1);
-    FakePacketIDs[Length(FakePacketIDs) - 1] := CreateClientToServerPacketIdentifier(0);
+    FakePacketIDs[Length(FakePacketIDs) - 1] := MQTT_CreateClientToServerPacketIdentifier(0);
     ReceivedPubAckFields.PacketIdentifier := FakePacketIDs[Length(FakePacketIDs) - 1];
 
     FillIn_PubAck(ReceivedPubAckFields, ReceivedPubAckProperties, DestPacket);
     EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-    PutReceivedBufferToMQTTLib(0, TempBuffer);
+    MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
     FreeDynArray(TempBuffer);
     MQTT_FreeControlPacket(DestPacket);
   end;

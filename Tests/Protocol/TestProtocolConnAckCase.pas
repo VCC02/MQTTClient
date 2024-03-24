@@ -200,7 +200,7 @@ begin
   FillIn_ConnAck(FieldsToSend, PropertiesToSend, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
 
   Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF);
@@ -226,8 +226,8 @@ begin
   FillIn_ConnAck(FieldsToSend, PropertiesToSend, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
 
   Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF);
@@ -251,14 +251,14 @@ begin
   InitDynArrayToEmpty(TempBuffer);
 
   StringToDynArrayOfByte(Chr(CMQTT_UNDEFINED) + 'abc', TempBuffer); //some string which the MQTT library will mark as bad packet
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   FreeDynArray(TempBuffer);
 
   FillInTestProperties;
 
   FillIn_ConnAck(FieldsToSend, PropertiesToSend, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_UnhandledPacketType, 'Bad processing');
 
   Expect(FoundError).ToBe(CMQTT_UnhandledPacketType);
@@ -283,10 +283,10 @@ begin
 
   FillIn_ConnAck(FieldsToSend, PropertiesToSend, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
 
   StringToDynArrayOfByte(Chr(CMQTT_UNDEFINED) + 'abc', TempBuffer); //some string which the MQTT library will mark as bad packet
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   FreeDynArray(TempBuffer);
 
   Expect(MQTT_Process(0)).ToBe(CMQTT_UnhandledPacketType, 'Bad processing');
@@ -316,14 +316,14 @@ begin
   InitDynArrayToEmpty(TempBuffer);
 
   StringToDynArrayOfByte(Chr(CMQTT_CONNACK) + 'abc', TempBuffer); //some string which the MQTT library will mark as bad packet
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   FreeDynArray(TempBuffer);
 
   FillInTestProperties;
 
   FillIn_ConnAck(FieldsToSend, PropertiesToSend, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTTDecoderUnknownProperty, 'Bad processing');
 
   Expect(FoundError).ToBe(CMQTTDecoderUnknownProperty, 'Expected found error');
@@ -348,10 +348,10 @@ begin
 
   FillIn_ConnAck(FieldsToSend, PropertiesToSend, DestPacket);
   EncodeControlPacketToBuffer(DestPacket, TempBuffer);
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
 
   StringToDynArrayOfByte(Chr(CMQTT_CONNACK) + 'abc', TempBuffer); //some string which the MQTT library will mark as bad packet
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   FreeDynArray(TempBuffer);
 
   Expect(MQTT_Process(0)).ToBe(CMQTTDecoderIncompleteBuffer, 'Bad processing');
@@ -386,7 +386,7 @@ begin
 
   SetDynLength(TempBuffer, TempBuffer.Len - 10); // remove some bytes at the end, to make the decoder report an incomplete buffer
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTTDecoderIncompleteBuffer, 'Expecting an incomplete buffer.');
 
   FreeDynArray(TempBuffer);
@@ -411,10 +411,10 @@ begin
   Expect(CopyFromDynArray(RemainingBuffer, TempBuffer, TempBuffer.Len - 10, 10)).ToBe(True);
   SetDynLength(TempBuffer, TempBuffer.Len - 10); // remove some bytes at the end, to make the decoder report an incomplete buffer
 
-  PutReceivedBufferToMQTTLib(0, TempBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTTDecoderIncompleteBuffer, 'Expecting an incomplete buffer.');
 
-  PutReceivedBufferToMQTTLib(0, RemainingBuffer);
+  MQTT_PutReceivedBufferToMQTTLib(0, RemainingBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Expecting a full buffer.');
 
   Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF);

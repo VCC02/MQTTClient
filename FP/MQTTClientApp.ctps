@@ -11,9 +11,9 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="2"/>
-        <CursorPos Y="27"/>
-        <UsageCount Value="189"/>
+        <TopLine Value="26"/>
+        <CursorPos Y="51"/>
+        <UsageCount Value="200"/>
       </Unit>
       <Unit>
         <Filename Value="MQTTClientAppMainForm.pas"/>
@@ -22,94 +22,92 @@
         <ComponentName Value="frmMQTTClientAppMain"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
-        <IsVisibleTab Value="True"/>
         <EditorIndex Value="0"/>
         <WindowIndex Value="0"/>
-        <CursorPos X="36" Y="3"/>
-        <UsageCount Value="189"/>
+        <TopLine Value="1048"/>
+        <CursorPos X="51" Y="1063"/>
+        <UsageCount Value="200"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
-      </Unit>
-      <Unit>
-        <Filename Value="..\..\MiscUtils\DynArrays.pas"/>
-        <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="95"/>
-        <CursorPos X="23" Y="114"/>
-        <UsageCount Value="181"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTUtils.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="2"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="279"/>
-        <CursorPos X="5" Y="292"/>
-        <UsageCount Value="151"/>
+        <TopLine Value="189"/>
+        <CursorPos X="48" Y="202"/>
+        <UsageCount Value="202"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTConnectCtrl.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="4"/>
+        <EditorIndex Value="3"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="117"/>
-        <CursorPos X="7" Y="130"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="26"/>
+        <CursorPos X="65" Y="69"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTConnAckCtrl.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="5"/>
+        <EditorIndex Value="4"/>
         <WindowIndex Value="0"/>
         <TopLine Value="496"/>
         <CursorPos X="4" Y="512"/>
-        <UsageCount Value="127"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTPublishCtrl.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="6"/>
+        <EditorIndex Value="5"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="310"/>
-        <CursorPos X="18" Y="327"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="149"/>
+        <CursorPos Y="165"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTPubAckCtrl.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="6"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="65"/>
+        <CursorPos X="32" Y="74"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTPubRecCtrl.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="8"/>
+        <EditorIndex Value="7"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="65"/>
+        <CursorPos X="33" Y="74"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTPubRelCtrl.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="9"/>
+        <EditorIndex Value="8"/>
         <WindowIndex Value="0"/>
-        <CursorPos X="28" Y="8"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="65"/>
+        <CursorPos X="23" Y="61"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTPubCompCtrl.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="10"/>
+        <EditorIndex Value="9"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="65"/>
+        <CursorPos X="26" Y="74"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -117,9 +115,9 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="11"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="126"/>
-        <CursorPos X="49" Y="129"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="386"/>
+        <CursorPos X="26" Y="390"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -127,7 +125,7 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="12"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -135,7 +133,9 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="13"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="31"/>
+        <CursorPos X="35" Y="44"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -143,7 +143,7 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="14"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -151,7 +151,9 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="15"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="38"/>
+        <CursorPos Y="56"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -159,7 +161,7 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="16"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -167,7 +169,8 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="17"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <TopLine Value="37"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
@@ -175,219 +178,165 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="18"/>
         <WindowIndex Value="0"/>
-        <UsageCount Value="127"/>
+        <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
         <Filename Value="..\Lib\MQTTClient.pas"/>
         <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="196"/>
-        <CursorPos X="30" Y="213"/>
-        <UsageCount Value="36"/>
+        <TopLine Value="2500"/>
+        <CursorPos X="34" Y="2503"/>
+        <UsageCount Value="142"/>
         <Loaded Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="..\Lib\MQTTDynArrays.pas"/>
-        <EditorIndex Value="-1"/>
+        <Filename Value="..\Lib\MQTTCommonCodecCtrl.pas"/>
+        <FRMtype Value="0"/>
+        <EditorIndex Value="10"/>
         <WindowIndex Value="0"/>
-        <TopLine Value="179"/>
-        <CursorPos X="43" Y="209"/>
-        <UsageCount Value="50"/>
+        <TopLine Value="116"/>
+        <CursorPos X="12" Y="77"/>
+        <UsageCount Value="37"/>
+        <Loaded Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="C:\codetyphon\typhon\components\pl_Indy\source\IdTCPClient.pas"/>
-        <FRMtype Value="0"/>
+        <Filename Value="..\..\MiscUtils\DynArrays.pas"/>
+        <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="217"/>
-        <CursorPos X="14" Y="233"/>
-        <UsageCount Value="9"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="20"/>
       </Unit>
       <Unit>
-        <Filename Value="C:\codetyphon\fpcsrc\rtl\objpas\classes\classesh.inc"/>
-        <FRMtype Value="0"/>
+        <Filename Value="..\..\MiscUtils\PollingFIFO.pas"/>
+        <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="101"/>
-        <CursorPos X="3" Y="118"/>
-        <UsageCount Value="9"/>
-      </Unit>
-      <Unit>
-        <Filename Value="C:\codetyphon\typhon\components\pl_Indy\source\IdIOHandler.pas"/>
-        <FRMtype Value="0"/>
-        <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="536"/>
-        <CursorPos X="44" Y="539"/>
-        <UsageCount Value="9"/>
-      </Unit>
-      <Unit>
-        <Filename Value="C:\codetyphon\typhon\components\pl_Indy\source\IdGlobal.pas"/>
-        <FRMtype Value="0"/>
-        <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="434"/>
-        <CursorPos X="14" Y="451"/>
-        <UsageCount Value="9"/>
-      </Unit>
-      <Unit>
-        <Filename Value="W:\usr\local\codetyphon\typhon\lcl\interfaces\gtk2\interfaces.pas"/>
-        <FRMtype Value="0"/>
-        <UnitName Value="Interfaces"/>
-        <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="16"/>
-        <CursorPos X="40" Y="35"/>
-        <UsageCount Value="9"/>
-      </Unit>
-      <Unit>
-        <Filename Value="C:\codetyphon\fpcsrc\rtl\objpas\sysutils\sysstrh.inc"/>
-        <FRMtype Value="0"/>
-        <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <CursorPos X="4" Y="22"/>
-        <UsageCount Value="9"/>
-      </Unit>
-      <Unit>
-        <Filename Value="C:\codetyphon\fpcsrc\rtl\objpas\objpas.pp"/>
-        <FRMtype Value="0"/>
-        <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="23"/>
-        <CursorPos X="8" Y="40"/>
-        <UsageCount Value="9"/>
-      </Unit>
-      <Unit>
-        <Filename Value="C:\codetyphon\fpcsrc\rtl\inc\systemh.inc"/>
-        <FRMtype Value="0"/>
-        <EditorIndex Value="-1"/>
-        <WindowIndex Value="0"/>
-        <TopLine Value="612"/>
-        <CursorPos X="3" Y="629"/>
-        <UsageCount Value="9"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="20"/>
       </Unit>
     </Units>
-    <JumpHistory HistoryIndex="29">
+    <JumpHistory HistoryIndex="28">
       <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="275" Column="30" TopLine="264"/>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="241" Column="57" TopLine="228"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1303" Column="34" TopLine="1297"/>
       </Position>
       <Position>
         <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="372" Column="72" TopLine="348"/>
+        <Caret Line="309" Column="77" TopLine="296"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="244" Column="53" TopLine="227"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1128" Column="49" TopLine="1119"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="2007" Column="65" TopLine="1987"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="2099" Column="67" TopLine="2079"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="2786" Column="54" TopLine="2766"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1128" Column="64" TopLine="1124"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="2007" Column="70" TopLine="1993"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="2099" Column="72" TopLine="2091"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="2785" Column="47" TopLine="2766"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1128" Column="10" TopLine="1096"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="279" Column="54" TopLine="274"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1140" Column="54" TopLine="1130"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="279" Column="54" TopLine="266"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="280" Column="55" TopLine="267"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1156" Column="55" TopLine="1143"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="281" Column="54" TopLine="267"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="283" Column="27" TopLine="270"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1266" Column="27" TopLine="1253"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="284" Column="16" TopLine="270"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="291" Column="35" TopLine="278"/>
+      </Position>
+      <Position>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="2748" Column="15" TopLine="2736"/>
       </Position>
       <Position>
         <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="300" Column="45" TopLine="288"/>
+        <Caret Line="945" Column="29" TopLine="932"/>
       </Position>
       <Position>
         <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="306" Column="46" TopLine="293"/>
+        <Caret Line="1063" Column="51" TopLine="1048"/>
       </Position>
       <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="304" Column="3" TopLine="291"/>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="358" Column="17" TopLine="348"/>
       </Position>
       <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="326" Column="107" TopLine="311"/>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1189" Column="72" TopLine="1180"/>
       </Position>
       <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="328" TopLine="311"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="295" Column="33" TopLine="287"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="393" Column="58" TopLine="388"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="392" Column="56" TopLine="378"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="382" Column="35" TopLine="379"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="529" Column="29" TopLine="523"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="486" Column="52" TopLine="478"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="327" Column="39" TopLine="313"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="350" Column="25" TopLine="327"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="353" Column="40" TopLine="330"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="339" Column="22" TopLine="334"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="320" Column="38" TopLine="311"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="416" Column="43" TopLine="402"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="336" Column="36" TopLine="326"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="431" Column="69" TopLine="423"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="366" Column="74" TopLine="353"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="431" Column="69" TopLine="418"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="444" Column="43" TopLine="425"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="431" Column="57" TopLine="417"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="358" Column="40" TopLine="351"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="437" Column="79" TopLine="430"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="367" Column="61" TopLine="353"/>
-      </Position>
-      <Position>
-        <Filename Value="MQTTClientAppMainForm.pas"/>
-        <Caret Line="364" Column="37" TopLine="349"/>
+        <Filename Value="..\Lib\MQTTClient.pas"/>
+        <Caret Line="1358" Column="50" TopLine="1343"/>
       </Position>
     </JumpHistory>
     <RunParams>
@@ -430,7 +379,63 @@
         <WatchScope Value="wpsLocal"/>
         <WatchKind Value="wpkWrite"/>
         <Source Value="MQTTClientAppMainForm.pas"/>
-        <Line Value="553"/>
+        <Line Value="878"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\Lib\MQTTClient.pas"/>
+        <Line Value="2207"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="MQTTClientAppMainForm.pas"/>
+        <Line Value="901"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="MQTTClientAppMainForm.pas"/>
+        <Line Value="140"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\Lib\MQTTClient.pas"/>
+        <Line Value="2269"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\Lib\MQTTClient.pas"/>
+        <Line Value="2095"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\Lib\MQTTClient.pas"/>
+        <Line Value="2756"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\Lib\MQTTClient.pas"/>
+        <Line Value="1986"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="..\Lib\MQTTClient.pas"/>
+        <Line Value="1052"/>
       </Item>
     </BreakPoints>
     <Watches>

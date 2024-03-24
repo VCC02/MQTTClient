@@ -76,7 +76,7 @@ begin
 
   if IncludeSubscriptionIdentifier then
   begin
-    Expect(RemoveClientToServerSubscriptionIdentifier(ClientInstance, AllocatedSubscriptionIdentifier)).ToBe(0);
+    Expect(MQTT_RemoveClientToServerSubscriptionIdentifier(ClientInstance, AllocatedSubscriptionIdentifier)).ToBe(0);
     AUnsubscribeFields.EnabledProperties := 0;
   end;
 end;
@@ -133,7 +133,7 @@ var
 begin
   Expect(MQTT_UNSUBSCRIBE(0, 0)).ToBe(True);  //add an UNSUBSCRIBE packet to ClientToServer buffer
   //verify buffer content
-  BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  BufferPointer := MQTT_GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Err).ToBe(CMQTT_Success);
   Expect(FoundError).ToBe(CMQTT_Success);
   Expect(ErrorOnPacketType).ToBe(CMQTT_UNDEFINED);
@@ -169,7 +169,7 @@ procedure TTestProtocolUnsubscribeCase.TestClientToServerBufferContent_BeforeSub
 begin
   IncludeSubscriptionIdentifier := True;
 
-  AllocatedSubscriptionIdentifier := CreateClientToServerSubscriptionIdentifier(0); //used in handler
+  AllocatedSubscriptionIdentifier := MQTT_CreateClientToServerSubscriptionIdentifier(0); //used in handler
   Expect(AllocatedSubscriptionIdentifier).NotToBe($FFFF);
   TestClientToServerBufferContent_BeforeSubscribe_WithCallback_Generic;
 end;

@@ -34,11 +34,11 @@ uses
   athreads,
   {$ENDIF}
   Interfaces, // this includes the CT adLCL widgetset
-  Forms, MQTTClientAppMainForm, DynArrays, PollingFIFO, MQTTUtils,
-  MQTTConnectCtrl, MQTTConnAckCtrl, MQTTPublishCtrl, MQTTPubAckCtrl,
-  MQTTPubRecCtrl, MQTTPubRelCtrl, MQTTPubCompCtrl, MQTTSubscribeCtrl,
-  MQTTSubAckCtrl, MQTTUnsubscribeCtrl, MQTTUnsubAckCtrl, MQTTPingReqCtrl,
-  MQTTPingRespCtrl, MQTTDisconnectCtrl, MQTTAuthCtrl, MQTTClient;
+  Forms, MQTTClientAppMainForm, MQTTUtils, MQTTConnectCtrl, MQTTConnAckCtrl,
+  MQTTPublishCtrl, MQTTPubAckCtrl, MQTTPubRecCtrl, MQTTPubRelCtrl,
+  MQTTPubCompCtrl, MQTTSubscribeCtrl, MQTTSubAckCtrl, MQTTUnsubscribeCtrl,
+  MQTTUnsubAckCtrl, MQTTPingReqCtrl, MQTTPingRespCtrl, MQTTDisconnectCtrl,
+  MQTTAuthCtrl, MQTTClient, DynArrays, PollingFIFO;
 
 {$R *.res}
 

@@ -77,7 +77,7 @@ begin
 
   if IncludeSubscriptionIdentifier then
   begin
-    NewSubId := CreateClientToServerSubscriptionIdentifier(ClientInstance);  /////////////// always use CreateClientToServerSubscriptionIdentifier for these identifiers !!!
+    NewSubId := MQTT_CreateClientToServerSubscriptionIdentifier(ClientInstance);  /////////////// always use CreateClientToServerSubscriptionIdentifier for these identifiers !!!
     if NewSubId = $FFFF then
     begin
       Result := False;
@@ -141,7 +141,7 @@ var
 begin
   Expect(MQTT_SUBSCRIBE(0, 0)).ToBe(True);  //add a SUBSCRIBE packet to ClientToServer buffer
   //verify buffer content
-  BufferPointer := GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
+  BufferPointer := MQTT_GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   Expect(Err).ToBe(CMQTT_Success);
   Expect(FoundError).ToBe(CMQTT_Success);
   Expect(ErrorOnPacketType).ToBe(CMQTT_UNDEFINED);
@@ -156,7 +156,7 @@ begin
     Decode_Subscribe(DecodedSubscribePacket, SubscribeFields, SubscribeProperties);
 
     if IncludeSubscriptionIdentifier then
-      Expect(SubscribeProperties.SubscriptionIdentifier).ToBe(CClientToServerSubscriptionIdentifiersInitOffset, 'Allocated SubscriptionIdentifier')
+      Expect(SubscribeProperties.SubscriptionIdentifier).ToBe(CMQTT_ClientToServerSubscriptionIdentifiersInitOffset, 'Allocated SubscriptionIdentifier')
     else
       Expect(SubscribeProperties.SubscriptionIdentifier).ToBe(3, 'Default SubscriptionIdentifier');
 
