@@ -2366,27 +2366,27 @@ type
 
 const
   {$IFDEF IsDesktop}
-  CPacketProcessor: array[0..15] of TMQTTProcessPacket = (
+    CPacketProcessor: array[0..15] of TMQTTProcessPacket = (
   {$ELSE}
-  CPacketProcessor: array[0..15] of PMQTTProcessPacket = (
-    @Process_ErrPacket,    //ERR
-    @Process_ErrPacket,    //CONNECT
-    @Process_CONNACK,      //CONNACK      //Server to Client
-    @Process_PUBLISH,      //PUBLISH      //Server to Client
-    @Process_PUBACK,       //PUBACK       //Server to Client
-    @Process_PUBREC,       //PUBREC       //Server to Client
-    @Process_PUBREL,       //PUBREL       //Server to Client
-    @Process_PUBCOMP,      //PUBCOMP      //Server to Client
-    @Process_ErrPacket,    //SUBSCRIBE
-    @Process_SUBACK,       //SUBACK       //Server to Client
-    @Process_ErrPacket,    //UNSUBSCRIBE
-    @Process_UNSUBACK,     //UNSUBACK     //Server to Client
-    @Process_ErrPacket,    //PINGREQ
-    @Process_PINGRESP,     //PINGRESP     //Server to Client
-    @Process_DISCONNECT,   //DISCONNECT   //Server to Client
-    @Process_AUTH          //AUTH         //Server to Client
+    CPacketProcessor: array[0..15] of PMQTTProcessPacket = (
   {$ENDIF}
-  );
+      @Process_ErrPacket,    //ERR
+      @Process_ErrPacket,    //CONNECT
+      @Process_CONNACK,      //CONNACK      //Server to Client
+      @Process_PUBLISH,      //PUBLISH      //Server to Client
+      @Process_PUBACK,       //PUBACK       //Server to Client
+      @Process_PUBREC,       //PUBREC       //Server to Client
+      @Process_PUBREL,       //PUBREL       //Server to Client
+      @Process_PUBCOMP,      //PUBCOMP      //Server to Client
+      @Process_ErrPacket,    //SUBSCRIBE
+      @Process_SUBACK,       //SUBACK       //Server to Client
+      @Process_ErrPacket,    //UNSUBSCRIBE
+      @Process_UNSUBACK,     //UNSUBACK     //Server to Client
+      @Process_ErrPacket,    //PINGREQ
+      @Process_PINGRESP,     //PINGRESP     //Server to Client
+      @Process_DISCONNECT,   //DISCONNECT   //Server to Client
+      @Process_AUTH          //AUTH         //Server to Client
+    );
 
 
 function MQTT_Process(ClientInstance: DWord): Word;  //this function processes incoming packets (from server to "this" client)

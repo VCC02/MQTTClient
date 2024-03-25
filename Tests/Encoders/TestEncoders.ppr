@@ -27,7 +27,7 @@ program TestEncoders;
 {$mode objfpc}{$H+}
 
 uses
-  Interfaces, Forms, GuiTestRunner, TestEncodersCase,
+  Interfaces, Forms, GuiTestRunner, TestEncodersCase, DynArrays, Expectations,
   MQTTUtils, MQTTConnAckCtrl, MQTTSubscribeCtrl, TestHeaderConnectEncoderCase,
   TestHeaderConnAckDecoderCase, TestHeaderPublishDecoderCase,
   MQTTCommonProperties, MQTTPubAckCtrl, MQTTPubRecCtrl, MQTTPubRelCtrl,
