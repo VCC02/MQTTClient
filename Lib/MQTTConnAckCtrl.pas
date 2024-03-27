@@ -46,7 +46,7 @@ function FillIn_ConnAck(var AConnAckFields: TMQTTConnAckFields;
                         var ADestPacket: TMQTTControlPacket): Boolean;
 
 function Decode_ConnAckProperties(var AVarHeader: TDynArrayOfByte; APropertiesOffset, APropertyLen: DWord; var AConnAckProperties: TMQTTConnAckProperties; var AEnabledProperties: DWord): Boolean;
-//function Decode_ConnAckToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord; var AErr: Word): Boolean;
+function Valid_ConnAckPacketLength(var ABuffer: TDynArrayOfByte): Word;
 function Decode_ConnAckToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
 function Decode_ConnAck(var AReceivedPacket: TMQTTControlPacket;
                         var AConnAckFields: TMQTTConnAckFields;  //bits 7-1 are reserved. Bit 0 is the Session Present flag
@@ -395,17 +395,17 @@ end;
 
 
 //input args: ABuffer
-//output args: ADestPacket
+//output args: ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen
 //Result: Err
-function Decode_ConnAckToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
+function Decode_ConnAckPacketLength(var ABuffer: TDynArrayOfByte; var ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen: DWord): Word;
 var
   TempArr4: T4ByteArray;
-  FixedHeaderLen, ExpectedVarAndPayloadLen, VarHeaderLen, ActualVarAndPayloadLen: DWord;
-  CurrentBufferPointer, PropertyLen: DWord;
-  VarIntLen, ConnectReasonCode: Byte;
+  ActualVarAndPayloadLen: DWord;
+  VarIntLen: Byte;
   TempErr: Word;
   ConvErr: Boolean;
 begin
+  Result := CMQTTDecoderNoErr;
   ADecodedBufferLen := 0;
 
   if ABuffer.Len = 0 then
@@ -415,7 +415,7 @@ begin
   end;
 
   MemMove(@TempArr4, @ABuffer.Content^[1], 4);
-  ExpectedVarAndPayloadLen := VarIntToDWord(TempArr4, VarIntLen, ConvErr);    //this is more of the VarHeader length, because there is no payload
+  AExpectedVarAndPayloadLen := VarIntToDWord(TempArr4, VarIntLen, ConvErr);    //this is more of the VarHeader length, because there is no payload
 
   if ConvErr then
   begin
@@ -423,20 +423,49 @@ begin
     Exit;
   end;
 
-  if ExpectedVarAndPayloadLen = 0 then
+  if AExpectedVarAndPayloadLen = 0 then
   begin
     Result := CMQTTDecoderBadHeaderSize;
     Exit;
   end;
 
-  FixedHeaderLen := VarIntLen + 1;    //the fixed header should be 2 bytes long
-  ADecodedBufferLen := FixedHeaderLen + ExpectedVarAndPayloadLen;
+  AFixedHeaderLen := VarIntLen + 1;    //the fixed header should be 2 bytes long
+  ADecodedBufferLen := AFixedHeaderLen + AExpectedVarAndPayloadLen;
 
   //the returned error code could be verified here, but the fixed header is empty at this point, so the function would not return useful info
 
-  ActualVarAndPayloadLen := ABuffer.Len - FixedHeaderLen;
+  ActualVarAndPayloadLen := ABuffer.Len - AFixedHeaderLen;
 
-  TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(ExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(AExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  if TempErr <> CMQTTDecoderNoErr then
+  begin
+    Result := TempErr;
+    Exit;
+  end;
+end;
+
+
+function Valid_ConnAckPacketLength(var ABuffer: TDynArrayOfByte): Word;
+var
+  FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen: DWord;
+begin
+  Result := Decode_ConnAckPacketLength(ABuffer, FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen);
+end;
+
+
+//input args: ABuffer
+//output args: ADestPacket
+//Result: Err
+function Decode_ConnAckToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
+var
+  TempArr4: T4ByteArray;
+  FixedHeaderLen, ExpectedVarAndPayloadLen, VarHeaderLen: DWord;
+  CurrentBufferPointer, PropertyLen: DWord;
+  VarIntLen, ConnectReasonCode: Byte;
+  TempErr: Word;
+  ConvErr: Boolean;
+begin
+  TempErr := Decode_ConnAckPacketLength(ABuffer, ADecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen);
   if TempErr <> CMQTTDecoderNoErr then
   begin
     Result := TempErr;

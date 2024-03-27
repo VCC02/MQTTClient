@@ -45,6 +45,7 @@ function FillIn_Publish(var APublishFields: TMQTTPublishFields;
                         var APublishProperties: TMQTTPublishProperties;
                         var ADestPacket: TMQTTControlPacket): Boolean;
 
+function Valid_PublishPacketLength(var ABuffer: TDynArrayOfByte): Word;
 function Decode_PublishToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
 function Decode_Publish(var AReceivedPacket: TMQTTControlPacket;
                         var APublishFields: TMQTTPublishFields;
@@ -193,14 +194,12 @@ end;
 
 //input args: ABuffer
 //output args: ADestPacket, AErr
-function Decode_PublishToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
+function Decode_PublishPacketLength(var ABuffer: TDynArrayOfByte; var ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen: DWord): Word;
 var
   TempArr4: T4ByteArray;
-  FixedHeaderLen, ExpectedVarAndPayloadLen, VarHeaderLen, PropertyLen, ActualVarAndPayloadLen: DWord;
-  CurrentBufferPointer: DWord;
-  VarIntLen, QoS, TempErr: Byte;
+  ActualVarAndPayloadLen: DWord;
+  VarIntLen, TempErr: Byte;
   ConvErr: Boolean;
-  TopicNameLen: Word;
 begin
   Result := CMQTTDecoderNoErr;
   ADecodedBufferLen := 0;
@@ -212,7 +211,7 @@ begin
   end;
 
   MemMove(@TempArr4, @ABuffer.Content^[1], 4);
-  ExpectedVarAndPayloadLen := VarIntToDWord(TempArr4, VarIntLen, ConvErr);
+  AExpectedVarAndPayloadLen := VarIntToDWord(TempArr4, VarIntLen, ConvErr);
 
   if ConvErr then
   begin
@@ -220,18 +219,46 @@ begin
     Exit;
   end;
 
-  if ExpectedVarAndPayloadLen = 0 then
+  if AExpectedVarAndPayloadLen = 0 then
   begin
     Result := CMQTTDecoderBadHeaderSize;
     Exit;
   end;
 
-  FixedHeaderLen := VarIntLen + 1;
-  ADecodedBufferLen := FixedHeaderLen + ExpectedVarAndPayloadLen;
+  AFixedHeaderLen := VarIntLen + 1;
+  ADecodedBufferLen := AFixedHeaderLen + AExpectedVarAndPayloadLen;
 
-  ActualVarAndPayloadLen := ABuffer.Len - FixedHeaderLen;
+  ActualVarAndPayloadLen := ABuffer.Len - AFixedHeaderLen;
 
-  TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(ExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(AExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  if TempErr <> CMQTTDecoderNoErr then
+  begin
+    Result := TempErr;
+    Exit;
+  end;
+end;
+
+
+function Valid_PublishPacketLength(var ABuffer: TDynArrayOfByte): Word;
+var
+  FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen: DWord;
+begin
+  Result := Decode_PublishPacketLength(ABuffer, FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen);
+end;
+
+
+//input args: ABuffer
+//output args: ADestPacket, AErr
+function Decode_PublishToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
+var
+  TempArr4: T4ByteArray;
+  FixedHeaderLen, ExpectedVarAndPayloadLen, VarHeaderLen, PropertyLen: DWord;
+  CurrentBufferPointer: DWord;
+  VarIntLen, QoS, TempErr: Byte;
+  ConvErr: Boolean;
+  TopicNameLen: Word;
+begin
+  TempErr := Decode_PublishPacketLength(ABuffer, ADecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen);
   if TempErr <> CMQTTDecoderNoErr then
   begin
     Result := TempErr;

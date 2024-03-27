@@ -46,6 +46,7 @@ function FillIn_Auth(var AAuthFields: TMQTTAuthFields;
                      var ADestPacket: TMQTTControlPacket): Boolean;
 
 function Decode_AuthProperties(var AVarHeader: TDynArrayOfByte; APropertiesOffset, APropertyLen: DWord; var AAuthProperties: TMQTTAuthProperties; var AEnabledProperties: Word): Boolean;
+function Valid_AuthPacketLength(var ABuffer: TDynArrayOfByte): Word;
 
 //input args: ABuffer
 //output args: ADestPacket
@@ -227,16 +228,15 @@ end;
 
 
 //input args: ABuffer
-//output args: ADestPacket
+//output args: ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen, AActualVarAndPayloadLen
 //Result: Err
-function Decode_AuthToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
+function Decode_AuthPacketLength(var ABuffer: TDynArrayOfByte; var ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen, AActualVarAndPayloadLen: DWord): Word;
 var
   TempArr4: T4ByteArray;
-  FixedHeaderLen, ExpectedVarAndPayloadLen, VarHeaderLen, PropertyLen, ActualVarAndPayloadLen: DWord;
-  CurrentBufferPointer: DWord;
   VarIntLen, TempErr: Byte;
   ConvErr: Boolean;
 begin
+  Result := CMQTTDecoderNoErr;
   ADecodedBufferLen := 0;
 
   if ABuffer.Len = 0 then
@@ -252,7 +252,7 @@ begin
   end;
 
   MemMove(@TempArr4, @ABuffer.Content^[1], 4);
-  ExpectedVarAndPayloadLen := VarIntToDWord(TempArr4, VarIntLen, ConvErr);
+  AExpectedVarAndPayloadLen := VarIntToDWord(TempArr4, VarIntLen, ConvErr);
 
   if ConvErr then
   begin
@@ -260,18 +260,46 @@ begin
     Exit;
   end;
 
-  //if ExpectedVarAndPayloadLen = 0 then     //auth packets can have a 0-len VarHeader, when there is no reason code and no properties
+  //if AExpectedVarAndPayloadLen = 0 then     //auth packets can have a 0-len VarHeader, when there is no reason code and no properties
   //begin
   //  //Result := CMQTTDecoderBadHeaderSize;
   //  Exit;
   //end;
 
-  FixedHeaderLen := VarIntLen + 1;
-  ADecodedBufferLen := FixedHeaderLen + ExpectedVarAndPayloadLen;
+  AFixedHeaderLen := VarIntLen + 1;
+  ADecodedBufferLen := AFixedHeaderLen + AExpectedVarAndPayloadLen;
 
-  ActualVarAndPayloadLen := ABuffer.Len - FixedHeaderLen;
+  AActualVarAndPayloadLen := ABuffer.Len - AFixedHeaderLen;
 
-  TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(ExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(AExpectedVarAndPayloadLen, AActualVarAndPayloadLen);
+  if TempErr <> CMQTTDecoderNoErr then
+  begin
+    Result := TempErr;
+    Exit;
+  end;
+end;
+
+
+function Valid_AuthPacketLength(var ABuffer: TDynArrayOfByte): Word;
+var
+  FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
+begin
+  Result := Decode_AuthPacketLength(ABuffer, FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+end;
+
+
+//input args: ABuffer
+//output args: ADestPacket, ADecodedBufferLen
+//Result: Err
+function Decode_AuthToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
+var
+  TempArr4: T4ByteArray;
+  FixedHeaderLen, ExpectedVarAndPayloadLen, VarHeaderLen, PropertyLen, ActualVarAndPayloadLen: DWord;
+  CurrentBufferPointer: DWord;
+  VarIntLen, TempErr: Byte;
+  ConvErr: Boolean;
+begin
+  TempErr := Decode_AuthPacketLength(ABuffer, ADecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
   if TempErr <> CMQTTDecoderNoErr then
   begin
     Result := TempErr;
@@ -295,6 +323,7 @@ begin
     Exit; //end of packet
   end;
 
+  ConvErr := False;
   VarHeaderLen := 1;  //Auth Reason Code, one byte
 
   if ActualVarAndPayloadLen = 1 then    //there is a reason code, but there is no property

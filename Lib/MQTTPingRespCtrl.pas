@@ -39,6 +39,8 @@ interface
 uses
   DynArrays, MQTTUtils;
 
+
+function Valid_PingRespPacketLength(var ABuffer: TDynArrayOfByte): Word;
   //no properties
 //input args: ABuffer
 //output args: ADestPacket, AErr
@@ -47,10 +49,10 @@ function Decode_PingRespToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPack
 implementation
 
 
-//input args: ABuffer
-//output args: ADestPacket, AErr
-function Decode_PingRespToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
+function Decode_PingRespPacketLength(var ABuffer: TDynArrayOfByte): Word;
 begin
+  Result := CMQTTDecoderNoErr;
+
   if ABuffer.Len = 0 then
   begin
     Result := CMQTTDecoderEmptyBuffer;
@@ -68,9 +70,21 @@ begin
   //  Result := CMQTTDecoderOverfilledBuffer;
   //  Exit;
   //end;
-  
+end;
+
+
+function Valid_PingRespPacketLength(var ABuffer: TDynArrayOfByte): Word;
+begin
+  Result := Decode_PingRespPacketLength(ABuffer);
+end;
+
+
+//input args: ABuffer
+//output args: ADestPacket, AErr
+function Decode_PingRespToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
+begin
   ADecodedBufferLen := 2;
-  Result := CMQTTDecoderNoErr;
+  Result := Decode_PingRespPacketLength(ABuffer); // CMQTTDecoderNoErr;
 end;
 
 end.

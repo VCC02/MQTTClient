@@ -1,5 +1,5 @@
 {
-    Copyright (C) 2023 VCC
+    Copyright (C) 2024 VCC
     creation date: 31 Jul 2023
     initial release date: 26 Sep 2023
 
@@ -236,6 +236,8 @@ function MQTT_GetClientToServerResendBuffer(ClientInstance: DWord; var AErr: Wor
 function MQTT_GetServerToClientBuffer(ClientInstance: DWord; var AErr: Word): PMQTTBuffer;  //Err is 0 for success
 
 function MQTT_Process(ClientInstance: DWord): Word; //Should be called in the main loop (not necessarily at every iteration), to do packet processing and trigger events. It should be called for every client. If it returns OutOfMemory, then the application has to be adjusted to call MQTT_Process more often and/or reserve more heap memory for MQTT library.
+function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
+
 function MQTT_PutReceivedBufferToMQTTLib(ClientInstance: DWord; var ABuffer: TDynArrayOfByte): Boolean; //Should be called by user code, after receiving data from server. When a valid packet is formed, the MQTT library will process it and call the decoded event.
 function MQTT_CreateClientToServerPacketIdentifier(ClientInstance: DWord): Word;
 function MQTT_ClientToServerPacketIdentifierIsUsed(ClientInstance: DWord; APacketIdentifier: Word): Boolean;
@@ -2359,9 +2361,18 @@ begin
 end;
 
 
+function DummyValidPacketLength(var ABuffer: TDynArrayOfByte): Word;
+begin
+  Result := CMQTTDecoderBadCtrlPacket;
+end;
+
+
 type
   TMQTTProcessPacket = function(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
   PMQTTProcessPacket = ^TMQTTProcessPacket;
+
+  TMQTTValidPacketLength = function(var ABuffer: TDynArrayOfByte): Word;
+  PMQTTValidPacketLength = ^TMQTTValidPacketLength;
 
 
 const
@@ -2386,6 +2397,30 @@ const
       @Process_PINGRESP,     //PINGRESP     //Server to Client
       @Process_DISCONNECT,   //DISCONNECT   //Server to Client
       @Process_AUTH          //AUTH         //Server to Client
+    );
+
+const
+  {$IFDEF IsDesktop}
+    CPacketLengthValidator: array[0..15] of TMQTTValidPacketLength = (
+  {$ELSE}
+    CPacketLengthValidator: array[0..15] of PMQTTValidPacketLength = (
+  {$ENDIF}
+      @DummyValidPacketLength,         //ERR
+      @DummyValidPacketLength,         //CONNECT
+      @Valid_ConnAckPacketLength,      //CONNACK      //Server to Client
+      @Valid_PublishPacketLength,      //PUBLISH      //Server to Client
+      @Valid_CommonPacketLength,       //PUBACK       //Server to Client
+      @Valid_CommonPacketLength,       //PUBREC       //Server to Client
+      @Valid_CommonPacketLength,       //PUBREL       //Server to Client
+      @Valid_CommonPacketLength,       //PUBCOMP      //Server to Client
+      @DummyValidPacketLength,         //SUBSCRIBE
+      @Valid_CommonPacketLength,       //SUBACK       //Server to Client
+      @DummyValidPacketLength,         //UNSUBSCRIBE
+      @Valid_CommonPacketLength,       //UNSUBACK     //Server to Client
+      @DummyValidPacketLength,         //PINGREQ
+      @Valid_PingRespPacketLength,     //PINGRESP     //Server to Client
+      @Valid_DisconnectPacketLength,   //DISCONNECT   //Server to Client
+      @Valid_AuthPacketLength          //AUTH         //Server to Client
     );
 
 
@@ -2421,6 +2456,17 @@ begin
 
     InitialLength := BufferPointer^.Len;
   end;
+end;
+
+
+function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
+var
+  PacketType: Byte;
+begin
+  Result := CMQTT_Success;
+
+  PacketType := ABuffer.Content^[0];
+  Result := CPacketLengthValidator[(PacketType shr 4) and $0F](ABuffer);
 end;
 
 
