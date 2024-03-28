@@ -447,9 +447,12 @@ end;
 
 function Valid_ConnAckPacketLength(var ABuffer: TDynArrayOfByte): Word;
 var
-  FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen: DWord;
+  DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen: DWord;
 begin
-  Result := Decode_ConnAckPacketLength(ABuffer, FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen);
+  Result := Decode_ConnAckPacketLength(ABuffer, DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen);
+  if Result = CMQTTDecoderNoErr then
+    if ABuffer.Len < DecodedBufferLen then
+      Result := CMQTTDecoderIncompleteBuffer;
 end;
 
 

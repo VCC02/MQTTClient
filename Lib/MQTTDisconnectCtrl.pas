@@ -277,9 +277,12 @@ end;
 
 function Valid_DisconnectPacketLength(var ABuffer: TDynArrayOfByte): Word;
 var
-  FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
+  DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
 begin
-  Result := Decode_DisconnectPacketLength(ABuffer, FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  Result := Decode_DisconnectPacketLength(ABuffer, DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  if Result = CMQTTDecoderNoErr then
+    if ABuffer.Len < DecodedBufferLen then
+      Result := CMQTTDecoderIncompleteBuffer;
 end;
 
 

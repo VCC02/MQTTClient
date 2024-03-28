@@ -148,6 +148,9 @@ begin
 
   if Lo(AErr) = CMQTT_PacketIdentifierNotFound_ClientToServer then   // $CE
     frmMQTTClientAppMain.AddToLog('Client error: PacketIdentifierNotFound.');
+
+  if Lo(AErr) = CMQTT_UnhandledPacketType then   // $CA
+    frmMQTTClientAppMain.AddToLog('Client error: UnhandledPacketType.');  //Usually appears when an incomplete packet is received, so the packet type by is 0.
 end;
 
 
@@ -796,33 +799,52 @@ begin
     try
       LoggedDisconnection := False;
       repeat
+        //try
+        //  TempByte := frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadByte;
+        //  AddByteToDynArray(TempByte, TempReadBuf);
+        //except
+        //  on E: Exception do      ////////////////// ToDo: switch to EIdReadTimeout
+        //  begin
+        //    if (E.Message = 'Read timed out.') and (TempReadBuf.Len > 0) then
+        //    begin
+        //      MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
+        //      AddToLog('done receiving packet: ' + E.Message + {'   ReadCount: ' + IntToStr(ReadCount) +} '   E.ClassName: ' + E.ClassName);
+        //      AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
+        //
+        //      frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);
+        //
+        //      FreeDynArray(TempReadBuf);
+        //      //ReadCount := 0; //reset for next packet
+        //    end
+        //    else
+        //      if E.Message = 'Connection Closed Gracefully.' then
+        //        if not LoggedDisconnection then
+        //        begin
+        //          LoggedDisconnection := True;
+        //          AddToLog('Disconnected from server. Cannot receive more data. Ex: ' + E.Message);
+        //        end;
+        //
+        //    Sleep(1);
+        //  end;
+        //end;
+
+
         try
           TempByte := frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadByte;
           AddByteToDynArray(TempByte, TempReadBuf);
-        except
-          on E: Exception do      ////////////////// ToDo: switch to EIdReadTimeout
+
+          if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
           begin
-            if (E.Message = 'Read timed out.') and (TempReadBuf.Len > 0) then
-            begin
-              MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
-              AddToLog('done receiving packet: ' + E.Message + {'   ReadCount: ' + IntToStr(ReadCount) +} '   E.ClassName: ' + E.ClassName);
-              AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
+            MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
+            AddToLog('done receiving packet');
+            AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
 
-              frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);
+            frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and inomplete packets
 
-              FreeDynArray(TempReadBuf);
-              //ReadCount := 0; //reset for next packet
-            end
-            else
-              if E.Message = 'Connection Closed Gracefully.' then
-                if not LoggedDisconnection then
-                begin
-                  LoggedDisconnection := True;
-                  AddToLog('Disconnected from server. Cannot receive more data. Ex: ' + E.Message);
-                end;
-
+            FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
             Sleep(1);
           end;
+        except
         end;
 
         //Inc(ReadCount);
@@ -852,7 +874,7 @@ begin
   try
     try
       IdTCPClient1.Connect(lbeAddress.Text, StrToIntDef(lbePort.Text, 1883));
-      IdTCPClient1.IOHandler.ReadTimeout := 100;
+      IdTCPClient1.IOHandler.ReadTimeout := 10;
       //AddToLog('Connected to broker...');
 
       if Th <> nil then

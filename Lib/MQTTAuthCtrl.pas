@@ -282,9 +282,12 @@ end;
 
 function Valid_AuthPacketLength(var ABuffer: TDynArrayOfByte): Word;
 var
-  FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
+  DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
 begin
-  Result := Decode_AuthPacketLength(ABuffer, FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  Result := Decode_AuthPacketLength(ABuffer, DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  if Result = CMQTTDecoderNoErr then
+    if ABuffer.Len < DecodedBufferLen then
+      Result := CMQTTDecoderIncompleteBuffer;
 end;
 
 

@@ -241,9 +241,12 @@ end;
 
 function Valid_PublishPacketLength(var ABuffer: TDynArrayOfByte): Word;
 var
-  FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen: DWord;
+  DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen: DWord;
 begin
-  Result := Decode_PublishPacketLength(ABuffer, FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen);
+  Result := Decode_PublishPacketLength(ABuffer, DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen);
+  if Result = CMQTTDecoderNoErr then
+    if ABuffer.Len < DecodedBufferLen then
+      Result := CMQTTDecoderIncompleteBuffer;
 end;
 
 

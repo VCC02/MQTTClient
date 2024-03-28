@@ -76,6 +76,9 @@ end;
 function Valid_PingRespPacketLength(var ABuffer: TDynArrayOfByte): Word;
 begin
   Result := Decode_PingRespPacketLength(ABuffer);
+  if Result = CMQTTDecoderNoErr then
+    if ABuffer.Len < 2 {DecodedBufferLen} then
+      Result := CMQTTDecoderIncompleteBuffer;
 end;
 
 

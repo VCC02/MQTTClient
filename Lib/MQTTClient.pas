@@ -2369,11 +2369,12 @@ end;
 
 type
   TMQTTProcessPacket = function(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
-  PMQTTProcessPacket = ^TMQTTProcessPacket;
-
   TMQTTValidPacketLength = function(var ABuffer: TDynArrayOfByte): Word;
-  PMQTTValidPacketLength = ^TMQTTValidPacketLength;
 
+  {$IFnDEF IsDesktop}
+    PMQTTProcessPacket = ^TMQTTProcessPacket;
+    PMQTTValidPacketLength = ^TMQTTValidPacketLength;
+  {$ENDIF}
 
 const
   {$IFDEF IsDesktop}

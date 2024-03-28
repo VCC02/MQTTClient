@@ -145,9 +145,9 @@ end;
 
 
 //input args: ABuffer
-//output args: ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen
+//output args: ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen, AActualVarAndPayloadLen
 //Result: Err
-function Decode_CommonPacketLength(var ABuffer: TDynArrayOfByte; var ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord): Word;
+function Decode_CommonPacketLength(var ABuffer: TDynArrayOfByte; var ADecodedBufferLen, AFixedHeaderLen, AExpectedVarAndPayloadLen, AActualVarAndPayloadLen: DWord): Word;
 var
   TempArr4: T4ByteArray;
   VarIntLen, TempErr: Byte;
@@ -180,11 +180,11 @@ begin
   AFixedHeaderLen := VarIntLen + 1;
   ADecodedBufferLen := AFixedHeaderLen + AExpectedVarAndPayloadLen;
 
-  ActualVarAndPayloadLen := ABuffer.Len - AFixedHeaderLen;
-  if ActualVarAndPayloadLen > AExpectedVarAndPayloadLen then  ////////////////////////////////// Quick fix, in case the buffer contains multiple packets.
-    ActualVarAndPayloadLen := AExpectedVarAndPayloadLen;
+  AActualVarAndPayloadLen := ABuffer.Len - AFixedHeaderLen;
+  if AActualVarAndPayloadLen > AExpectedVarAndPayloadLen then  ////////////////////////////////// Quick fix, in case the buffer contains multiple packets.
+    AActualVarAndPayloadLen := AExpectedVarAndPayloadLen;
 
-  TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(AExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  TempErr := MQTT_VerifyExpectedAndActual_VarAndPayloadLen(AExpectedVarAndPayloadLen, AActualVarAndPayloadLen);
   if TempErr <> CMQTTDecoderNoErr then
   begin
     Result := TempErr;
@@ -195,9 +195,12 @@ end;
 
 function Valid_CommonPacketLength(var ABuffer: TDynArrayOfByte): Word;
 var
-  FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
+  DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
 begin
-  Result := Decode_CommonPacketLength(ABuffer, FixedHeaderLen, ExpectedVarAndPayloadLen, AExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  Result := Decode_CommonPacketLength(ABuffer, DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen);
+  if Result = CMQTTDecoderNoErr then
+    if ABuffer.Len < DecodedBufferLen then
+      Result := CMQTTDecoderIncompleteBuffer;
 end;
 
 
