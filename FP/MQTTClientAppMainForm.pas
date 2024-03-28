@@ -839,7 +839,7 @@ begin
             AddToLog('done receiving packet');
             AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
 
-            frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and inomplete packets
+            frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
 
             FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
             Sleep(1);

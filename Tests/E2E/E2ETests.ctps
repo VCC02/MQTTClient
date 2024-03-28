@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="12"/>
+    <BuildModes Active="Default"/>
+    <Units>
+      <Unit>
+        <Filename Value="E2ETests.ppr"/>
+        <FRMtype Value="0"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="0"/>
+        <CursorPos X="2" Y="24"/>
+        <UsageCount Value="29"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="0"/>
+        <WindowIndex Value="0"/>
+        <CursorPos X="11" Y="2"/>
+        <UsageCount Value="29"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\DynArrays.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="29"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\Expectations.pas"/>
+        <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="1"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="132"/>
+        <CursorPos X="24" Y="145"/>
+        <UsageCount Value="29"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\PollingFIFO.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="2"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="127"/>
+        <CursorPos Y="137"/>
+        <UsageCount Value="29"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTClient.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="4"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="354"/>
+        <CursorPos X="50" Y="361"/>
+        <UsageCount Value="29"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\Lib\MQTTUtils.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="3"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="301"/>
+        <CursorPos X="5" Y="314"/>
+        <UsageCount Value="29"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\MQTTTestUtils.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="0"/>
+        <TopLine Value="256"/>
+        <UsageCount Value="29"/>
+      </Unit>
+    </Units>
+    <JumpHistory HistoryIndex="29">
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="223" TopLine="211"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="225" TopLine="221"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="220" Column="46" TopLine="207"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="1038" Column="46" TopLine="1026"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="222" TopLine="208"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="223" TopLine="208"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="222" Column="44" TopLine="208"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="625" Column="18" TopLine="603"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="1111" Column="11" TopLine="1095"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="1113" Column="46" TopLine="1095"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="1115" Column="48" TopLine="1095"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="64" Column="14" TopLine="49"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="76" Column="21" TopLine="56"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="78" Column="64" TopLine="56"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="464" Column="39" TopLine="443"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="1113" Column="19" TopLine="1102"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="1118" Column="29" TopLine="1102"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="925" Column="18" TopLine="913"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="914" Column="18" TopLine="899"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="925" Column="30" TopLine="906"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="922" Column="28" TopLine="906"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="933" Column="44" TopLine="916"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="935" Column="29" TopLine="922"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="945" Column="35" TopLine="932"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="916" Column="17" TopLine="901"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="981" Column="34" TopLine="971"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="1152" Column="66" TopLine="1144"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="83" Column="60" TopLine="73"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="64" Column="12" TopLine="57"/>
+      </Position>
+      <Position>
+        <Filename Value="TestBuiltinClientsCase.pas"/>
+        <Caret Line="971" Column="28" TopLine="968"/>
+      </Position>
+    </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+  <Debugging>
+    <BreakPoints>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestBuiltinClientsCase.pas"/>
+        <Line Value="328"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestBuiltinClientsCase.pas"/>
+        <Line Value="312"/>
+      </Item>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="TestBuiltinClientsCase.pas"/>
+        <Line Value="226"/>
+      </Item>
+    </BreakPoints>
+  </Debugging>
+</CONFIG>

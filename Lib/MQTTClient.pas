@@ -362,6 +362,8 @@ const
   CMQTT_ServerToClientPacketIdentifiersInitOffset = 300;  //ServerToClient packet identifiers start at 300.
   CMQTT_ClientToServerSubscriptionIdentifiersInitOffset = 700;
 
+  CClientIndexMask = $0000FFFF;
+
 
 implementation
 
@@ -377,9 +379,6 @@ implementation
 //QoS=2:
 //Server (Sender) -> Client (Receiver):   Server sends Publish,  Client responds with PubRec,  Server sends PubRel,  Client responds with PubComp
 //Client (Sender) -> Server (Receiver):   Client sends Publish,  Server responds with PubRec,  Client sends PubRel,  Server responds with PubComp
-
-const
-  CClientIndexMask = $0000FFFF;
 
 
 var
