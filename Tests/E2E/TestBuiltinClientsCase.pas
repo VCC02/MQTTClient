@@ -22,6 +22,9 @@
 }
 
 
+//These tests assume that the broker is configured to relay the messages at the same QoS as published.
+
+
 unit TestBuiltinClientsCase;
 
 {$IFNDEF IsMCU}
@@ -49,9 +52,24 @@ type
     FMQTTPassword: string;
 
     FReceivedConAck: Boolean;
-    FSubscribePacketID: Integer;
-    FSubAckPacketID: Integer;
+    FSubscribePacketID: DWord;
+    FUnsubscribePacketID: DWord;
+    FSubAckPacketID: DWord;
+    FUnsubAckPacketID: DWord;
+
+    FSentPublishedMessage: string;
     FReceivedPublishedMessage: string;
+    FAllReceivedPublishedMessages: TStringArray;
+
+    FReceivedPubAck: Boolean;
+    FReceivedPubRec: Boolean;
+    FReceivedPubRel: Boolean;
+    FReceivedPubComp: Boolean;
+
+    FSentPubAck: Boolean;
+    FSentPubRec: Boolean;
+    FSentPubRel: Boolean;
+    FSentPubComp: Boolean;
 
     procedure InitHandlers;
     procedure SendDynArrayOfByte(AArr: TDynArrayOfByte);
@@ -72,13 +90,31 @@ type
     property IdTCPClientObj: TIdTCPClient read FIdTCPClientObj;
 
     property ReceivedConAck: Boolean read FReceivedConAck write FReceivedConAck;
-    property SubscribePacketID: Integer read FSubscribePacketID write FSubscribePacketID;
-    property SubAckPacketID: Integer read FSubAckPacketID write FSubAckPacketID;
+    property SubscribePacketID: DWord read FSubscribePacketID write FSubscribePacketID;
+    property UnsubscribePacketID: DWord read FUnsubscribePacketID write FUnsubscribePacketID;
+    property SubAckPacketID: DWord read FSubAckPacketID write FSubAckPacketID;
+    property UnsubAckPacketID: DWord read FUnsubAckPacketID write FUnsubAckPacketID;
+
+    property SentPublishedMessage: string read FSentPublishedMessage write FSentPublishedMessage;
     property ReceivedPublishedMessage: string read FReceivedPublishedMessage write FReceivedPublishedMessage;
+
+    property ReceivedPubAck: Boolean read FReceivedPubAck write FReceivedPubAck;
+    property ReceivedPubRec: Boolean read FReceivedPubRec write FReceivedPubRec;
+    property ReceivedPubRel: Boolean read FReceivedPubRel write FReceivedPubRel;
+    property ReceivedPubComp: Boolean read FReceivedPubComp write FReceivedPubComp;
+
+    property SentPubAck: Boolean read FSentPubAck write FSentPubAck;
+    property SentPubRec: Boolean read FSentPubRec write FSentPubRec;
+    property SentPubRel: Boolean read FSentPubRel write FSentPubRel;
+    property SentPubComp: Boolean read FSentPubComp write FSentPubComp;
   end;
 
 
   TTestE2EBuiltinClientsCase = class(TTestCase)
+  private
+    procedure TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+    procedure TestPublish_Client0ToClient1_HappyFlow_SendPublish(AQoS: Byte; AMsgToPublish: string = 'some content');
+    procedure TestPublish_Client0ToClient1_HappyFlow_SendUnsubscribe(APacketIDOffset: Word = 1);
   protected
     procedure SetUp; override;
     procedure TearDown; override;
@@ -86,6 +122,14 @@ type
     procedure TestPublish_Client0ToClient1_HappyFlow_QoS0;
     procedure TestPublish_Client0ToClient1_HappyFlow_QoS1;
     procedure TestPublish_Client0ToClient1_HappyFlow_QoS2;
+
+    procedure TestPublish_Client0ToClient1_HappyFlowUnsubscribed_QoS0;
+    procedure TestPublish_Client0ToClient1_HappyFlowUnsubscribed_QoS1;
+    procedure TestPublish_Client0ToClient1_HappyFlowUnsubscribed_QoS2;
+
+    procedure TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS0;
+    procedure TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS1;
+    procedure TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS2;
   end;
 
 implementation
@@ -299,8 +343,8 @@ begin
   TestClients[TempClientInstance].AddToLog('Subscribing with PacketIdentifier: ' + IntToStr(ASubscribeFields.PacketIdentifier));
   TestClients[TempClientInstance].AddToLog('Subscribing to: ' + StringReplace(DynArrayOfByteToString(ASubscribeFields.TopicFilters), #0, '#0', [rfReplaceAll]));
 
-  TestClients[TempClientInstance].AddToLog('');
   TestClients[TempClientInstance].SubscribePacketID := ASubscribeFields.PacketIdentifier;
+  TestClients[TempClientInstance].AddToLog('');
 end;
 
 
@@ -324,8 +368,8 @@ begin
   TestClients[TempClientInstance].AddToLog('ASubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(ASubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
   TestClients[TempClientInstance].AddToLog('ASubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(ASubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
 
-  TestClients[TempClientInstance].AddToLog('');
   TestClients[TempClientInstance].SubAckPacketID := ASubAckFields.PacketIdentifier;
+  TestClients[TempClientInstance].AddToLog('');
 end;
 
 
@@ -350,6 +394,7 @@ begin
     TestClients[TempClientInstance].AddToLog('Unsubscribing from "' + FSubscribeToTopicNames[i] + '"...');
   end;
 
+  TestClients[TempClientInstance].UnsubscribePacketID := AUnsubscribeFields.PacketIdentifier;
   //the user code should call RemoveClientToServerSubscriptionIdentifier to remove the allocate identifier.
 end;
 
@@ -374,6 +419,7 @@ begin
   TestClients[TempClientInstance].AddToLog('AUnsubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(AUnsubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
   TestClients[TempClientInstance].AddToLog('AUnsubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AUnsubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
 
+  TestClients[TempClientInstance].UnsubAckPacketID := AUnsubAckFields.PacketIdentifier;
   TestClients[TempClientInstance].AddToLog('');
 end;
 
@@ -396,6 +442,7 @@ begin
   Result := Result and StringToDynArrayOfByte(FMsgToPublish, APublishFields.ApplicationMessage);
   Result := Result and StringToDynArrayOfByte(FTopicNameToPublish, APublishFields.TopicName);
 
+  TestClients[TempClientInstance].SentPublishedMessage := FMsgToPublish;
   TestClients[TempClientInstance].AddToLog('');
   //QoS can be overriden here. If users override QoS in this handler, then a a different PacketIdentifier might be allocated (depending on what is available)
 end;
@@ -407,6 +454,8 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
+  TestClients[TempClientInstance].SentPubAck := True;
+
   TestClients[TempClientInstance].AddToLog('Acknowledging with PUBACK');
   TestClients[TempClientInstance].AddToLog('APubAckFields.EnabledProperties: ' + IntToStr(APubAckFields.EnabledProperties));
   TestClients[TempClientInstance].AddToLog('APubAckFields.IncludeReasonCode: ' + IntToStr(APubAckFields.IncludeReasonCode));
@@ -426,6 +475,7 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
+  TestClients[TempClientInstance].ReceivedPubAck := True;
 
   TestClients[TempClientInstance].AddToLog('Received PUBACK');
   TestClients[TempClientInstance].AddToLog('APubAckFields.EnabledProperties: ' + IntToStr(APubAckFields.EnabledProperties));
@@ -464,7 +514,9 @@ begin
     s := s + IntToStr(APublishProperties.SubscriptionIdentifier.Content^[i]) + ', ';
   TestClients[TempClientInstance].AddToLog('SubscriptionIdentifier(s): ' + s);
 
-  TestClients[TempClientInstance].ReceivedPublishedMessage := Msg;
+  TestClients[TempClientInstance].ReceivedPublishedMessage := Msg; //ReceivedPublishedMessage is the latest received message
+  SetLength(TestClients[TempClientInstance].FAllReceivedPublishedMessages, Length(TestClients[TempClientInstance].FAllReceivedPublishedMessages) + 1);
+  TestClients[TempClientInstance].FAllReceivedPublishedMessages[Length(TestClients[TempClientInstance].FAllReceivedPublishedMessages) - 1] := Msg;
 
   TestClients[TempClientInstance].AddToLog('');
 end;
@@ -475,6 +527,7 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
+  TestClients[TempClientInstance].SentPubRec := True;
   TestClients[TempClientInstance].AddToLog('Acknowledging with PUBREC for ServerPacketID: ' + IntToStr(ATempPubRecFields.PacketIdentifier));
 end;
 
@@ -484,6 +537,7 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
+  TestClients[TempClientInstance].ReceivedPubRec := True;
   TestClients[TempClientInstance].AddToLog('Received PUBREC for PacketID: ' + IntToStr(ATempPubRecFields.PacketIdentifier));
 end;
 
@@ -494,6 +548,7 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
+  TestClients[TempClientInstance].SentPubRel := True;
   TestClients[TempClientInstance].AddToLog('Acknowledging with PUBREL for PacketID: ' + IntToStr(ATempPubRelFields.PacketIdentifier));
 end;
 
@@ -503,6 +558,7 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
+  TestClients[TempClientInstance].ReceivedPubRel := True;
   TestClients[TempClientInstance].AddToLog('Received PUBREL for ServerPacketID: ' + IntToStr(ATempPubRelFields.PacketIdentifier));
 end;
 
@@ -512,6 +568,7 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
+  TestClients[TempClientInstance].SentPubComp := True;
   TestClients[TempClientInstance].AddToLog('Acknowledging with PUBCOMP for PacketID: ' + IntToStr(ATempPubCompFields.PacketIdentifier));
 end;
 
@@ -521,6 +578,7 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
+  TestClients[TempClientInstance].ReceivedPubComp := True;
   TestClients[TempClientInstance].AddToLog('Received PUBCOMP for ServerPacketID: ' + IntToStr(ATempPubCompFields.PacketIdentifier));
 end;
 
@@ -630,8 +688,22 @@ begin
 
   FReceivedConAck := False;
   FSubscribePacketID := 0;
+  FUnsubscribePacketID := 0;
   FSubAckPacketID := 0;
+  FUnsubAckPacketID := 0;
+  FSentPublishedMessage := 'NotSet';
   FReceivedPublishedMessage := 'NotSetYet';
+  SetLength(FAllReceivedPublishedMessages, 0);
+
+  FReceivedPubAck := False;
+  FReceivedPubRec := False;
+  FReceivedPubRel := False;
+  FReceivedPubComp := False;
+
+  FSentPubAck := False;
+  FSentPubRec := False;
+  FSentPubRel := False;
+  FSentPubComp := False;
 end;
 
 
@@ -672,7 +744,6 @@ procedure TMQTTTestClient.ProcessReceivedBuffer;  //called by a timer, to proces
 var
   TempReadBuf: TDynArrayOfByte;
   NewData: string;
-  i: Integer;
 begin
   if FRecBufFIFO.Pop(NewData) then
   begin
@@ -782,6 +853,7 @@ end;
 type
   TMQTTReceiveThread = class(TThread)
   private
+    FClient: TMQTTTestClient;
     procedure AddToLog(s: string);
   protected
     procedure Execute; override;
@@ -801,7 +873,6 @@ var
   TempByte: Byte;
   PacketName: string;
   LoggedDisconnection: Boolean;
-  i: Integer;
 begin
   try
     InitDynArrayToEmpty(TempReadBuf);
@@ -809,27 +880,23 @@ begin
     try
       LoggedDisconnection := False;
       repeat
-        for i := 0 to Length(TestClients) - 1 do
-        begin
-          try
-            TempByte := TestClients[i].IdTCPClientObj.IOHandler.ReadByte;
-            AddByteToDynArray(TempByte, TempReadBuf);
+        try
+          TempByte := FClient.IdTCPClientObj.IOHandler.ReadByte;
+          AddByteToDynArray(TempByte, TempReadBuf);
 
-            if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
-            begin
-              MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
-              AddToLog('done receiving packet');
-              AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
+          if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
+          begin
+            MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
+            AddToLog('done receiving packet');
+            AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
 
-              TestClients[i].SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+            FClient.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
 
-              FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
-              Sleep(1);
-            end;
-          except
+            FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
+            Sleep(1);
           end;
+        except
         end;
-
       until Terminated;
     finally
       AddToLog('Thread done..');
@@ -841,216 +908,14 @@ begin
 end;
 
 
-type
-  TExHandler = class
-    procedure CustomExceptionHandler(Sender: TObject; E: Exception);
-  end;
-
 var
-  FExHandler: TExHandler;
-
-
-//see https://wiki.freepascal.org/Logging_exceptions
-procedure TExHandler.CustomExceptionHandler(Sender: TObject; E: Exception);
-var
-  ClName, EMsg: string;
-begin
-  try
-    ClName := Sender.ClassName;
-  except
-    ClName := '';
-  end;
-
-  try
-    EMsg := E.Message;
-  except
-    EMsg := '';
-  end;
-
-  try
-    MessageBoxFunction(PChar('Custom exception in test app: "' + EMsg + '"   Class: "' + ClName + '"."'), 'test app', 0);
-  except
-    on EE: Exception do
-      //MessageBox(0, PChar('Ex on custom exception: ' + EE.Message), 'test app', MB_ICONERROR);
-  end;
-end;
-
-
-//see https://wiki.freepascal.org/Logging_exceptions
-procedure CatchUnhandledException(Obj: TObject; Addr: Pointer; FrameCount: LongInt; Frames: PPointer);
-var
-  Msg: string;
-  i: Integer;
-begin
-  try //use another try..excempt, just in case parsing the stack would raise more exceptions
-    Msg := 'Unhandled exception at adddr $' + SysBacktraceStr(Addr) + ':' + #13#10;
-
-    if Obj is Exception then
-      Msg := Msg + Exception(Obj).ClassName + ' : ' + Exception(Obj).Message
-    else
-      Msg := Msg + 'Exception object '  + Exception(Obj).ClassName + ' is not class Exception.';
-
-    Msg := Msg + #13#10;
-    Msg := Msg + BacktraceStrFunc(Addr) + #13#10;
-
-    for i := 0 to FrameCount - 1 do
-      Msg := Msg + BacktraceStrFunc(Frames[i]) + #13#10;
-
-    MessageBoxFunction(PChar('Custom exception in test app: "' + Msg + '".'), 'test app', 0);
-  except
-  end;
-end;
-
-
-var
-  Th: TMQTTReceiveThread;
-
-
-type                                 ////////////////// Should be moved to Expectations unit
-  TLoopedExpect = class(TExpect)
-  private
-    FActualValue: PString;
-    FActualValueInt: PInteger;
-    FActualValueBoolean: PBoolean;
-  public
-    procedure ToBe(ExpectedValue: string; ExtraMessage: string = ''); overload;
-    procedure ToBe(ExpectedValue: Integer; ExtraMessage: string = ''); overload;
-    procedure ToBe(ExpectedValue: Boolean; ExtraMessage: string = ''); overload;
-  end;
-
-
-function LoopedExpect(ActualValue: PString): TLoopedExpect; overload;
-begin
-  Result := TLoopedExpect.Create;
-  Result.FActualValueInt := nil;
-  //Result.FActualValueDWord := ActualValue;
-  Result.FActualValue := ActualValue;
-  Result.FActualValueBoolean := nil;
-end;
-
-
-function LoopedExpect(ActualValue: PInteger): TLoopedExpect; overload;
-begin
-  Result := TLoopedExpect.Create;
-  Result.FActualValueInt := ActualValue;
-  //Result.FActualValueDWord := ActualValue;
-  Result.FActualValue := nil;
-  Result.FActualValueBoolean := nil;
-end;
-
-
-function LoopedExpect(ActualValue: PBoolean): TLoopedExpect; overload;
-begin
-  Result := TLoopedExpect.Create;
-  Result.FActualValueInt := nil;
-  //Result.FActualValueDWord := ActualValue;
-  Result.FActualValue := nil;
-  Result.FActualValueBoolean := ActualValue;
-end;
-
-
-procedure ExpectStr(ActualValue, ExpectedValue: string; ExtraMsg: string = '');
-begin
-  if ExpectedValue <> ActualValue then
-    raise Exception.Create('Expected "' + ExpectedValue + '", but is was "' + ActualValue + '".  ' + ExtraMsg);
-end;
-
-
-procedure ExpectInt(ActualValue, ExpectedValue: Integer; ExtraMsg: string = '');
-begin
-  if ExpectedValue <> ActualValue then
-    raise Exception.Create('Expected ' + IntToStr(ExpectedValue) + ', but is was ' + IntToStr(ActualValue) + '.  ' + ExtraMsg);
-end;
-
-
-procedure ExpectBoolean(ActualValue, ExpectedValue: Boolean; ExtraMsg: string = '');
-begin
-  if ExpectedValue <> ActualValue then
-    raise Exception.Create('Expected ' + BoolToStr(ExpectedValue, 'True', 'False') + ', but is was ' + BoolToStr(ActualValue, 'True', 'False') + '.  ' + ExtraMsg);
-end;
-
-
-procedure TLoopedExpect.ToBe(ExpectedValue: string; ExtraMessage: string = '');
-var
-  tk: DWord;
-begin
-  try
-    tk := GetTickCount64;
-    repeat
-      try
-        ExpectStr(FActualValue^, ExpectedValue, ExtraMessage);
-        Break;
-      except
-        if GetTickCount64 - tk > 1000 then
-          raise;
-      end;
-
-      Application.ProcessMessages;
-      Sleep(1);
-    until False;
-  finally
-    Free;
-  end;
-end;
-
-
-procedure TLoopedExpect.ToBe(ExpectedValue: Integer; ExtraMessage: string = '');
-var
-  tk: DWord;
-begin
-  try
-    tk := GetTickCount64;
-    repeat
-      try
-        ExpectInt(FActualValueInt^, ExpectedValue, ExtraMessage);
-        Break;
-      except
-        if GetTickCount64 - tk > 1000 then
-          raise;
-      end;
-
-      Application.ProcessMessages;
-      Sleep(1);
-    until False;
-  finally
-    Free;
-  end;
-end;
-
-
-procedure TLoopedExpect.ToBe(ExpectedValue: Boolean; ExtraMessage: string = '');
-var
-  tk: DWord;
-begin
-  try
-    tk := GetTickCount64;
-    repeat
-      try
-        ExpectBoolean(FActualValueBoolean^, ExpectedValue, ExtraMessage);
-        Break;
-      except
-        if GetTickCount64 - tk > 1000 then
-          raise;
-      end;
-
-      Application.ProcessMessages;
-      Sleep(1);
-    until False;
-  finally
-    Free;
-  end;
-end;
+  Ths: array of TMQTTReceiveThread;
 
 
 procedure TTestE2EBuiltinClientsCase.SetUp;
 var
-  tk: QWord;
   i: Integer;
 begin
-  FExHandler := TExHandler.Create;
-  ExceptProc := @CatchUnhandledException;
-  Application.OnException := @FExHandler.CustomExceptionHandler;
-
   SetLength(TestClients, 2);
   TestClients[0] := TMQTTTestClient.Create(nil);
   TestClients[1] := TMQTTTestClient.Create(nil);
@@ -1064,25 +929,28 @@ begin
   TestClients[0].InitHandlers;
   TestClients[1].InitHandlers;
 
-  if Th <> nil then
-  begin
-    Th.Terminate;
-    tk := GetTickCount64;
-    repeat
-      Application.ProcessMessages;
-      Sleep(10);
-    until (GetTickCount64 - tk > 1500) or Th.Terminated;
-    Th := nil;
-  end;
+  SetLength(Ths, 2);
+
+  for i := 0 to Length(TestClients) - 1 do
+    if Ths[i] <> nil then
+    begin
+      Ths[i].Terminate;
+      LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True);
+      Ths[i] := nil;
+    end;
 
   TestClients[0].IdTCPClientObj.Connect('127.0.0.1', 1883);
   TestClients[0].IdTCPClientObj.IOHandler.ReadTimeout := 10;
   TestClients[1].IdTCPClientObj.Connect('127.0.0.1', 1883);
   TestClients[1].IdTCPClientObj.IOHandler.ReadTimeout := 10;
 
-  Th := TMQTTReceiveThread.Create(True);
-  Th.FreeOnTerminate := False;
-  Th.Start;
+  for i := 0 to Length(TestClients) - 1 do
+  begin
+    Ths[i] := TMQTTReceiveThread.Create(True);
+    Ths[i].FreeOnTerminate := False;
+    Ths[i].FClient := TestClients[i];
+    Ths[i].Start;
+  end;
 
   for i := 0 to Length(TestClients) - 1 do
   begin
@@ -1092,47 +960,44 @@ begin
 end;
 
 
-procedure TTestE2EBuiltinClientsCase.TearDown;
+function ClientToServerBufEmpty0: Boolean;
 var
-  tk: QWord;
   ClientToServerBuf: {$IFDEF SingleOutputBuffer} PMQTTBuffer; {$ELSE} PMQTTMultiBuffer; {$ENDIF}
   Err: Word;
+begin
+  ClientToServerBuf := MQTT_GetClientToServerBuffer(0, Err);
+  Result := (ClientToServerBuf <> nil) and (ClientToServerBuf^.Len = 0);
+end;
+
+
+function ClientToServerBufEmpty1: Boolean;
+var
+  ClientToServerBuf: {$IFDEF SingleOutputBuffer} PMQTTBuffer; {$ELSE} PMQTTMultiBuffer; {$ENDIF}
+  Err: Word;
+begin
+  ClientToServerBuf := MQTT_GetClientToServerBuffer(1, Err);
+  Result := (ClientToServerBuf <> nil) and (ClientToServerBuf^.Len = 0);
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TearDown;
+var
   i: Integer;
 begin
-  for i := 0 to Length(TestClients) - 1 do
-  begin
-    if not MQTT_DISCONNECT(i, 0) then
-    begin
-      TestClients[i].AddToLog('Can''t prepare MQTTDisconnect packet.');
-      Exit;
-    end;
-
-    tk := GetTickCount64;
-    repeat
-      try
-        ClientToServerBuf := MQTT_GetClientToServerBuffer(i, Err);
-        Application.ProcessMessages;
-      except
-      end;
-
-      Sleep(1);
-    until (GetTickCount64 - tk > 1500) or ((ClientToServerBuf <> nil) and (ClientToServerBuf^.Len = 0));
-  end;
+  Expect(MQTT_DISCONNECT(0, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet.');
+  Expect(MQTT_DISCONNECT(1, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet.');
+  LoopedExpect(@ClientToServerBufEmpty0, 1500).ToBe(True);
+  LoopedExpect(@ClientToServerBufEmpty1, 1500).ToBe(True);
 
   TestClients[0].tmrProcessRecData.Enabled := False;
   TestClients[1].tmrProcessRecData.Enabled := False;
 
-  Th.Terminate;
-  tk := GetTickCount64;
-  repeat
-    try
-      Application.ProcessMessages;
-    except
-    end;
-
-    Sleep(1);
-  until (GetTickCount64 - tk > 1500) or Th.Terminated;
-  Th := nil;
+  for i := 0 to Length(TestClients) - 1 do
+  begin
+    Ths[i].Terminate;
+    LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True);
+    Ths[i] := nil;
+  end;
 
   TestClients[0].IdTCPClientObj.Disconnect(False);
   TestClients[1].IdTCPClientObj.Disconnect(False);
@@ -1146,61 +1011,189 @@ begin
   SetLength(TestClients, 0);
 
   SetLength(FSubscribeToTopicNames, 0);
-
-  FExHandler.Free;
+  SetLength(Ths, 0);
 end;
 
 
-procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_QoS0;
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
 begin
   SetLength(FSubscribeToTopicNames, 1);
   FSubscribeToTopicNames[0] := 'abc';
 
   Expect(MQTT_SUBSCRIBE(1, 0)).ToBe(True);
-  LoopedExpect(PInteger(@TestClients[1].FSubscribePacketID)).ToBe(CMQTT_ClientToServerPacketIdentifiersInitOffset);
-  LoopedExpect(PInteger(@TestClients[1].FSubAckPacketID)).ToBe(TestClients[1].FSubscribePacketID, 'Should receive a SubAck');
+  LoopedExpect(PDWord(@TestClients[1].FSubscribePacketID)).ToBe(CMQTT_ClientToServerPacketIdentifiersInitOffset);
+  LoopedExpect(PDWord(@TestClients[1].FSubAckPacketID)).ToBe(TestClients[1].FSubscribePacketID, 'Should receive a SubAck');
+end;
 
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_SendPublish(AQoS: Byte; AMsgToPublish: string = 'some content');
+begin
   FTopicNameToPublish := FSubscribeToTopicNames[0];
-  FMsgToPublish := 'some content';
-  Expect(MQTT_PUBLISH(0, 0, 0)).ToBe(True);
+  FMsgToPublish := AMsgToPublish;
+  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True);
+  LoopedExpect(PString(@TestClients[0].FSentPublishedMessage)).ToBe(FMsgToPublish, 'Should send a Publish with "' + FMsgToPublish + '".');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_SendUnsubscribe(APacketIDOffset: Word = 1);
+begin
+  SetLength(FSubscribeToTopicNames, 1);
+  FSubscribeToTopicNames[0] := 'abc';
+
+  Expect(MQTT_UNSUBSCRIBE(1, 0)).ToBe(True);
+  LoopedExpect(PDWord(@TestClients[1].FUnsubscribePacketID)).ToBe(CMQTT_ClientToServerPacketIdentifiersInitOffset + APacketIDOffset);
+  LoopedExpect(PDWord(@TestClients[1].FUnsubAckPacketID)).ToBe(TestClients[1].FUnsubscribePacketID, 'Should receive an UnsubAck');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_QoS0;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(0);
+
   LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage)).ToBe(FMsgToPublish, 'Should receive a Publish with "' + FMsgToPublish + '".');
 end;
 
 
 procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_QoS1;
 begin
-  SetLength(FSubscribeToTopicNames, 1);
-  FSubscribeToTopicNames[0] := 'abc';
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(1);
 
-  Expect(MQTT_SUBSCRIBE(1, 0)).ToBe(True);
-  LoopedExpect(PInteger(@TestClients[1].FSubscribePacketID)).ToBe(CMQTT_ClientToServerPacketIdentifiersInitOffset);
-  LoopedExpect(PInteger(@TestClients[1].FSubAckPacketID)).ToBe(TestClients[1].FSubscribePacketID, 'Should receive a SubAck');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).ToBe(True, 'Should receive a PubAck');
 
-  FTopicNameToPublish := FSubscribeToTopicNames[0];
-  FMsgToPublish := 'some content';
-  Expect(MQTT_PUBLISH(0, 0, 1)).ToBe(True);
   LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage)).ToBe(FMsgToPublish, 'Should receive a Publish with "' + FMsgToPublish + '".');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubAck)).ToBe(True, 'Should send a PubAck');
 end;
 
 
 procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_QoS2;
 begin
-  SetLength(FSubscribeToTopicNames, 1);
-  FSubscribeToTopicNames[0] := 'abc';
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2);
 
-  Expect(MQTT_SUBSCRIBE(1, 0)).ToBe(True);
-  LoopedExpect(PInteger(@TestClients[1].FSubscribePacketID)).ToBe(CMQTT_ClientToServerPacketIdentifiersInitOffset);
-  LoopedExpect(PInteger(@TestClients[1].FSubAckPacketID)).ToBe(TestClients[1].FSubscribePacketID, 'Should receive a SubAck');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).ToBe(True, 'Should receive a PubRec');
+  LoopedExpect(PBoolean(@TestClients[0].FSentPubRel)).ToBe(True, 'Should send a PubRel');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).ToBe(True, 'Should receive a PubComp');
 
-  FTopicNameToPublish := FSubscribeToTopicNames[0];
-  FMsgToPublish := 'some content';
-  Expect(MQTT_PUBLISH(0, 0, 2)).ToBe(True);
   LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage)).ToBe(FMsgToPublish, 'Should receive a Publish with "' + FMsgToPublish + '".');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubRec)).ToBe(True, 'Should send a PubRec');
+  LoopedExpect(PBoolean(@TestClients[1].FReceivedPubRel)).ToBe(True, 'Should receive a PubRel');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubComp)).ToBe(True, 'Should send a PubComp');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlowUnsubscribed_QoS0;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendUnsubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(0);
+
+  LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage), 400).NotToBe(FMsgToPublish, 'NotSetYet');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlowUnsubscribed_QoS1;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendUnsubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(1);
+
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).ToBe(True, 'Should receive a PubAck');
+
+  LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage), 400).NotToBe(FMsgToPublish, 'NotSetYet');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubAck), 400).NotToBe(True, 'Should not send a PubAck');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlowUnsubscribed_QoS2;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendUnsubscribe;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2);
+
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).ToBe(True, 'Should receive a PubRec');
+  LoopedExpect(PBoolean(@TestClients[0].FSentPubRel)).ToBe(True, 'Should send a PubRel');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).ToBe(True, 'Should receive a PubComp');
+
+  LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage), 400).NotToBe(FMsgToPublish, 'NotSetYet');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubRec), 400).NotToBe(True, 'Should not send a PubRec');
+  LoopedExpect(PBoolean(@TestClients[1].FReceivedPubRel), 400).NotToBe(True, 'Should not receive a PubRel');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubComp), 400).NotToBe(True, 'Should not send a PubComp');
+end;
+
+
+function LengthOfAllRecMsgs: Integer;
+begin
+  Result := Length(TestClients[1].FAllReceivedPublishedMessages);
+end;
+
+
+const
+  CMsg1 = 'First content';
+  CMsg2 = 'Second content';
+
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS0;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+
+  Ths[1].Suspend; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(0, CMsg1);
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(0, CMsg2);
+
+  Ths[1].Resume;
+  LoopedExpect(@LengthOfAllRecMsgs).ToBe(2, 'Expected two received messages.');
+  Expect(TestClients[1].FAllReceivedPublishedMessages[0]).ToBe(CMsg1, 'Should receive a Publish with "' + CMsg1 + '" (1).');
+  Expect(TestClients[1].FAllReceivedPublishedMessages[1]).ToBe(CMsg2, 'Should receive a Publish with "' + CMsg2 + '" (2).');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS1;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+
+  Ths[1].Suspend; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(1, CMsg1);
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(1, CMsg2);
+
+  Ths[1].Resume;
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).ToBe(True, 'Should receive a PubAck');   //actually, there should be two PubAck packets
+  LoopedExpect(@LengthOfAllRecMsgs).ToBe(2, 'Expected two received messages.');
+
+  Expect(TestClients[1].FAllReceivedPublishedMessages[0]).ToBe(CMsg1, 'Should receive a Publish with "' + CMsg1 + '" (1).');
+  Expect(TestClients[1].FAllReceivedPublishedMessages[1]).ToBe(CMsg2, 'Should receive a Publish with "' + CMsg2 + '" (2).');
+
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubAck)).ToBe(True, 'Should send a PubAck');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS2;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+
+  Ths[1].Suspend; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2, CMsg1);
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2, CMsg2);
+
+  Ths[1].Resume;
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).ToBe(True, 'Should receive a PubRec');
+  LoopedExpect(PBoolean(@TestClients[0].FSentPubRel)).ToBe(True, 'Should send a PubRel');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).ToBe(True, 'Should receive a PubComp');
+
+  LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage)).ToBe(FMsgToPublish, 'Should receive a Publish with "' + FMsgToPublish + '".');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubRec)).ToBe(True, 'Should send a PubRec');
+  LoopedExpect(PBoolean(@TestClients[1].FReceivedPubRel)).ToBe(True, 'Should receive a PubRel');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubComp)).ToBe(True, 'Should send a PubComp');
+
+  LoopedExpect(@LengthOfAllRecMsgs).ToBe(2, 'Expected two received messages.');
+  Expect(TestClients[1].FAllReceivedPublishedMessages[0]).ToBe(CMsg1, 'Should receive a Publish with "' + CMsg1 + '" (1).');
+  Expect(TestClients[1].FAllReceivedPublishedMessages[1]).ToBe(CMsg2, 'Should receive a Publish with "' + CMsg2 + '" (2).');
 end;
 
 
 initialization
-  Th := nil;
+
   RegisterTest(TTestE2EBuiltinClientsCase);
 end.
 
