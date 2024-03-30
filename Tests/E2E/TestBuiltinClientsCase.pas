@@ -51,6 +51,8 @@ type
     FMQTTUsername: string;
     FMQTTPassword: string;
 
+    FIncludeCleanStartFlag: Boolean;
+
     FReceivedConAck: Boolean;
     FSubscribePacketID: DWord;
     FUnsubscribePacketID: DWord;
@@ -70,6 +72,10 @@ type
     FSentPubRec: Boolean;
     FSentPubRel: Boolean;
     FSentPubComp: Boolean;
+
+    FReceivedSessionPresentFlag: Boolean;
+    FClientId: string;
+    FUseCurrentClientIdInConnect: Boolean;
 
     procedure InitHandlers;
     procedure SendDynArrayOfByte(AArr: TDynArrayOfByte);
@@ -115,9 +121,13 @@ type
     procedure TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
     procedure TestPublish_Client0ToClient1_HappyFlow_SendPublish(AQoS: Byte; AMsgToPublish: string = 'some content');
     procedure TestPublish_Client0ToClient1_HappyFlow_SendUnsubscribe(APacketIDOffset: Word = 1);
+    procedure DisconnectWithNoCleanStartFlag(AClientIndex: Integer);
+    procedure ReconnectToBroker(AClientIndex: Integer);
+
   protected
     procedure SetUp; override;
     procedure TearDown; override;
+
   published
     procedure TestPublish_Client0ToClient1_HappyFlow_QoS0;
     procedure TestPublish_Client0ToClient1_HappyFlow_QoS1;
@@ -130,6 +140,11 @@ type
     procedure TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS0;
     procedure TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS1;
     procedure TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS2;
+
+    procedure TestReconnectWithSessionPresentFlag;
+    procedure TestReconnectWithReceiveMissingPacketsFromServer_QoS1;
+    procedure TestReconnectWithReceiveMissingPacketsFromServer_QoS2;
+    procedure TestReconnectWithResend;
   end;
 
 implementation
@@ -197,8 +212,6 @@ function HandleOnBeforeMQTT_CONNECT(ClientInstance: DWord;  //The lower byte ide
 var
   TempWillProperties: TMQTTWillProperties;
   UserName, Password: string;
-  //ClientId: string;
-  //Id: Char;
   ConnectFlags: Byte;
   EnabledProperties: Word;
   TempClientInstance: DWord;
@@ -208,19 +221,22 @@ begin
 
   TestClients[TempClientInstance].AddToLog('Preparing CONNECT data..');
 
-  //Id := Chr((ClientInstance and $FF) + 48);
-  //ClientId := 'MyClient' + Id;
   UserName := TestClients[TempClientInstance].FMQTTUsername;
   Password := TestClients[TempClientInstance].FMQTTPassword;
 
-  //StringToDynArrayOfByte(ClientId, AConnectFields.PayloadContent.ClientID);
+  if TestClients[TempClientInstance].FUseCurrentClientIdInConnect then      //FClientId is initialized on creating the client instance
+    StringToDynArrayOfByte(TestClients[TempClientInstance].FClientId, AConnectFields.PayloadContent.ClientID);
+
   StringToDynArrayOfByte(UserName, AConnectFields.PayloadContent.UserName);
   StringToDynArrayOfByte(Password, AConnectFields.PayloadContent.Password);
 
   ConnectFlags := CMQTT_UsernameInConnectFlagsBitMask or
-                  CMQTT_PasswordInConnectFlagsBitMask or
-                  CMQTT_CleanStartInConnectFlagsBitMask {or
-                  CMQTT_WillQoSB1InConnectFlagsBitMask};
+                  CMQTT_PasswordInConnectFlagsBitMask;
+
+  if TestClients[TempClientInstance].FIncludeCleanStartFlag then
+    ConnectFlags := ConnectFlags or CMQTT_CleanStartInConnectFlagsBitMask;
+
+  //CMQTT_WillQoSB1InConnectFlagsBitMask;  //a different class field is required for this one
 
   EnabledProperties := CMQTTConnect_EnSessionExpiryInterval or
                        CMQTTConnect_EnRequestResponseInformation or
@@ -295,7 +311,8 @@ begin
   TestClients[TempClientInstance].AddToLog('');
 
   ///////////////////////////////////////// when the server returns SessionPresentFlag set to 1, the library resends unacknowledged Publish and PubRel packets.
-  //AConnAckFields.SessionPresentFlag := 1;
+  TestClients[TempClientInstance].FReceivedSessionPresentFlag := AConnAckFields.SessionPresentFlag = 1;
+  TestClients[TempClientInstance].FClientId := StringReplace(DynArrayOfByteToString(AConnAckProperties.AssignedClientIdentifier), #0, '#0', [rfReplaceAll]);
 end;
 
 
@@ -685,6 +702,7 @@ begin
 
   FMQTTUsername := '';
   FMQTTPassword := '';
+  FIncludeCleanStartFlag := True;
 
   FReceivedConAck := False;
   FSubscribePacketID := 0;
@@ -704,6 +722,9 @@ begin
   FSentPubRec := False;
   FSentPubRel := False;
   FSentPubComp := False;
+
+  FReceivedSessionPresentFlag := False;
+  FClientId := 'SomeClientID';
 end;
 
 
@@ -1189,6 +1210,73 @@ begin
   LoopedExpect(@LengthOfAllRecMsgs).ToBe(2, 'Expected two received messages.');
   Expect(TestClients[1].FAllReceivedPublishedMessages[0]).ToBe(CMsg1, 'Should receive a Publish with "' + CMsg1 + '" (1).');
   Expect(TestClients[1].FAllReceivedPublishedMessages[1]).ToBe(CMsg2, 'Should receive a Publish with "' + CMsg2 + '" (2).');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.DisconnectWithNoCleanStartFlag(AClientIndex: Integer);
+begin
+  Ths[AClientIndex].Suspend; //pause the receiving thread while disconnected
+  TestClients[AClientIndex].IdTCPClientObj.Disconnect;                       ////////////////// ToDo: test also with sending a DISCONNECT packet  (maybe it should not keep the session.
+  Sleep(500); //wait a bit, so the broker invalidates the connection         ////////////////// ToDo: test also with  session timeouts
+  TestClients[AClientIndex].FIncludeCleanStartFlag := False;
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.ReconnectToBroker(AClientIndex: Integer);
+begin
+  Ths[AClientIndex].Resume;
+  TestClients[AClientIndex].IdTCPClientObj.Connect('127.0.0.1', 1883);
+  TestClients[AClientIndex].IdTCPClientObj.IOHandler.ReadTimeout := 10;
+
+  TestClients[AClientIndex].FUseCurrentClientIdInConnect := True;
+  Expect(MQTT_CONNECT(AClientIndex, 1)).ToBe(True, 'Can''t prepare MQTTConnect packet at client index 1 for second connection.');  //should use FClientId
+  LoopedExpect(PBoolean(@TestClients[AClientIndex].ReceivedConAck)).ToBe(True, 'Should receive a ConAck at client index 1');
+  LoopedExpect(PBoolean(@TestClients[AClientIndex].FReceivedSessionPresentFlag), 100).ToBe(True, 'Should receive a ConAck with SessionPresent flag');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithSessionPresentFlag;
+begin
+  DisconnectWithNoCleanStartFlag(1);
+  ReconnectToBroker(1);
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithReceiveMissingPacketsFromServer_QoS1;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  DisconnectWithNoCleanStartFlag(1);
+
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(1);
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).ToBe(True, 'Should receive a PubAck');
+
+  ReconnectToBroker(1);
+
+  LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage)).ToBe(FMsgToPublish, 'Should receive a Publish with "' + FMsgToPublish + '".');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubAck)).ToBe(True, 'Should send a PubAck');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithReceiveMissingPacketsFromServer_QoS2;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  DisconnectWithNoCleanStartFlag(1);
+
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2);
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).NotToBe(True, 'Should not receive a PubAck');     //no PubAck on QoS=2
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).ToBe(True, 'Should receive a PubComp');
+
+  ReconnectToBroker(1);
+
+  LoopedExpect(PString(@TestClients[1].FReceivedPublishedMessage)).ToBe(FMsgToPublish, 'Should receive a Publish with "' + FMsgToPublish + '".');
+  LoopedExpect(PBoolean(@TestClients[1].FSentPubAck)).NotToBe(True, 'Should not send a PubAck');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithResend;
+begin
+//The connection should be broken between client 0, sending Publish/PubRel packets, and receiving PubAck/PubComp packets, also at client 0.
+//The client can pretend it never received them, by discarding received packets from FIFO.
 end;
 
 
