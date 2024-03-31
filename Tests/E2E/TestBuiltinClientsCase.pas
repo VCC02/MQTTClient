@@ -77,6 +77,13 @@ type
     FClientId: string;
     FUseCurrentClientIdInConnect: Boolean;
 
+    FAllowReceivingPubAck: Boolean;
+    FAllowReceivingPubRec: Boolean;
+    FAllowReceivingPubComp: Boolean;
+
+    FLatestError: Integer;         //Integer, to allow using LoopedExpect
+    FLatestPacketOnError: Integer; //Integer, to allow using LoopedExpect
+
     procedure InitHandlers;
     procedure SendDynArrayOfByte(AArr: TDynArrayOfByte);
     procedure SendPacketToServer(ClientInstance: DWord);
@@ -144,15 +151,18 @@ type
     procedure TestReconnectWithSessionPresentFlag;
     procedure TestReconnectWithReceiveMissingPacketsFromServer_QoS1;
     procedure TestReconnectWithReceiveMissingPacketsFromServer_QoS2;
-    procedure TestReconnectWithResend;
+
+    procedure TestReconnectWithResend_QoS1;
+    procedure TestReconnectWithResend_QoS2_PubRec;
+    procedure TestReconnectWithResend_QoS2_PubComp;
   end;
 
 implementation
 
 
 uses
-  MQTTClient, MQTTUtils, MQTTTestUtils,
-  MQTTConnectCtrl, MQTTConnAckCtrl, MQTTPublishCtrl, MQTTPubAckCtrl, MQTTSubscribeCtrl, MQTTUnsubscribeCtrl,
+  MQTTClient, MQTTUtils,
+  MQTTConnectCtrl, MQTTSubscribeCtrl, MQTTUnsubscribeCtrl,
   Expectations, ExpectationsDynArrays;
 
 
@@ -184,6 +194,9 @@ begin
 
   if Lo(AErr) = CMQTT_UnhandledPacketType then   // $CA
     TestClients[TempClientInstance].AddToLog('Client error: UnhandledPacketType.');  //Usually appears when an incomplete packet is received, so the packet type by is 0.
+
+  TestClients[TempClientInstance].FLatestError := AErr;
+  TestClients[TempClientInstance].FLatestPacketOnError := APacketType;
 end;
 
 
@@ -725,6 +738,14 @@ begin
 
   FReceivedSessionPresentFlag := False;
   FClientId := 'SomeClientID';
+  FUseCurrentClientIdInConnect := False;
+
+  FAllowReceivingPubAck := True;
+  FAllowReceivingPubRec := True;
+  FAllowReceivingPubComp := True;
+
+  FLatestError := CMQTT_Success;
+  FLatestPacketOnError := CMQTT_UNDEFINED;
 end;
 
 
@@ -765,12 +786,25 @@ procedure TMQTTTestClient.ProcessReceivedBuffer;  //called by a timer, to proces
 var
   TempReadBuf: TDynArrayOfByte;
   NewData: string;
+  Allow: Boolean;
+  PacketType: Byte;
 begin
   if FRecBufFIFO.Pop(NewData) then
   begin
     InitDynArrayToEmpty(TempReadBuf);
     try
-      if StringToDynArrayOfByte(NewData, TempReadBuf) then
+      if Length(NewData) > 0 then
+      begin
+        PacketType := Ord(NewData[1]) and $F0;
+        Allow := (FAllowReceivingPubAck and (PacketType = CMQTT_PUBACK)) or
+                 (FAllowReceivingPubRec and (PacketType = CMQTT_PUBREC)) or
+                 (FAllowReceivingPubComp and (PacketType = CMQTT_PUBCOMP)) or
+                 not (PacketType in [CMQTT_PUBACK, CMQTT_PUBREC, CMQTT_PUBCOMP]);
+      end
+      else
+        Allow := True;
+
+      if Allow and StringToDynArrayOfByte(NewData, TempReadBuf) then
       begin
         MQTT_PutReceivedBufferToMQTTLib(FClientIndex, TempReadBuf);
         MQTT_Process(FClientIndex);
@@ -893,13 +927,11 @@ var
   TempReadBuf: TDynArrayOfByte;
   TempByte: Byte;
   PacketName: string;
-  LoggedDisconnection: Boolean;
 begin
   try
     InitDynArrayToEmpty(TempReadBuf);
 
     try
-      LoggedDisconnection := False;
       repeat
         try
           TempByte := FClient.IdTCPClientObj.IOHandler.ReadByte;
@@ -921,6 +953,7 @@ begin
       until Terminated;
     finally
       AddToLog('Thread done..');
+      FreeDynArray(TempReadBuf);
     end;
   except
     on E: Exception do
@@ -1049,6 +1082,7 @@ end;
 
 procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_SendPublish(AQoS: Byte; AMsgToPublish: string = 'some content');
 begin
+  Expect(Length(FSubscribeToTopicNames)).ToBeGreaterThan(0, 'There should be a topic name.');
   FTopicNameToPublish := FSubscribeToTopicNames[0];
   FMsgToPublish := AMsgToPublish;
   Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True);
@@ -1273,10 +1307,66 @@ begin
 end;
 
 
-procedure TTestE2EBuiltinClientsCase.TestReconnectWithResend;
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithResend_QoS1;
 begin
-//The connection should be broken between client 0, sending Publish/PubRel packets, and receiving PubAck/PubComp packets, also at client 0.
-//The client can pretend it never received them, by discarding received packets from FIFO.
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestClients[0].FAllowReceivingPubAck := False;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(1); //the response is received from server, but is ignored
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).NotToBe(True, 'Should not receive a PubAck');
+
+  DisconnectWithNoCleanStartFlag(0);
+  TestClients[0].FAllowReceivingPubAck := True;
+  ReconnectToBroker(0);
+
+  {$IfDEF SkipSendingUnAck}
+    Expect(MQTT_ResendUnacknowledged(0)).ToBe(True, 'Resending successful');
+  {$ENDIF}
+
+  LoopedExpect(PInteger(@TestClients[0].FLatestError)).ToBe(CMQTT_Success, 'There should be no error.');
+  LoopedExpect(PInteger(@TestClients[0].FLatestPacketOnError)).ToBe(CMQTT_UNDEFINED, 'There should be no errored packet.');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).ToBe(True, 'Should receive a PubAck.');  //Process_PUBACK_OR_PUBCOMP returns many errors (like PackedID not found in Resend array)
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithResend_QoS2_PubRec;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestClients[0].FAllowReceivingPubRec := False;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2); //the response is received from server, but is ignored
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).NotToBe(True, 'Should not receive a PubRec');
+
+  DisconnectWithNoCleanStartFlag(0);
+  TestClients[0].FAllowReceivingPubRec := True;
+  ReconnectToBroker(0);
+
+  {$IfDEF SkipSendingUnAck}
+    Expect(MQTT_ResendUnacknowledged(0)).ToBe(True, 'Resending successful');
+  {$ENDIF}
+
+  LoopedExpect(PInteger(@TestClients[0].FLatestError)).ToBe(CMQTT_Success, 'There should be no error.');
+  LoopedExpect(PInteger(@TestClients[0].FLatestPacketOnError)).ToBe(CMQTT_UNDEFINED, 'There should be no errored packet.');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).ToBe(True, 'Should receive a PubRec.');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithResend_QoS2_PubComp;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestClients[0].FAllowReceivingPubComp := False;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2); //the response is received from server, but is ignored
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).NotToBe(True, 'Should not receive a PubComp');
+
+  DisconnectWithNoCleanStartFlag(0);
+  TestClients[0].FAllowReceivingPubComp := True;
+  ReconnectToBroker(0);
+
+  {$IfDEF SkipSendingUnAck}
+    Expect(MQTT_ResendUnacknowledged(0)).ToBe(True, 'Resending successful');
+  {$ENDIF}
+
+  LoopedExpect(PInteger(@TestClients[0].FLatestError)).ToBe(CMQTT_Success, 'There should be no error.');
+  LoopedExpect(PInteger(@TestClients[0].FLatestPacketOnError)).ToBe(CMQTT_UNDEFINED, 'There should be no errored packet.');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).ToBe(True, 'Should receive a PubComp.');
 end;
 
 

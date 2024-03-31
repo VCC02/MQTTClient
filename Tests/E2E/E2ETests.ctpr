@@ -92,6 +92,7 @@
       <ConfigFile>
         <WriteConfigFilePath Value=""/>
       </ConfigFile>
+      <CustomOptions Value="-d_SkipSendingUnAck"/>
     </Other>
   </CompilerOptions>
   <Debugging>
@@ -116,6 +117,13 @@
       </Item>
       <Item>
         <Name Value="Exception"/>
+        <Enabled Value="False"/>
+      </Item>
+      <Item>
+        <Name Value="EExp"/>
+      </Item>
+      <Item>
+        <Name Value="EIdNotASocket"/>
       </Item>
     </Exceptions>
   </Debugging>

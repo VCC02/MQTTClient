@@ -367,6 +367,13 @@ const
 
 implementation
 
+
+{$IfnDEF SkipSendingUnAck}
+  const
+    CMQTTCleanStartBitMask = 1;     //bit 0   (Set after Connect)
+    CMQTTSessionPresentBitMask = 2; //bit 1   (Set after ConAck)
+{$ENDIF}
+
 //Publish request-response:
 //QoS=0:
 //Server (Sender) -> Client (Receiver):   Server sends Publish,  Client does not respond
@@ -409,6 +416,13 @@ var
   ClientToServerSubscriptionIdentifiers: TDynArrayOfTDynArrayOfWord; //limited to 65534 subscriptions at a time
   ClientToServerSubscriptionIdentifiersInit: TDynArrayOfWord;  //one word for every Client
 
+  //When SkipSendingUnAck is not defined, the library automatically tracks reconnections and calls MQTT_ResendUnacknowledged in ConAck.
+  //If this feature doesn't work as expected, the SkipSendingUnAck compiler directive can be defined at project level, so the user code should manually call MQTT_ResendUnacknowledged when reconnecting.
+  {$IfnDEF SkipSendingUnAck}
+    ClientToServerConnectionType: TDynArrayOfByte;  //one byte / client instance.
+    //Bit 0 keeps track of CleanStart in Connect packet        (when CMQTT_CleanStartInConnectFlagsBitMask is present in ConnectFields.ConnectFlags)
+    //Bit 1 keeps track of SessionPresentFlag in ConAck packet (when ConnAckFields.SessionPresentFlag is 1)
+  {$ENDIF}
 
 procedure InitLibStateVars;
 begin
@@ -430,6 +444,10 @@ begin
   InitDynOfDynOfByteToEmpty(MaximumQoS);
   InitDynOfDynOfWordToEmpty(ClientToServerSubscriptionIdentifiers);
   InitDynArrayOfWordToEmpty(ClientToServerSubscriptionIdentifiersInit);
+
+  {$IfnDEF SkipSendingUnAck}
+    InitDynArrayToEmpty(ClientToServerConnectionType);
+  {$ENDIF}
 end;
 
 
@@ -453,6 +471,10 @@ begin
   FreeDynOfDynOfByteArray(MaximumQoS);
   FreeDynOfDynOfWordArray(ClientToServerSubscriptionIdentifiers);
   FreeDynArrayOfWord(ClientToServerSubscriptionIdentifiersInit);
+
+  {$IfnDEF SkipSendingUnAck}
+    FreeDynArray(ClientToServerConnectionType);
+  {$ENDIF}
 end;
 
 
@@ -1350,6 +1372,10 @@ begin
     Result := Result and SetDynOfDynOfWordLength(ClientToServerSubscriptionIdentifiers, NewLen);
     Result := Result and SetDynOfWordLength(ClientToServerSubscriptionIdentifiersInit, NewLen);
 
+    {$IfnDEF SkipSendingUnAck}
+      Result := Result and SetDynLength(ClientToServerConnectionType, NewLen);
+    {$ENDIF}
+
     if MQTT_CreateClientToServerPacketIdentifierWithStart(ClientToServerPacketIdentifiers.Len - 1, 0) <> 0 then
       DoOnMQTTError(ClientToServerSubscriptionIdentifiers.Len - 1, CMQTT_CannotReserveBadPacketIdentifier, 0); //preallocate 0,
 
@@ -1358,6 +1384,10 @@ begin
 
     ClientToServerPacketIdentifiersInit.Content^[ClientToServerPacketIdentifiersInit.Len - 1] := CMQTT_ClientToServerPacketIdentifiersInitOffset;
     ClientToServerSubscriptionIdentifiersInit.Content^[ClientToServerSubscriptionIdentifiersInit.Len - 1] := CMQTT_ClientToServerSubscriptionIdentifiersInitOffset;
+
+    {$IfnDEF SkipSendingUnAck}
+      ClientToServerConnectionType.Content^[ClientToServerConnectionType.Len - 1] := 0;
+    {$ENDIF}
 
     {$IFDEF IsDesktop}
       if Assigned(OnMQTTAfterCreateClient) and Assigned(OnMQTTAfterCreateClient^) then
@@ -1407,6 +1437,10 @@ begin
     Result := Result and DeleteItemFromDynOfDynOfByte(MaximumQoS, ClientInstance);
     Result := Result and DeleteItemFromDynOfDynOfWord(ClientToServerSubscriptionIdentifiers, ClientInstance);
     Result := Result and DeleteItemFromDynArrayOfWord(ClientToServerSubscriptionIdentifiersInit, ClientInstance);
+
+    {$IfnDEF SkipSendingUnAck}
+      Result := Result and DeleteItemFromDynArray(ClientToServerConnectionType, ClientInstance);
+    {$ENDIF}
   end;
 end;
 
@@ -1798,11 +1832,18 @@ end;
 //Used in ClientToServer scenario.
 function Process_CONNACK(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
 var
+  {$IfnDEF SkipSendingUnAck}
+    TempClientInstance: DWord;
+  {$ENDIF}
   TempReceivedPacket: TMQTTControlPacket;
   TempConnAckFields: TMQTTConnAckFields;
   TempConnAckProperties: TMQTTConnAckProperties;
 begin
   MQTT_InitControlPacket(TempReceivedPacket);
+
+  {$IfnDEF SkipSendingUnAck}
+    TempClientInstance := ClientInstance and CClientIndexMask;
+  {$ENDIF}
 
   Result := Decode_ConnAckToCtrlPacket(ABuffer, TempReceivedPacket, ASizeToFree);
   if Result = CMQTTDecoderNoErr then
@@ -1828,6 +1869,20 @@ begin
       MQTT_FreeControlPacket(TempReceivedPacket);
       Exit;
     end;
+
+    {$IfnDEF SkipSendingUnAck}
+      if TempConnAckFields.SessionPresentFlag = 1 then
+      begin
+        ClientToServerConnectionType.Content^[TempClientInstance] := ClientToServerConnectionType.Content^[TempClientInstance] or CMQTTSessionPresentBitMask; //set bit 1
+        if not MQTT_ResendUnacknowledged(TempClientInstance) then
+        begin
+          DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_CONNACK);
+          MQTT_FreeConnAckProperties(TempConnAckProperties);
+          MQTT_FreeControlPacket(TempReceivedPacket);
+          Exit;
+        end;
+      end;
+    {$ENDIF}
   end;
 
   MQTT_FreeConnAckProperties(TempConnAckProperties);
@@ -1988,7 +2043,7 @@ begin
       //PacketIdentifierIdxInResend is set here, because TempCommonFields can be altered in user code, from DoOnAfterReceiving_MQTT_*.
       PacketIdentifierIdxInResend := IndexOfWordInArrayOfWord(ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^, TempCommonFields.PacketIdentifier);
 
-      if not IncrementSendQuota(ClientInstance) then
+      if (PacketIdentifierIdxInResend = -1) and not IncrementSendQuota(ClientInstance) then    //SendQuota should not be modified by resending
       begin
         DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, APacketType);   //too many acknowledgements
         Result := CMQTT_ReceiveMaximumReset;
@@ -2084,7 +2139,7 @@ begin
         PacketIdentifierIdxInResend := IndexOfWordInArrayOfWord(ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^, TempPubRecFields.PacketIdentifier);
 
         if TempPubRecFields.ReasonCode >= 128 then  //Verify response error for PUBREC only !!! Other packets should not have this check.
-          if not IncrementSendQuota(ClientInstance) then
+          if (PacketIdentifierIdxInResend = -1) and not IncrementSendQuota(ClientInstance) then
             DoOnMQTTError(TempClientInstance, CMQTT_ReceiveMaximumReset, CMQTT_PUBREC);   //too many acknowledgements
 
         //The spec says that the PacketIdentifier should be removed on receiving PUBREC, but it is still required in PUBCOMP.
@@ -2503,6 +2558,13 @@ begin
   else
     DoOnMQTTError(ClientInstance, Err, CMQTT_CONNECT);
 
+  {$IfnDEF SkipSendingUnAck}
+    if TempConnectFields.ConnectFlags and CMQTT_CleanStartInConnectFlagsBitMask = CMQTT_CleanStartInConnectFlagsBitMask then
+      ClientToServerConnectionType.Content^[ClientInstance] := CMQTTCleanStartBitMask //set bit 0   //it's ok to reset the ConAck flag here
+    else
+      ClientToServerConnectionType.Content^[ClientInstance] := 0; //it's ok to reset the ConAck flag here
+  {$ENDIF}
+
   if Result then
   begin
     ClientToServerSendQuota.Content^[TempClientInstance] := TempConnectProperties.ReceiveMaximum;       //this keeps track of current quota (valid range: 0..ReceiveMaximum)
@@ -2827,6 +2889,7 @@ begin
     if Result then
       if TempArr.Len > 0 then
       begin
+        Err := CMQTT_Success;
         DoOnSend_MQTT_Packet(ClientInstance, TempArr.Content^[0], Err);  //Publish or PubRel
         Result := Err = CMQTT_Success;      //it is fine to return the result from the last iteration
       end;
@@ -2834,8 +2897,8 @@ begin
     FreeDynArray(TempArr);
   end;
 
-  for i := 0 to ResendBuffItemCountM1 do
-    MQTT_RemovePacketFromClientToServerResendBufferByIndex(TempClientInstance, 0);
+  //for i := 0 to ResendBuffItemCountM1 do
+  //  MQTT_RemovePacketFromClientToServerResendBufferByIndex(TempClientInstance, 0); //This should not be called here on sending, it should be called on PubAck/PubRec only !
 end;
 
 end.
