@@ -136,6 +136,8 @@ type
     procedure TearDown; override;
 
   published
+    procedure TestMemoryLeakInSetupAndTearDown;
+
     procedure TestPublish_Client0ToClient1_HappyFlow_QoS0;
     procedure TestPublish_Client0ToClient1_HappyFlow_QoS1;
     procedure TestPublish_Client0ToClient1_HappyFlow_QoS2;
@@ -1053,10 +1055,12 @@ begin
   TestClients[1].tmrProcessRecData.Enabled := False;
 
   for i := 0 to Length(TestClients) - 1 do
-  begin
     Ths[i].Terminate;
+
+  for i := 0 to Length(TestClients) - 1 do
+  begin
     LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True);
-    Ths[i] := nil;
+    FreeAndNil(Ths[i]);
   end;
 
   TestClients[0].IdTCPClientObj.Disconnect(False);
@@ -1072,6 +1076,12 @@ begin
 
   SetLength(FSubscribeToTopicNames, 0);
   SetLength(Ths, 0);
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestMemoryLeakInSetupAndTearDown;
+begin
+  Expect(True).ToBe(True, 'Only a simple content.');
 end;
 
 

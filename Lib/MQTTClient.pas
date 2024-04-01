@@ -1865,11 +1865,11 @@ begin
     MQTT_InitConnAckProperties(TempConnAckProperties);
     Result := Decode_ConnAck(TempReceivedPacket, TempConnAckFields, TempConnAckProperties);
   end;
+  MQTT_FreeControlPacket(TempReceivedPacket);
 
   if Lo(Result) <> CMQTTDecoderNoErr then
   begin
     //MQTT_FreeConnAckProperties(TempConnAckProperties);    // not initialized here
-    MQTT_FreeControlPacket(TempReceivedPacket);
     Exit;
   end;
 
@@ -1880,7 +1880,6 @@ begin
     if Result <> CMQTTDecoderNoErr then
     begin
       MQTT_FreeConnAckProperties(TempConnAckProperties);
-      MQTT_FreeControlPacket(TempReceivedPacket);
       Exit;
     end;
 
@@ -1894,7 +1893,6 @@ begin
         begin
           DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_CONNACK);
           MQTT_FreeConnAckProperties(TempConnAckProperties);
-          MQTT_FreeControlPacket(TempReceivedPacket);
           Exit;
         end;
       {$ENDIF}
@@ -1908,7 +1906,7 @@ begin
   end;
 
   MQTT_FreeConnAckProperties(TempConnAckProperties);
-  MQTT_FreeControlPacket(TempReceivedPacket);
+  //MQTT_FreeControlPacket(TempReceivedPacket); - not needed. See above code.
 end;
 
 
@@ -2097,6 +2095,8 @@ begin
 
     FreeDynArray(TempCommonFields.SrcPayload);
   end;
+
+  MQTT_FreeControlPacket(TempReceivedPacket);
 end;
 
 
@@ -2199,6 +2199,8 @@ begin
   begin
     //respond with some error code ?
   end;
+
+  MQTT_FreeControlPacket(TempReceivedPacket);
 end;
 
 
@@ -2268,6 +2270,8 @@ begin
   begin
     //respond with some error code ?
   end;
+
+  MQTT_FreeControlPacket(TempReceivedPacket);
 end;
 
 
@@ -2308,6 +2312,8 @@ begin
     MQTT_InitCommonProperties(TempSubAckProperties);
     InitDynArrayToEmpty(TempSubAckFields.SrcPayload);
     Result := Decode_SubAck(TempReceivedPacket, TempSubAckFields, TempSubAckProperties);
+    MQTT_FreeControlPacket(TempReceivedPacket);
+
     if Result <> CMQTTDecoderNoErr then
     begin
       DoOnMQTTError(TempClientInstance, Result, CMQTT_SUBACK);
@@ -2325,9 +2331,6 @@ begin
       Exit;
     end;
 
-    if Result <> CMQTTDecoderNoErr then
-      MQTT_FreeControlPacket(TempReceivedPacket);
-
     PacketIdentifierIdx := IndexOfWordInArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, TempSubAckFields.PacketIdentifier);
     if PacketIdentifierIdx = -1 then
       DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ServerToClient, CMQTT_SUBACK)
@@ -2338,6 +2341,8 @@ begin
     FreeDynArray(TempSubAckFields.SrcPayload);
     MQTT_FreeCommonProperties(TempSubAckProperties);
   end;
+
+  MQTT_FreeControlPacket(TempReceivedPacket);
 end;
 
 
@@ -2359,6 +2364,8 @@ begin
     MQTT_InitCommonProperties(TempUnsubAckProperties);
     InitDynArrayToEmpty(TempUnsubAckFields.SrcPayload);
     Result := Decode_UnsubAck(TempReceivedPacket, TempUnsubAckFields, TempUnsubAckProperties);
+    MQTT_FreeControlPacket(TempReceivedPacket);
+
     if Result <> CMQTTDecoderNoErr then
     begin
       DoOnMQTTError(TempClientInstance, Result, CMQTT_UNSUBACK);
@@ -2376,8 +2383,6 @@ begin
       Exit;
     end;
 
-    MQTT_FreeControlPacket(TempReceivedPacket);
-
     PacketIdentifierIdx := IndexOfWordInArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, TempUnsubAckFields.PacketIdentifier);
     if PacketIdentifierIdx = -1 then
       DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ServerToClient, CMQTT_UNSUBACK)
@@ -2388,6 +2393,8 @@ begin
     FreeDynArray(TempUnsubAckFields.SrcPayload);
     MQTT_FreeCommonProperties(TempUnsubAckProperties);
   end;
+
+  MQTT_FreeControlPacket(TempReceivedPacket);
 end;
 
 
@@ -2400,6 +2407,8 @@ begin
   MQTT_InitControlPacket(TempReceivedPacket);
 
   Result := Decode_PingRespToCtrlPacket(ABuffer, TempReceivedPacket, ASizeToFree);
+  MQTT_FreeControlPacket(TempReceivedPacket);
+
   if Result = CMQTTDecoderNoErr then
     DoOnAfterReceivingMQTT_PINGRESP(ClientInstance, Err);
 end;
@@ -2423,10 +2432,10 @@ begin
     Result := Decode_Disconnect(TempReceivedPacket, TempDisconnectFields, TempDisconnectProperties);
 
     DoOnAfterReceiving_MQTT_DISCONNECT(ClientInstance, TempDisconnectFields, TempDisconnectProperties, Err);
-
-    MQTT_FreeControlPacket(TempReceivedPacket);
     MQTT_FreeDisconnectProperties(TempDisconnectProperties);
   end;
+
+  MQTT_FreeControlPacket(TempReceivedPacket);
 end;
 
 
@@ -2448,10 +2457,10 @@ begin
     Result := Decode_Auth(TempReceivedPacket, TempAuthFields, TempAuthProperties);
 
     DoOnAfterReceiving_MQTT_AUTH(ClientInstance, TempAuthFields, TempAuthProperties, Err);
-
-    MQTT_FreeControlPacket(TempReceivedPacket);
     MQTT_FreeAuthProperties(TempAuthProperties);
   end;
+
+  MQTT_FreeControlPacket(TempReceivedPacket);
 end;
 
 
