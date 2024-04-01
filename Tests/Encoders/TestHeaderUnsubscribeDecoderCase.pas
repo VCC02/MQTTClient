@@ -284,10 +284,15 @@ begin
 
   MQTT_InitUnsubscribeProperties(DecodedUnsubscribeProperties);
   try
-    Expect(Decode_Unsubscribe({DestPacket} DecodedUnsubscribePacket, DecodedUnsubscribeFields, DecodedUnsubscribeProperties)).ToBe(CMQTTDecoderNoErr);
+    InitDynArrayToEmpty(DecodedUnsubscribeFields.TopicFilters);
+    try
+      Expect(Decode_Unsubscribe({DestPacket} DecodedUnsubscribePacket, DecodedUnsubscribeFields, DecodedUnsubscribeProperties)).ToBe(CMQTTDecoderNoErr);
 
-    Expect(DecodedUnsubscribeFields.PacketIdentifier).ToBe(1234);
-    Expect(DecodedUnsubscribeFields.EnabledProperties).ToBe(TempUnsubscribeFields.EnabledProperties);
+      Expect(DecodedUnsubscribeFields.PacketIdentifier).ToBe(1234);
+      Expect(DecodedUnsubscribeFields.EnabledProperties).ToBe(TempUnsubscribeFields.EnabledProperties);
+    finally
+      FreeDynArray(DecodedUnsubscribeFields.TopicFilters);
+    end;
 
     Expect(DecodedUnsubscribeProperties.UserProperty.Len).ToBe(3);
     //
@@ -337,11 +342,13 @@ begin
   Expect(DecodedBufferLen).ToBe(EncodedUnsubscribeBuffer.Len);
 
   MQTT_InitUnsubscribeProperties(DecodedUnsubscribeProperties);
+  InitDynArrayToEmpty(DecodedUnsubscribeFields.TopicFilters);
   try
     Expect(Decode_Unsubscribe({DestPacket} DecodedUnsubscribePacket, DecodedUnsubscribeFields, DecodedUnsubscribeProperties)).ToBe(CMQTTDecoderNoErr);
     Expect(DecodedUnsubscribeFields.EnabledProperties).ToBe(0, 'no property should be decoded');
   finally
     MQTT_FreeUnsubscribeProperties(DecodedUnsubscribeProperties);
+    FreeDynArray(DecodedUnsubscribeFields.TopicFilters);
   end;
 end;
 

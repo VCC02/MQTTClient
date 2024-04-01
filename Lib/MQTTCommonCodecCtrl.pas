@@ -385,6 +385,7 @@ begin
 
   if IsSubAck = 1 then
   begin
+    InitDynArrayToEmpty(ACommonFields.SrcPayload);
     if not CopyFromDynArray(ACommonFields.SrcPayload, AReceivedPacket.Payload, 0, AReceivedPacket.Payload.Len) then   //the dest array is initialized by CopyFromDynArray
     begin
       Result := CMQTTDecoderOutOfMemory or CMQTT_OOM_PayloadAlloc;

@@ -129,7 +129,7 @@ type
     procedure TestPublish_Client0ToClient1_HappyFlow_SendPublish(AQoS: Byte; AMsgToPublish: string = 'some content');
     procedure TestPublish_Client0ToClient1_HappyFlow_SendUnsubscribe(APacketIDOffset: Word = 1);
     procedure DisconnectWithNoCleanStartFlag(AClientIndex: Integer);
-    procedure ReconnectToBroker(AClientIndex: Integer);
+    procedure ReconnectToBroker(AClientIndex: Integer; AExpectSessionPresentFlag: Boolean = True);
 
   protected
     procedure SetUp; override;
@@ -155,6 +155,10 @@ type
     procedure TestReconnectWithResend_QoS1;
     procedure TestReconnectWithResend_QoS2_PubRec;
     procedure TestReconnectWithResend_QoS2_PubComp;
+
+    procedure TestReconnectWithResend_TwoReconnections_QoS1;
+    procedure TestReconnectWithResend_TwoReconnections_QoS2_PubRec;
+    procedure TestReconnectWithResend_TwoReconnections_QoS2_PubComp;
   end;
 
 implementation
@@ -234,6 +238,8 @@ begin
 
   TestClients[TempClientInstance].AddToLog('Preparing CONNECT data..');
 
+  TestClients[TempClientInstance].ReceivedConAck := False;  //reset for the next ConAck
+
   UserName := TestClients[TempClientInstance].FMQTTUsername;
   Password := TestClients[TempClientInstance].FMQTTPassword;
 
@@ -296,7 +302,6 @@ var
   TempClientInstance: DWord;
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
-  TestClients[TempClientInstance].ReceivedConAck := True;
   TestClients[TempClientInstance].AddToLog('Received CONNACK');
 
   TestClients[TempClientInstance].AddToLog('ConnAckFields.EnabledProperties: ' + IntToStr(AConnAckFields.EnabledProperties));
@@ -326,6 +331,7 @@ begin
   ///////////////////////////////////////// when the server returns SessionPresentFlag set to 1, the library resends unacknowledged Publish and PubRel packets.
   TestClients[TempClientInstance].FReceivedSessionPresentFlag := AConnAckFields.SessionPresentFlag = 1;
   TestClients[TempClientInstance].FClientId := StringReplace(DynArrayOfByteToString(AConnAckProperties.AssignedClientIdentifier), #0, '#0', [rfReplaceAll]);
+  TestClients[TempClientInstance].ReceivedConAck := True;
 end;
 
 
@@ -1256,7 +1262,7 @@ begin
 end;
 
 
-procedure TTestE2EBuiltinClientsCase.ReconnectToBroker(AClientIndex: Integer);
+procedure TTestE2EBuiltinClientsCase.ReconnectToBroker(AClientIndex: Integer; AExpectSessionPresentFlag: Boolean = True);
 begin
   Ths[AClientIndex].Resume;
   TestClients[AClientIndex].IdTCPClientObj.Connect('127.0.0.1', 1883);
@@ -1265,7 +1271,7 @@ begin
   TestClients[AClientIndex].FUseCurrentClientIdInConnect := True;
   Expect(MQTT_CONNECT(AClientIndex, 1)).ToBe(True, 'Can''t prepare MQTTConnect packet at client index 1 for second connection.');  //should use FClientId
   LoopedExpect(PBoolean(@TestClients[AClientIndex].ReceivedConAck)).ToBe(True, 'Should receive a ConAck at client index 1');
-  LoopedExpect(PBoolean(@TestClients[AClientIndex].FReceivedSessionPresentFlag), 100).ToBe(True, 'Should receive a ConAck with SessionPresent flag');
+  LoopedExpect(PBoolean(@TestClients[AClientIndex].FReceivedSessionPresentFlag)).ToBe(AExpectSessionPresentFlag, 'Should receive a ConAck with SessionPresent flag');
 end;
 
 
@@ -1324,7 +1330,7 @@ begin
 
   LoopedExpect(PInteger(@TestClients[0].FLatestError)).ToBe(CMQTT_Success, 'There should be no error.');
   LoopedExpect(PInteger(@TestClients[0].FLatestPacketOnError)).ToBe(CMQTT_UNDEFINED, 'There should be no errored packet.');
-  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).ToBe(True, 'Should receive a PubAck.');  //Process_PUBACK_OR_PUBCOMP returns many errors (like PackedID not found in Resend array)
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).ToBe(True, 'Should receive a PubAck.');
 end;
 
 
@@ -1367,6 +1373,90 @@ begin
   LoopedExpect(PInteger(@TestClients[0].FLatestError)).ToBe(CMQTT_Success, 'There should be no error.');
   LoopedExpect(PInteger(@TestClients[0].FLatestPacketOnError)).ToBe(CMQTT_UNDEFINED, 'There should be no errored packet.');
   LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).ToBe(True, 'Should receive a PubComp.');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithResend_TwoReconnections_QoS1;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestClients[0].FAllowReceivingPubAck := False;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(1); //the response is received from server, but is ignored
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).NotToBe(True, 'Should not receive a PubAck #1');
+
+  DisconnectWithNoCleanStartFlag(0);
+  ReconnectToBroker(0);
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).NotToBe(True, 'Should not receive a PubAck #2');
+
+  DisconnectWithNoCleanStartFlag(0);
+  TestClients[0].FAllowReceivingPubAck := True;
+  ReconnectToBroker(0, False);                         //A ConAck is received, but there is no SessionPresent flag. Also, the ClientID is new.
+
+  {$IfDEF SkipSendingUnAck}
+    if TestClients[0].FReceivedSessionPresentFlag then
+      Expect(MQTT_ResendUnacknowledged(0)).ToBe(True, 'Resending successful');
+  {$ENDIF}
+
+  LoopedExpect(PInteger(@TestClients[0].FLatestError)).ToBe(CMQTT_Success, 'There should be no error.');
+  LoopedExpect(PInteger(@TestClients[0].FLatestPacketOnError)).ToBe(CMQTT_UNDEFINED, 'There should be no errored packet.');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).NotToBe(True, 'Should not receive a PubAck #3'); //because the session is not present.
+
+  Expect(MQTT_GetClientToServerResendPacketIdentifierCount(0)).ToBe(0, 'Since the server returned with clean session, the library should clear the resend buffers.');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithResend_TwoReconnections_QoS2_PubRec;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestClients[0].FAllowReceivingPubRec := False;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2); //the response is received from server, but is ignored
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).NotToBe(True, 'Should not receive a PubRec #1');
+
+  DisconnectWithNoCleanStartFlag(0);
+  ReconnectToBroker(0);
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).NotToBe(True, 'Should not receive a PubRec #2');
+
+  DisconnectWithNoCleanStartFlag(0);
+  TestClients[0].FAllowReceivingPubRec := True;
+  ReconnectToBroker(0, False);
+
+  {$IfDEF SkipSendingUnAck}
+    if TestClients[0].FReceivedSessionPresentFlag then
+      Expect(MQTT_ResendUnacknowledged(0)).ToBe(True, 'Resending successful');
+  {$ENDIF}
+
+  LoopedExpect(PInteger(@TestClients[0].FLatestError)).ToBe(CMQTT_Success, 'There should be no error.');
+  LoopedExpect(PInteger(@TestClients[0].FLatestPacketOnError)).ToBe(CMQTT_UNDEFINED, 'There should be no errored packet.');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).NotToBe(True, 'Should not receive a PubRec #3.'); //because the session is not present.
+
+  Expect(MQTT_GetClientToServerResendPacketIdentifierCount(0)).ToBe(0, 'Since the server returned with clean session, the library should clear the resend buffers.');
+end;
+
+
+procedure TTestE2EBuiltinClientsCase.TestReconnectWithResend_TwoReconnections_QoS2_PubComp;
+begin
+  TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
+  TestClients[0].FAllowReceivingPubComp := False;
+  TestPublish_Client0ToClient1_HappyFlow_SendPublish(2); //the response is received from server, but is ignored
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).NotToBe(True, 'Should not receive a PubComp #1');
+
+  DisconnectWithNoCleanStartFlag(0);
+  ReconnectToBroker(0);
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).NotToBe(True, 'Should not receive a PubComp #2');
+
+  DisconnectWithNoCleanStartFlag(0);
+  TestClients[0].FAllowReceivingPubComp := True;
+  ReconnectToBroker(0, False);
+
+  {$IfDEF SkipSendingUnAck}
+    if TestClients[0].FReceivedSessionPresentFlag then
+      Expect(MQTT_ResendUnacknowledged(0)).ToBe(True, 'Resending successful');
+  {$ENDIF}
+
+  LoopedExpect(PInteger(@TestClients[0].FLatestError)).ToBe(CMQTT_Success, 'There should be no error.');
+  LoopedExpect(PInteger(@TestClients[0].FLatestPacketOnError)).ToBe(CMQTT_UNDEFINED, 'There should be no errored packet.');
+  LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).NotToBe(True, 'Should not receive a PubComp #3.'); //because the session is not present.
+
+  Expect(MQTT_GetClientToServerResendPacketIdentifierCount(0)).ToBe(0, 'Since the server returned with clean session, the library should clear the resend buffers.');
 end;
 
 

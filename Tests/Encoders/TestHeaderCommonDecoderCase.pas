@@ -369,6 +369,7 @@ begin
   Expect(DecodedBufferLen).ToBe(EncodedCommonBuffer.Len);
 
   MQTT_InitCommonProperties(DecodedCommonProperties);
+  InitDynArrayToEmpty(DecodedCommonFields.SrcPayload);
   try
     Expect(Decode_Common({DestPacket} DecodedCommonPacket, DecodedCommonFields, DecodedCommonProperties)).ToBe(CMQTTDecoderNoErr);
 
@@ -396,6 +397,7 @@ begin
     end;
   finally
     MQTT_FreeCommonProperties(DecodedCommonProperties);
+    FreeDynArray(DecodedCommonFields.SrcPayload);
   end;
 end;
 
@@ -437,11 +439,13 @@ begin
   Expect(DecodedBufferLen).ToBe(EncodedCommonBuffer.Len);
 
   MQTT_InitCommonProperties(DecodedCommonProperties);
+  InitDynArrayToEmpty(DecodedCommonFields.SrcPayload);
   try
     Expect(Decode_Common({DestPacket} DecodedCommonPacket, DecodedCommonFields, DecodedCommonProperties)).ToBe(CMQTTDecoderNoErr);
     Expect(DecodedCommonFields.EnabledProperties).ToBe(0, 'no property should be decoded');
   finally
     MQTT_FreeCommonProperties(DecodedCommonProperties);
+    FreeDynArray(DecodedCommonFields.SrcPayload);
   end;
 end;
 

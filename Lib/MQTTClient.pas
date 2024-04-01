@@ -285,6 +285,7 @@ function MQTT_GetServerToClientPacketIdentifierByIndex(ClientInstance: DWord; AI
 function MQTT_GetClientToServerPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
 function MQTT_GetClientToServerPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of ClientToServerPacketIdentifiers array
 function MQTT_GetSendQuota(ClientInstance: DWord): Word;
+function MQTT_GetClientToServerResendPacketIdentifierCount(ClientInstance: DWord): TDynArrayLength;
 
 //From spec, pag 96:
 //When a Client reconnects with Clean Start set to 0 and a session is present, both the Client and Server
@@ -1297,6 +1298,18 @@ begin
 end;
 
 
+function MQTT_GetClientToServerResendPacketIdentifierCount(ClientInstance: DWord): TDynArrayLength;
+var
+  TempClientInstance: DWord;
+begin
+  TempClientInstance := ClientInstance and CClientIndexMask;
+  if IsValidClientInstance(ClientInstance) then
+    Result := ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^.Len
+  else
+    Result := CMQTT_BadClientIndex;
+end;
+
+
 /////////////////////
 
 
@@ -1832,18 +1845,19 @@ end;
 //Used in ClientToServer scenario.
 function Process_CONNACK(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
 var
-  {$IfnDEF SkipSendingUnAck}
+  //{$IfnDEF SkipSendingUnAck}
     TempClientInstance: DWord;
-  {$ENDIF}
+  //{$ENDIF}
   TempReceivedPacket: TMQTTControlPacket;
   TempConnAckFields: TMQTTConnAckFields;
   TempConnAckProperties: TMQTTConnAckProperties;
+  i, ResendBuffItemCountM1: TDynArrayLengthSig;
 begin
   MQTT_InitControlPacket(TempReceivedPacket);
 
-  {$IfnDEF SkipSendingUnAck}
+  //{$IfnDEF SkipSendingUnAck}
     TempClientInstance := ClientInstance and CClientIndexMask;
-  {$ENDIF}
+  //{$ENDIF}
 
   Result := Decode_ConnAckToCtrlPacket(ABuffer, TempReceivedPacket, ASizeToFree);
   if Result = CMQTTDecoderNoErr then
@@ -1870,10 +1884,12 @@ begin
       Exit;
     end;
 
-    {$IfnDEF SkipSendingUnAck}
-      if TempConnAckFields.SessionPresentFlag = 1 then
-      begin
-        ClientToServerConnectionType.Content^[TempClientInstance] := ClientToServerConnectionType.Content^[TempClientInstance] or CMQTTSessionPresentBitMask; //set bit 1
+    if TempConnAckFields.SessionPresentFlag = 1 then
+    begin
+      {$IfnDEF SkipSendingUnAck}
+      ClientToServerConnectionType.Content^[TempClientInstance] := ClientToServerConnectionType.Content^[TempClientInstance] or CMQTTSessionPresentBitMask; //set bit 1
+
+      if ClientToServerConnectionType.Content^[TempClientInstance] and CMQTTCleanStartBitMask = 0 then
         if not MQTT_ResendUnacknowledged(TempClientInstance) then
         begin
           DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_CONNACK);
@@ -1881,8 +1897,14 @@ begin
           MQTT_FreeControlPacket(TempReceivedPacket);
           Exit;
         end;
-      end;
-    {$ENDIF}
+      {$ENDIF}
+    end
+    else
+    begin
+      ResendBuffItemCountM1 := ClientToServerResendBuffer.Content^[TempClientInstance]^.Len - 1;
+      for i := 0 to ResendBuffItemCountM1 do
+        MQTT_RemovePacketFromClientToServerResendBufferByIndex(TempClientInstance, 0);
+    end;
   end;
 
   MQTT_FreeConnAckProperties(TempConnAckProperties);
@@ -1938,12 +1960,16 @@ begin
     if Result <> CMQTTDecoderNoErr then
     begin
       MQTT_FreePublishProperties(TempPublishProperties);
+      FreeDynArray(TempPublishFields.TopicName);
+      FreeDynArray(TempPublishFields.ApplicationMessage);
       Exit;
     end;
   end
   else
   begin
     MQTT_FreePublishProperties(TempPublishProperties);
+    FreeDynArray(TempPublishFields.TopicName);
+    FreeDynArray(TempPublishFields.ApplicationMessage);
     Exit;
   end;
 
@@ -1995,7 +2021,7 @@ begin
     3 : //  Expected Response: Protocol error, should disconnect
     begin
       Result := CMQTT_BadQoS;
-      Exit;
+      //Exit; //there is nothing after this Exit, except the Free-array calls, which should be executed.
     end;
   end;
 
@@ -2068,6 +2094,8 @@ begin
       else
         DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServerResend, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
     end;  //PacketIdentifierIdx <> -1
+
+    FreeDynArray(TempCommonFields.SrcPayload);
   end;
 end;
 
@@ -2135,7 +2163,7 @@ begin
       // The PacketIdentifier is removed here, not in MQTT_PUBResponse_NoCallback, because its index is already available here.
       if PacketIdentifierIdx <> -1 then
       begin
-        //PacketIdentifierIdxInResend is set here, because TempCommonFields can be altered in user code, from DoOnAfterReceiving_MQTT_*.
+        //PacketIdentifierIdxInResend is set here, because TempPubRecFields can be altered in user code, from DoOnAfterReceiving_MQTT_*.
         PacketIdentifierIdxInResend := IndexOfWordInArrayOfWord(ClientToServerResendPacketIdentifier.Content^[TempClientInstance]^, TempPubRecFields.PacketIdentifier);
 
         if TempPubRecFields.ReasonCode >= 128 then  //Verify response error for PUBREC only !!! Other packets should not have this check.
@@ -2164,6 +2192,8 @@ begin
     end
     else
       Result := CMQTT_OutOfMemory;    //probably nothing gets sent to server
+
+    FreeDynArray(TempPubRecFields.SrcPayload);
   end
   else
   begin
@@ -2231,6 +2261,8 @@ begin
       end
       else
         Result := CMQTT_OutOfMemory;    //probably nothing gets sent to server
+
+    FreeDynArray(TempPubRelFields.SrcPayload);
   end
   else
   begin
@@ -2279,6 +2311,8 @@ begin
     if Result <> CMQTTDecoderNoErr then
     begin
       DoOnMQTTError(TempClientInstance, Result, CMQTT_SUBACK);
+      MQTT_FreeCommonProperties(TempSubAckProperties);
+      FreeDynArray(TempSubAckFields.SrcPayload);
       Exit;
     end;
 
@@ -2286,11 +2320,13 @@ begin
     if Result <> CMQTTDecoderNoErr then
     begin
       DoOnMQTTError(TempClientInstance, Result, CMQTT_SUBACK);
+      MQTT_FreeCommonProperties(TempSubAckProperties);
+      FreeDynArray(TempSubAckFields.SrcPayload);
       Exit;
     end;
 
     if Result <> CMQTTDecoderNoErr then
-    MQTT_FreeControlPacket(TempReceivedPacket);
+      MQTT_FreeControlPacket(TempReceivedPacket);
 
     PacketIdentifierIdx := IndexOfWordInArrayOfWord(ClientToServerPacketIdentifiers.Content^[TempClientInstance]^, TempSubAckFields.PacketIdentifier);
     if PacketIdentifierIdx = -1 then
@@ -2326,6 +2362,8 @@ begin
     if Result <> CMQTTDecoderNoErr then
     begin
       DoOnMQTTError(TempClientInstance, Result, CMQTT_UNSUBACK);
+      FreeDynArray(TempUnsubAckFields.SrcPayload);
+      MQTT_FreeCommonProperties(TempUnsubAckProperties);
       Exit;
     end;
 
@@ -2333,6 +2371,8 @@ begin
     if Result <> CMQTTDecoderNoErr then
     begin
       DoOnMQTTError(TempClientInstance, Result, CMQTT_UNSUBACK);
+      FreeDynArray(TempUnsubAckFields.SrcPayload);
+      MQTT_FreeCommonProperties(TempUnsubAckProperties);
       Exit;
     end;
 

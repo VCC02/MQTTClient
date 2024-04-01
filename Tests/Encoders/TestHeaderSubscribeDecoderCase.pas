@@ -292,10 +292,15 @@ begin
 
   MQTT_InitSubscribeProperties(DecodedSubscribeProperties);
   try
-    Expect(Decode_Subscribe({DestPacket} DecodedSubscribePacket, DecodedSubscribeFields, DecodedSubscribeProperties)).ToBe(CMQTTDecoderNoErr);
+    InitDynArrayToEmpty(DecodedSubscribeFields.TopicFilters);
+    try
+      Expect(Decode_Subscribe({DestPacket} DecodedSubscribePacket, DecodedSubscribeFields, DecodedSubscribeProperties)).ToBe(CMQTTDecoderNoErr);
 
-    Expect(DecodedSubscribeFields.PacketIdentifier).ToBe(1234);
-    Expect(DecodedSubscribeFields.EnabledProperties).ToBe(TempSubscribeFields.EnabledProperties);
+      Expect(DecodedSubscribeFields.PacketIdentifier).ToBe(1234);
+      Expect(DecodedSubscribeFields.EnabledProperties).ToBe(TempSubscribeFields.EnabledProperties);
+    finally
+      FreeDynArray(DecodedSubscribeFields.TopicFilters);
+    end;
 
     Expect(DecodedSubscribeProperties.UserProperty.Len).ToBe(3);
     //
@@ -346,11 +351,13 @@ begin
   Expect(DecodedBufferLen).ToBe(EncodedSubscribeBuffer.Len);
 
   MQTT_InitSubscribeProperties(DecodedSubscribeProperties);
+  InitDynArrayToEmpty(DecodedSubscribeFields.TopicFilters);
   try
     Expect(Decode_Subscribe({DestPacket} DecodedSubscribePacket, DecodedSubscribeFields, DecodedSubscribeProperties)).ToBe(CMQTTDecoderNoErr);
     Expect(DecodedSubscribeFields.EnabledProperties).ToBe(0, 'no property should be decoded');
   finally
     MQTT_FreeSubscribeProperties(DecodedSubscribeProperties);
+    FreeDynArray(DecodedSubscribeFields.TopicFilters);
   end;
 end;
 

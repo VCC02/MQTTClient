@@ -432,6 +432,7 @@ begin
     Exit;
   end;
 
+  InitDynArrayToEmpty(ASubscribeFields.TopicFilters);
   CopyFromDynArray(ASubscribeFields.TopicFilters, AReceivedPacket.Payload, 0, AReceivedPacket.Payload.Len);
 
   Result := CMQTTDecoderNoErr;
