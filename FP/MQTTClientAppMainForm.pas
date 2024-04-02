@@ -939,7 +939,7 @@ begin
     Application.ProcessMessages;
     Sleep(10);
   until (GetTickCount64 - tk > 1500) or Th.Terminated;
-  Th := nil;
+  FreeAndNil(Th);
 
   IdTCPClient1.Disconnect(False);
 end;
@@ -1019,7 +1019,7 @@ procedure TfrmMQTTClientAppMain.FormDestroy(Sender: TObject);
 begin
   FreeAndNil(FLoggingFIFO);
   FreeAndNil(FRecBufFIFO);
-  Th := nil;
+  FreeAndNil(Th);
   MQTT_Done;
 end;
 

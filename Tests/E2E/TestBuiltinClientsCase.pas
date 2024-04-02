@@ -917,10 +917,24 @@ type
   TMQTTReceiveThread = class(TThread)
   private
     FClient: TMQTTTestClient;
+    FAllowExecution: Boolean;
+
     procedure AddToLog(s: string);
   protected
     procedure Execute; override;
+  public
+    constructor Create(CreateSuspended: Boolean; const StackSize: SizeUInt = DefaultStackSize);
+
+    procedure SuspendExecution;
+    procedure ResumeExecution;
   end;
+
+
+constructor TMQTTReceiveThread.Create(CreateSuspended: Boolean; const StackSize: SizeUInt = DefaultStackSize);
+begin
+  inherited Create(CreateSuspended, StackSize);
+  FAllowExecution := True;
+end;
 
 
 procedure TMQTTReceiveThread.AddToLog(s: string);
@@ -942,20 +956,25 @@ begin
     try
       repeat
         try
-          TempByte := FClient.IdTCPClientObj.IOHandler.ReadByte;
-          AddByteToDynArray(TempByte, TempReadBuf);
-
-          if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
+          if FAllowExecution then
           begin
-            MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
-            AddToLog('done receiving packet');
-            AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
+            TempByte := FClient.IdTCPClientObj.IOHandler.ReadByte;
+            AddByteToDynArray(TempByte, TempReadBuf);
 
-            FClient.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+            if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
+            begin
+              MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
+              AddToLog('done receiving packet');
+              AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
 
-            FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
+              FClient.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+
+              FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
+              Sleep(1);
+            end;
+          end
+          else
             Sleep(1);
-          end;
         except
         end;
       until Terminated;
@@ -967,6 +986,18 @@ begin
     on E: Exception do
       AddToLog('Th ex: ' + E.Message);
   end;
+end;
+
+
+procedure TMQTTReceiveThread.SuspendExecution;
+begin
+  FAllowExecution := False;
+end;
+
+
+procedure TMQTTReceiveThread.ResumeExecution;
+begin
+  FAllowExecution := True;
 end;
 
 
@@ -998,7 +1029,7 @@ begin
     begin
       Ths[i].Terminate;
       LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True);
-      Ths[i] := nil;
+      FreeAndNil(Ths[i]);
     end;
 
   TestClients[0].IdTCPClientObj.Connect('127.0.0.1', 1883);
@@ -1048,8 +1079,8 @@ var
 begin
   Expect(MQTT_DISCONNECT(0, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet.');
   Expect(MQTT_DISCONNECT(1, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet.');
-  LoopedExpect(@ClientToServerBufEmpty0, 1500).ToBe(True);
-  LoopedExpect(@ClientToServerBufEmpty1, 1500).ToBe(True);
+  LoopedExpect(@ClientToServerBufEmpty0, 1500).ToBe(True, 'Buffer 0 should be empty.');
+  LoopedExpect(@ClientToServerBufEmpty1, 1500).ToBe(True, 'Buffer 1 should be empty.');
 
   TestClients[0].tmrProcessRecData.Enabled := False;
   TestClients[1].tmrProcessRecData.Enabled := False;
@@ -1059,7 +1090,7 @@ begin
 
   for i := 0 to Length(TestClients) - 1 do
   begin
-    LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True);
+    LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True, 'Thread ' + IntToStr(i) + ' should be terminated.');
     FreeAndNil(Ths[i]);
   end;
 
@@ -1090,7 +1121,7 @@ begin
   SetLength(FSubscribeToTopicNames, 1);
   FSubscribeToTopicNames[0] := 'abc';
 
-  Expect(MQTT_SUBSCRIBE(1, 0)).ToBe(True);
+  Expect(MQTT_SUBSCRIBE(1, 0)).ToBe(True, 'Subscribed');
   LoopedExpect(PDWord(@TestClients[1].FSubscribePacketID)).ToBe(CMQTT_ClientToServerPacketIdentifiersInitOffset);
   LoopedExpect(PDWord(@TestClients[1].FSubAckPacketID)).ToBe(TestClients[1].FSubscribePacketID, 'Should receive a SubAck');
 end;
@@ -1101,7 +1132,7 @@ begin
   Expect(Length(FSubscribeToTopicNames)).ToBeGreaterThan(0, 'There should be a topic name.');
   FTopicNameToPublish := FSubscribeToTopicNames[0];
   FMsgToPublish := AMsgToPublish;
-  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True);
+  Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True, 'published at QoS = ' + IntToStr(AQoS));
   LoopedExpect(PString(@TestClients[0].FSentPublishedMessage)).ToBe(FMsgToPublish, 'Should send a Publish with "' + FMsgToPublish + '".');
 end;
 
@@ -1111,7 +1142,7 @@ begin
   SetLength(FSubscribeToTopicNames, 1);
   FSubscribeToTopicNames[0] := 'abc';
 
-  Expect(MQTT_UNSUBSCRIBE(1, 0)).ToBe(True);
+  Expect(MQTT_UNSUBSCRIBE(1, 0)).ToBe(True, 'Unsubscribed');
   LoopedExpect(PDWord(@TestClients[1].FUnsubscribePacketID)).ToBe(CMQTT_ClientToServerPacketIdentifiersInitOffset + APacketIDOffset);
   LoopedExpect(PDWord(@TestClients[1].FUnsubAckPacketID)).ToBe(TestClients[1].FUnsubscribePacketID, 'Should receive an UnsubAck');
 end;
@@ -1209,11 +1240,11 @@ procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_Mult
 begin
   TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
 
-  Ths[1].Suspend; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
+  Ths[1].SuspendExecution; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
   TestPublish_Client0ToClient1_HappyFlow_SendPublish(0, CMsg1);
   TestPublish_Client0ToClient1_HappyFlow_SendPublish(0, CMsg2);
 
-  Ths[1].Resume;
+  Ths[1].ResumeExecution;
   LoopedExpect(@LengthOfAllRecMsgs).ToBe(2, 'Expected two received messages.');
   Expect(TestClients[1].FAllReceivedPublishedMessages[0]).ToBe(CMsg1, 'Should receive a Publish with "' + CMsg1 + '" (1).');
   Expect(TestClients[1].FAllReceivedPublishedMessages[1]).ToBe(CMsg2, 'Should receive a Publish with "' + CMsg2 + '" (2).');
@@ -1224,11 +1255,11 @@ procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_Mult
 begin
   TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
 
-  Ths[1].Suspend; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
+  Ths[1].SuspendExecution; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
   TestPublish_Client0ToClient1_HappyFlow_SendPublish(1, CMsg1);
   TestPublish_Client0ToClient1_HappyFlow_SendPublish(1, CMsg2);
 
-  Ths[1].Resume;
+  Ths[1].ResumeExecution;
   LoopedExpect(PBoolean(@TestClients[0].FReceivedPubAck)).ToBe(True, 'Should receive a PubAck');   //actually, there should be two PubAck packets
   LoopedExpect(@LengthOfAllRecMsgs).ToBe(2, 'Expected two received messages.');
 
@@ -1243,11 +1274,11 @@ procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_Mult
 begin
   TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
 
-  Ths[1].Suspend; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
+  Ths[1].SuspendExecution; //pause the receiving thread while sending, so that receiving buffer fills with multiple packets
   TestPublish_Client0ToClient1_HappyFlow_SendPublish(2, CMsg1);
   TestPublish_Client0ToClient1_HappyFlow_SendPublish(2, CMsg2);
 
-  Ths[1].Resume;
+  Ths[1].ResumeExecution;
   LoopedExpect(PBoolean(@TestClients[0].FReceivedPubRec)).ToBe(True, 'Should receive a PubRec');
   LoopedExpect(PBoolean(@TestClients[0].FSentPubRel)).ToBe(True, 'Should send a PubRel');
   LoopedExpect(PBoolean(@TestClients[0].FReceivedPubComp)).ToBe(True, 'Should receive a PubComp');
@@ -1265,7 +1296,7 @@ end;
 
 procedure TTestE2EBuiltinClientsCase.DisconnectWithNoCleanStartFlag(AClientIndex: Integer);
 begin
-  Ths[AClientIndex].Suspend; //pause the receiving thread while disconnected
+  Ths[AClientIndex].SuspendExecution; //pause the receiving thread while disconnected
   TestClients[AClientIndex].IdTCPClientObj.Disconnect;                       ////////////////// ToDo: test also with sending a DISCONNECT packet  (maybe it should not keep the session.
   Sleep(500); //wait a bit, so the broker invalidates the connection         ////////////////// ToDo: test also with  session timeouts
   TestClients[AClientIndex].FIncludeCleanStartFlag := False;
@@ -1274,7 +1305,7 @@ end;
 
 procedure TTestE2EBuiltinClientsCase.ReconnectToBroker(AClientIndex: Integer; AExpectSessionPresentFlag: Boolean = True);
 begin
-  Ths[AClientIndex].Resume;
+  Ths[AClientIndex].ResumeExecution;
   TestClients[AClientIndex].IdTCPClientObj.Connect('127.0.0.1', 1883);
   TestClients[AClientIndex].IdTCPClientObj.IOHandler.ReadTimeout := 10;
 
