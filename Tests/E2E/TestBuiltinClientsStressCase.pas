@@ -51,9 +51,13 @@ type
     procedure StressTest_70s_Qos1;
     procedure StressTest_70s_Qos2;
 
-    procedure StressTest_70s_10MB_Qos0;
-    procedure StressTest_70s_10MB_Qos1;
-    procedure StressTest_70s_10MB_Qos2;
+    procedure StressTest_10s_7kB_Qos0;
+    procedure StressTest_10s_7kB_Qos1;
+    procedure StressTest_10s_7kB_Qos2;
+
+    procedure StressTest_70s_7kB_Qos0;
+    procedure StressTest_70s_7kB_Qos1;
+    procedure StressTest_70s_7kB_Qos2;
   end;
 
 
@@ -61,14 +65,19 @@ implementation
 
 
 uses
-  MQTTClient,
-  Expectations, ExpectationsDynArrays;
+  Math, MQTTClient, MQTTUtils,
+  Expectations, ExpectationsDynArrays
+  {$IFDEF UsingDynTFT}
+    , MemManager
+  {$ENDIF}
+  ;
 
 
 procedure TTestE2EBuiltinClientsStressCase.StressTest(AQoS: Byte; ATimeout: Integer = 10 * 1000; AMinDataSize: Integer = 500);  //ms
 var
   tk: QWord;
   i, n: Integer;
+  PacketName: string;
 begin
   Randomize;
   TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
@@ -82,14 +91,22 @@ begin
 
     TestClients[1].ReceivedPublishedMessage := '-'; //clear before receiving a new one
     try
-      TestPublish_Client0ToClient1_HappyFlow_SendPublish(AQoS);
+      TestPublish_Client0ToClient1_HappyFlow_SendPublish(AQoS, FMsgToPublish);
     except
       on E: Exception do
         Expect(E.Message).ToBe('', 'Expected successful publish call at iteration ' + IntToStr(n));
     end;
 
     Inc(n);
-    LoopedExpect(PString(@TestClients[1].ReceivedPublishedMessage)).ToBe(FMsgToPublish, 'Should receive a message of ' + IntToStr(Length(FMsgToPublish)) + ' bytes. Current duration: ' + IntToStr(GetTickCount64 - tk) + 'ms.');
+    try
+      LoopedExpect(PString(@TestClients[1].ReceivedPublishedMessage), Max(3000, ATimeout)).ToBe(FMsgToPublish, 'Should receive a message of ' + IntToStr(Length(FMsgToPublish)) + ' bytes. Current duration: ' + IntToStr(GetTickCount64 - tk) + 'ms.');
+    except
+      on E: Exception do
+      begin
+        MQTTPacketToString(TestClients[1].LatestPacketOnError, PacketName);
+        Expect(E.Message).ToBe('', 'Expected to receive published message at iteration ' + IntToStr(n) + '.  Err = ' + IntToStr(TestClients[1].LatestError) + '  ErrOnPacket: ' + PacketName {$IFDEF UsingDynTFT} + '  FreeMem = ' + IntToStr(MM_TotalFreeMemSize) + 'B.' {$ENDIF});
+      end;
+    end;
   until GetTickCount64 - tk > ATimeout;
 end;
 
@@ -130,21 +147,39 @@ begin
 end;
 
 
-procedure TTestE2EBuiltinClientsStressCase.StressTest_70s_10MB_Qos0;
+procedure TTestE2EBuiltinClientsStressCase.StressTest_10s_7kB_Qos0;
 begin
-  StressTest(0, 70 * 1000, 10 * 1048576);
+  StressTest(0, 10 * 1000, 7 * 1024);
 end;
 
 
-procedure TTestE2EBuiltinClientsStressCase.StressTest_70s_10MB_Qos1;
+procedure TTestE2EBuiltinClientsStressCase.StressTest_10s_7kB_Qos1;
 begin
-  StressTest(1, 70 * 1000, 10 * 1048576);
+  StressTest(1, 10 * 1000, 7 * 1024);
 end;
 
 
-procedure TTestE2EBuiltinClientsStressCase.StressTest_70s_10MB_Qos2;
+procedure TTestE2EBuiltinClientsStressCase.StressTest_10s_7kB_Qos2;
 begin
-  StressTest(2, 70 * 1000, 10 * 1048576);
+  StressTest(2, 10 * 1000, 7 * 1024);
+end;
+
+
+procedure TTestE2EBuiltinClientsStressCase.StressTest_70s_7kB_Qos0;
+begin
+  StressTest(0, 70 * 1000, 7 * 1024);
+end;
+
+
+procedure TTestE2EBuiltinClientsStressCase.StressTest_70s_7kB_Qos1;
+begin
+  StressTest(1, 70 * 1000, 7 * 1024);
+end;
+
+
+procedure TTestE2EBuiltinClientsStressCase.StressTest_70s_7kB_Qos2;
+begin
+  StressTest(2, 70 * 1000, 7 * 1024);
 end;
 
 

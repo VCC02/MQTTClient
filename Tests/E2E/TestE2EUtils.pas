@@ -174,7 +174,11 @@ implementation
 uses
   MQTTClient, MQTTUtils,
   MQTTConnectCtrl, MQTTSubscribeCtrl, MQTTUnsubscribeCtrl,
-  Expectations, ExpectationsDynArrays;
+  Expectations, ExpectationsDynArrays
+  {$IFDEF UsingDynTFT}
+    , MemManager
+  {$ENDIF}
+  ;
 
 
 procedure HandleOnMQTTError(ClientInstance: DWord; AErr: Word; APacketType: Byte);
@@ -536,9 +540,9 @@ var
 begin
   TempClientInstance := ClientInstance and CClientIndexMask;
   QoS := (APublishFields.PublishCtrlFlags shr 1) and 3;
-  Msg := StringReplace(DynArrayOfByteToString(APublishFields.ApplicationMessage), #0, '#0', [rfReplaceAll]);
+  Msg := DynArrayOfByteToString(APublishFields.ApplicationMessage); //StringReplace(DynArrayOfByteToString(APublishFields.ApplicationMessage), #0, '#0', [rfReplaceAll]);
   ID := APublishFields.PacketIdentifier;
-  Topic := StringReplace(DynArrayOfByteToString(APublishFields.TopicName), #0, '#0', [rfReplaceAll]);
+  Topic := DynArrayOfByteToString(APublishFields.TopicName); //StringReplace(DynArrayOfByteToString(APublishFields.TopicName), #0, '#0', [rfReplaceAll]);
 
   TestClients[TempClientInstance].AddToLog('Received PUBLISH  ServerPacketIdentifier: ' + IntToStr(ID) +
                                                  '  Msg: ' + Msg +
@@ -988,6 +992,11 @@ procedure TTestE2EBuiltinClientsMain.SetUp;
 var
   i: Integer;
 begin
+  {$IFDEF UsingDynTFT}
+    MM_Init;
+    //MessageBoxFunction(PChar(IntToStr(HEAP_SIZE)), 'HEAP_SIZE', 0);
+  {$ENDIF}
+
   SetLength(TestClients, 2);
   TestClients[0] := TMQTTTestClient.Create(nil);
   TestClients[1] := TMQTTTestClient.Create(nil);
@@ -995,8 +1004,8 @@ begin
   TestClients[1].ClientIndex := 1;
 
   MQTT_Init;
-  MQTT_CreateClient; //create first client
-  MQTT_CreateClient; //create second client
+  Expect(MQTT_CreateClient).ToBe(True, 'Should create first client.');
+  Expect(MQTT_CreateClient).ToBe(True, 'Should create second client.');
   //Assigning library events should be done after calling MQTT_Init!
   TestClients[0].InitHandlers;
   TestClients[1].InitHandlers;
@@ -1057,36 +1066,41 @@ procedure TTestE2EBuiltinClientsMain.TearDown;
 var
   i: Integer;
 begin
-  Expect(MQTT_DISCONNECT(0, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet.');
-  Expect(MQTT_DISCONNECT(1, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet.');
-  LoopedExpect(@ClientToServerBufEmpty0, 1500).ToBe(True, 'Buffer 0 should be empty.');
-  LoopedExpect(@ClientToServerBufEmpty1, 1500).ToBe(True, 'Buffer 1 should be empty.');
+  {$IFDEF UsingDynTFT}
+    Expect(MM_TotalFreeMemSize).ToBeGreaterThan(1000, 'There is no memory left to disconnect.');
+  {$ENDIF}
+  try
+    Expect(MQTT_DISCONNECT(0, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet. (Client 0)');
+    Expect(MQTT_DISCONNECT(1, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet. (Client 1)');
+    LoopedExpect(@ClientToServerBufEmpty0, 1500).ToBe(True, 'Buffer 0 should be empty.');
+    LoopedExpect(@ClientToServerBufEmpty1, 1500).ToBe(True, 'Buffer 1 should be empty.');
+  finally
+    TestClients[0].tmrProcessRecData.Enabled := False;
+    TestClients[1].tmrProcessRecData.Enabled := False;
 
-  TestClients[0].tmrProcessRecData.Enabled := False;
-  TestClients[1].tmrProcessRecData.Enabled := False;
+    for i := 0 to Length(TestClients) - 1 do
+      Ths[i].Terminate;
 
-  for i := 0 to Length(TestClients) - 1 do
-    Ths[i].Terminate;
+    for i := 0 to Length(TestClients) - 1 do
+    begin
+      LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True, 'Thread ' + IntToStr(i) + ' should be terminated.');
+      FreeAndNil(Ths[i]);
+    end;
 
-  for i := 0 to Length(TestClients) - 1 do
-  begin
-    LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True, 'Thread ' + IntToStr(i) + ' should be terminated.');
-    FreeAndNil(Ths[i]);
+    TestClients[0].IdTCPClientObj.Disconnect(False);
+    TestClients[1].IdTCPClientObj.Disconnect(False);
+
+    MQTT_DestroyClient(1);     //after destroying clients, the value of their ClientIndex property becomes invalid
+    MQTT_DestroyClient(0);
+    MQTT_Done;
+
+    FreeAndNil(TestClients[1]);
+    FreeAndNil(TestClients[0]);
+    SetLength(TestClients, 0);
+
+    SetLength(FSubscribeToTopicNames, 0);
+    SetLength(Ths, 0);
   end;
-
-  TestClients[0].IdTCPClientObj.Disconnect(False);
-  TestClients[1].IdTCPClientObj.Disconnect(False);
-
-  MQTT_DestroyClient(1);     //after destroying clients, the value of their ClientIndex property becomes invalid
-  MQTT_DestroyClient(0);
-  MQTT_Done;
-
-  FreeAndNil(TestClients[1]);
-  FreeAndNil(TestClients[0]);
-  SetLength(TestClients, 0);
-
-  SetLength(FSubscribeToTopicNames, 0);
-  SetLength(Ths, 0);
 end;
 
 

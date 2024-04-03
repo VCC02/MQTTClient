@@ -76,6 +76,10 @@
         <Filename Value="TestBuiltinClientsStressCase.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
+      <Unit>
+        <Filename Value="D:\DynTFT\MemManager.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -86,7 +90,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="..\..\..\MiscUtils;..\..\Lib;.."/>
+      <OtherUnitFiles Value="..\..\..\MiscUtils;..\..\Lib;..;D:\DynTFT\"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)\$(LCLWidgetType)"/>
     </SearchPaths>
     <Linking>
@@ -100,7 +104,11 @@
       <ConfigFile>
         <WriteConfigFilePath Value=""/>
       </ConfigFile>
-      <CustomOptions Value="-d_SkipSendingUnAck"/>
+      <CustomOptions Value="-d_SkipSendingUnAck
+-d_UsingDynTFT
+-dMaxMMAtProjectLevel
+-dConvExMsg
+-dTruncateDiffMsg"/>
     </Other>
   </CompilerOptions>
   <Debugging>
@@ -132,6 +140,9 @@
       </Item>
       <Item>
         <Name Value="EIdNotASocket"/>
+      </Item>
+      <Item>
+        <Name Value="EConvertError"/>
       </Item>
     </Exceptions>
   </Debugging>

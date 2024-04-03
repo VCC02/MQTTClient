@@ -1948,6 +1948,9 @@ begin
   end;
   MQTT_FreeControlPacket(TempReceivedPacket);
 
+  if Result <> CMQTTDecoderNoErr then
+    Exit;
+
   QoS := 4; //some unhandled value
   if Lo(Result) = CMQTTDecoderNoErr then      // Hi(Result) may contain more info about the error, like the error location.
   begin

@@ -28,8 +28,8 @@ program E2ETests;
 
 uses
   Interfaces, Forms, GuiTestRunner, TestBuiltinClientsCase, MQTTTestUtils,
-  DynArrays, Expectations, PollingFIFO, MQTTClient, MQTTUtils, TestE2EUtils,
-  TestBuiltinClientsStressCase;
+  DynArrays, Expectations, PollingFIFO, MemManager, MQTTClient, MQTTUtils,
+  TestE2EUtils, TestBuiltinClientsStressCase;
 
 {$R *.res}
 

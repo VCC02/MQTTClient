@@ -492,9 +492,9 @@ var
   i: Integer;
 begin
   QoS := (APublishFields.PublishCtrlFlags shr 1) and 3;
-  Msg := StringReplace(DynArrayOfByteToString(APublishFields.ApplicationMessage), #0, '#0', [rfReplaceAll]);
+  Msg := DynArrayOfByteToString(APublishFields.ApplicationMessage); //StringReplace(DynArrayOfByteToString(APublishFields.ApplicationMessage), #0, '#0', [rfReplaceAll]);
   ID := APublishFields.PacketIdentifier;
-  Topic := StringReplace(DynArrayOfByteToString(APublishFields.TopicName), #0, '#0', [rfReplaceAll]);
+  Topic := DynArrayOfByteToString(APublishFields.TopicName); //StringReplace(DynArrayOfByteToString(APublishFields.TopicName), #0, '#0', [rfReplaceAll]);
 
   frmMQTTClientAppMain.AddToLog('Received PUBLISH  ServerPacketIdentifier: ' + IntToStr(ID) +
                                                  '  Msg: ' + Msg +

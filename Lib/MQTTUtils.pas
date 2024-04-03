@@ -774,7 +774,10 @@ var
   TempArr: TDynArrayOfByte;
 begin
   InitDynArrayToEmpty(TempArr);
-  SetDynLength(TempArr, 5);
+  Result := SetDynLength(TempArr, 5);
+  if not Result then
+    Exit;
+
   TempArr.Content^[0] := APropertyIdentifier;
 
   TempDWord := AProperty;
@@ -800,7 +803,10 @@ var
   TempArr: TDynArrayOfByte;
 begin
   InitDynArrayToEmpty(TempArr);
-  SetDynLength(TempArr, 3);
+  Result := SetDynLength(TempArr, 3);
+  if not Result then
+    Exit;
+
   TempArr.Content^[0] := APropertyIdentifier;
 
   TempWord := AProperty;
@@ -820,7 +826,9 @@ var
   TempArr: TDynArrayOfByte;
 begin
   InitDynArrayToEmpty(TempArr);
-  SetDynLength(TempArr, 2);
+  Result := SetDynLength(TempArr, 2);
+  if not Result then
+    Exit;
 
   TempWord := AProperty;
   TempArr.Content^[1] := TempWord and $FF;
@@ -838,7 +846,10 @@ var
   TempArr: TDynArrayOfByte;
 begin
   InitDynArrayToEmpty(TempArr);
-  SetDynLength(TempArr, 2);
+  Result := SetDynLength(TempArr, 2);
+  if not Result then
+    Exit;
+
   TempArr.Content^[0] := APropertyIdentifier;
   TempArr.Content^[1] := AProperty;
 
@@ -853,7 +864,10 @@ var
   i: Integer;
 begin
   InitDynArrayToEmpty(TempArr);
-  SetDynLength(TempArr, 1 + APropertyLen);
+  Result := SetDynLength(TempArr, 1 + APropertyLen);
+  if not Result then
+    Exit;
+
   TempArr.Content^[0] := APropertyIdentifier;
 
   for i := 0 to Integer(APropertyLen) - 1 do
@@ -870,7 +884,9 @@ var
   i: Integer;
 begin
   InitDynArrayToEmpty(TempArr);
-  SetDynLength(TempArr, APropertyLen);
+  Result := SetDynLength(TempArr, APropertyLen);
+  if not Result then
+    Exit;
 
   for i := 0 to Integer(APropertyLen) - 1 do
     TempArr.Content^[i] := AProperty[i];
@@ -919,7 +935,10 @@ var
   TempWord: Word;
 begin
   InitDynArrayToEmpty(TempArr);
-  SetDynLength(TempArr, 3);    //one byte for identifier, two bytes for data length
+  Result := SetDynLength(TempArr, 3);    //one byte for identifier, two bytes for data length
+  if not Result then
+    Exit;
+
   TempArr.Content^[0] := APropertyIdentifier;
 
   TempWord := AProperty.Len;
@@ -940,7 +959,9 @@ var
   TempWord: Word;
 begin
   InitDynArrayToEmpty(TempArr);
-  SetDynLength(TempArr, 2);    //two bytes for data length
+  Result := SetDynLength(TempArr, 2);    //two bytes for data length
+  if not Result then
+    Exit;
 
   TempWord := AProperty.Len;
   TempArr.Content^[1] := TempWord and $FF;
@@ -965,6 +986,9 @@ begin
   OldLength := AVarHeader.Len;
   TempLen := Length(AProperty);
   Result := SetDynLength(AVarHeader, OldLength + DWord(TempLen) + 3);
+  if not Result then
+    Exit;
+
   AVarHeader.Content^[OldLength] := APropertyIdentifier;
 
   AVarHeader.Content^[OldLength + 2] := TempLen and $FF;
@@ -984,6 +1008,8 @@ begin
   OldLength := AVarHeader.Len;
   TempLen := Length(AProperty);
   Result := SetDynLength(AVarHeader, OldLength + DWord(TempLen) + 2);
+  if not Result then
+    Exit;
 
   AVarHeader.Content^[OldLength + 1] := TempLen and $FF;
   TempLen := TempLen shr 8;
