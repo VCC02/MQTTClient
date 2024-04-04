@@ -236,7 +236,7 @@ function MQTT_GetClientToServerResendBuffer(ClientInstance: DWord; var AErr: Wor
 function MQTT_GetServerToClientBuffer(ClientInstance: DWord; var AErr: Word): PMQTTBuffer;  //Err is 0 for success
 
 function MQTT_Process(ClientInstance: DWord): Word; //Should be called in the main loop (not necessarily at every iteration), to do packet processing and trigger events. It should be called for every client. If it returns OutOfMemory, then the application has to be adjusted to call MQTT_Process more often and/or reserve more heap memory for MQTT library.
-function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
+function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called. It outputs the APacketSize value as computed by a decoder function (when GetValidPacketSize is defined).
 
 function MQTT_PutReceivedBufferToMQTTLib(ClientInstance: DWord; var ABuffer: TDynArrayOfByte): Boolean; //Should be called by user code, after receiving data from server. When a valid packet is formed, the MQTT library will process it and call the decoded event.
 function MQTT_CreateClientToServerPacketIdentifier(ClientInstance: DWord): Word;
@@ -356,6 +356,7 @@ const
   CMQTT_CannotReserveBadSubscriptionIdentifier = 213; //The library cannot preallocate the value 0 (which is a current limitation of DynArrays lib).
   CMQTT_CannotReserveBadPacketIdentifier = 214; //see 213
   CMQTT_PacketIdentifierNotFound_ClientToServerResend = 215;
+  CMQTT_UserError = 216; //may be used to directly call HandleOnMQTTError in user code, for debugging purposes
 
 
   //The following values are start values for various identifiers. The allocated identifiers are incremented by the library (if required) on every new allocation.
@@ -2467,15 +2468,18 @@ begin
 end;
 
 
-function DummyValidPacketLength(var ABuffer: TDynArrayOfByte): Word;
+function DummyValidPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
 begin
   Result := CMQTTDecoderBadCtrlPacket;
+  {$IFDEF GetValidPacketSize}
+    APacketSize := 0;
+  {$ENDIF}
 end;
 
 
 type
   TMQTTProcessPacket = function(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
-  TMQTTValidPacketLength = function(var ABuffer: TDynArrayOfByte): Word;
+  TMQTTValidPacketLength = function(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
 
   {$IFnDEF IsDesktop}
     PMQTTProcessPacket = ^TMQTTProcessPacket;
@@ -2554,7 +2558,14 @@ begin
     Result := CPacketProcessor[(PacketType shr 4) and $0F](ClientInstance, BufferPointer^, SizeToFree);
 
     if Lo(Result) = CMQTTDecoderNoErr then
-      RemoveStartBytesFromDynArray(SizeToFree, BufferPointer^) //Delete the entire CONNACK packet from ABuffer.
+    begin
+      if not RemoveStartBytesFromDynArray(SizeToFree, BufferPointer^) then //Delete the entire processed packet from ABuffer.
+      begin
+        Result := CMQTT_OutOfMemory + $A shl 8;             //ToDo $A should be defined as constant (error location MQTT_Process)  200 + 11 + 2560 = 2771
+        DoOnMQTTError(ClientInstance, Result, PacketType);
+        Break;
+      end;
+    end
     else
       DoOnMQTTError(ClientInstance, Result, PacketType);
 
@@ -2566,14 +2577,14 @@ begin
 end;
 
 
-function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
+function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
 var
   PacketType: Byte;
 begin
   Result := CMQTT_Success;
 
   PacketType := ABuffer.Content^[0];
-  Result := CPacketLengthValidator[(PacketType shr 4) and $0F](ABuffer);
+  Result := CPacketLengthValidator[(PacketType shr 4) and $0F](ABuffer {$IFDEF GetValidPacketSize}, APacketSize{$ENDIF});
 end;
 
 

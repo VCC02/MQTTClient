@@ -106,7 +106,9 @@
       </ConfigFile>
       <CustomOptions Value="-d_SkipSendingUnAck
 -d_UsingDynTFT
+-dGetValidPacketSize
 -dMaxMMAtProjectLevel
+-dMMFreeBlocks
 -dConvExMsg
 -dTruncateDiffMsg"/>
     </Other>

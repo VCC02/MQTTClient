@@ -45,7 +45,7 @@ function FillIn_Publish(var APublishFields: TMQTTPublishFields;
                         var APublishProperties: TMQTTPublishProperties;
                         var ADestPacket: TMQTTControlPacket): Boolean;
 
-function Valid_PublishPacketLength(var ABuffer: TDynArrayOfByte): Word;
+function Valid_PublishPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
 function Decode_PublishToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
 function Decode_Publish(var AReceivedPacket: TMQTTControlPacket;
                         var APublishFields: TMQTTPublishFields;
@@ -239,7 +239,7 @@ begin
 end;
 
 
-function Valid_PublishPacketLength(var ABuffer: TDynArrayOfByte): Word;
+function Valid_PublishPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
 var
   DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen: DWord;
 begin
@@ -247,6 +247,10 @@ begin
   if Result = CMQTTDecoderNoErr then
     if ABuffer.Len < DecodedBufferLen then
       Result := CMQTTDecoderIncompleteBuffer;
+
+  {$IFDEF GetValidPacketSize}
+    APacketSize := DecodedBufferLen;
+  {$ENDIF}
 end;
 
 

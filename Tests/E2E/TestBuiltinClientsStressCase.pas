@@ -75,38 +75,66 @@ uses
 
 procedure TTestE2EBuiltinClientsStressCase.StressTest(AQoS: Byte; ATimeout: Integer = 10 * 1000; AMinDataSize: Integer = 500);  //ms
 var
-  tk: QWord;
+  tk, tk2: QWord;
   i, n: Integer;
-  PacketName: string;
+  PacketName, s: string;
+  Durations: array of Integer;
 begin
   Randomize;
   TestPublish_Client0ToClient1_HappyFlow_SendSubscribe;
 
   n := 0;
+  SetLength(Durations, 0);
   tk := GetTickCount64;
   repeat
     SetLength(FMsgToPublish, AMinDataSize + Random(16));
     for i := 1 to Length(FMsgToPublish) do
-      FMsgToPublish[i] := Chr(Random(256));  //hopefully, this content does not affect test result
+      FMsgToPublish[i] := Chr(1 + Random(255));  //hopefully, this content does not affect test result
 
-    TestClients[1].ReceivedPublishedMessage := '-'; //clear before receiving a new one
+    FMsgToPublish := IntToStr(n) + '//' + FMsgToPublish;
+
+    TestClients[1].ReceivedPublishedMessage := IntToStr(n) + '\\-'; //clear before receiving a new one
     try
       TestPublish_Client0ToClient1_HappyFlow_SendPublish(AQoS, FMsgToPublish);
     except
       on E: Exception do
-        Expect(E.Message).ToBe('', 'Expected successful publish call at iteration ' + IntToStr(n));
+        Expect(E.Message).ToBe('NoEx', 'Expected successful publish call at iteration ' + IntToStr(n));
     end;
 
-    Inc(n);
     try
-      LoopedExpect(PString(@TestClients[1].ReceivedPublishedMessage), Max(3000, ATimeout)).ToBe(FMsgToPublish, 'Should receive a message of ' + IntToStr(Length(FMsgToPublish)) + ' bytes. Current duration: ' + IntToStr(GetTickCount64 - tk) + 'ms.');
+      tk2 := GetTickCount64;
+      try
+        LoopedExpect(PString(@TestClients[1].ReceivedPublishedMessage), Max(3000, ATimeout - 1000)).ToBe(FMsgToPublish, 'Should receive a message of ' + IntToStr(Length(FMsgToPublish)) + ' bytes.');
+      finally
+        SetLength(Durations, Length(Durations) + 1);
+        Durations[Length(Durations) - 1] := GetTickCount64 - tk2;
+      end;
     except
       on E: Exception do
       begin
+        s := '';
+        for i := 0 to Length(Durations) - 1 do
+          s := s + 'D[' + IntToStr(i) + ']=' + IntToStr(Durations[i]) + ' ';
+
         MQTTPacketToString(TestClients[1].LatestPacketOnError, PacketName);
-        Expect(E.Message).ToBe('', 'Expected to receive published message at iteration ' + IntToStr(n) + '.  Err = ' + IntToStr(TestClients[1].LatestError) + '  ErrOnPacket: ' + PacketName {$IFDEF UsingDynTFT} + '  FreeMem = ' + IntToStr(MM_TotalFreeMemSize) + 'B.' {$ENDIF});
+        PacketName := PacketName + ' (#' + IntToStr(TestClients[1].LatestPacketOnError) + ')';
+        raise Exception.Create('Should receive published message at iteration ' + IntToStr(n) +
+                               '.  Err = ' + IntToStr(TestClients[1].LatestError) +
+                               '  ErrOnPacket: ' + PacketName +
+                               '  Current duration: ' + IntToStr(GetTickCount64 - tk) + 'ms.' +
+                               '  Available time left: ' + IntToStr(ATimeout - (GetTickCount64 - tk)) + 'ms.' +
+                               {$IFDEF UsingDynTFT}
+                                 '  FreeMem = ' + IntToStr(MM_TotalFreeMemSize) + 'B.' +
+                                 '  LargestFreeBlock = ' + IntToStr(MM_LargestFreeMemBlock) + 'B.' +
+                               {$ENDIF}
+                               '  Ex: "' + E.Message + '".' +
+                               '  Current message length: ' + IntToStr(Length(TestClients[1].ReceivedPublishedMessage)) + 'B.' +
+                               '  Durations: ' + s
+                               );
       end;
     end;
+
+    Inc(n);
   until GetTickCount64 - tk > ATimeout;
 end;
 

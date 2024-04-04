@@ -935,6 +935,12 @@ var
   TempReadBuf: TDynArrayOfByte;
   TempByte: Byte;
   PacketName: string;
+  {$IFDEF GetValidPacketSize}
+    PacketSize: DWord;
+    //RemainingTempReadBuf: TDynArrayOfByte;
+    //TempArr: TIdBytes;
+  {$ENDIF}
+  SuccessfullyDecoded: Boolean;
 begin
   try
     InitDynArrayToEmpty(TempReadBuf);
@@ -945,18 +951,41 @@ begin
           if FAllowExecution then
           begin
             TempByte := FClient.IdTCPClientObj.IOHandler.ReadByte;
-            AddByteToDynArray(TempByte, TempReadBuf);
-
-            if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
+            if not AddByteToDynArray(TempByte, TempReadBuf) then
             begin
-              MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
-              AddToLog('done receiving packet');
-              AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
+              HandleOnMQTTError(FClient.ClientIndex, CMQTT_UserError, CMQTT_UNDEFINED);
+              AddToLog('Cannot allocate buffer when reading. TempReadBuf.Len = ' + IntToStr(TempReadBuf.Len));
+              MessageBoxFunction('Cannot allocate buffer when reading.', 'th_', 0);
+              FreeDynArray(TempReadBuf);
+            end
+            else
+            begin
+              SuccessfullyDecoded := True;                                         //PacketSize should be the expected size, which can be greater than TempReadBuf.Len
+              if MQTT_ProcessBufferLength(TempReadBuf {$IFDEF GetValidPacketSize}, PacketSize{$ENDIF}) <> CMQTTDecoderNoErr then
+              begin
+                SuccessfullyDecoded := False;
 
-              FClient.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+                {$IFDEF GetValidPacketSize}
 
-              FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
-              Sleep(1);
+                {$ENDIF}
+              end;
+
+              if SuccessfullyDecoded then
+              begin
+                {$IFDEF GetValidPacketSize}
+                  if PacketSize <> TempReadBuf.Len then
+                    MessageBoxFunction(PChar('incomplete packet' + #13#10 + 'PacketSize = ' + IntToStr(PacketSize) + #13#10 + 'Read buffer = ' + IntToStr(TempReadBuf.Len)), 'th_', 0);
+                {$ENDIF}
+
+                MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
+                AddToLog('done receiving packet');
+                AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
+
+                FClient.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+
+                FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
+                Sleep(1);
+              end; //SuccessfullyDecoded
             end;
           end
           else

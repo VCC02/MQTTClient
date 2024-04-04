@@ -40,7 +40,7 @@ uses
   DynArrays, MQTTUtils;
 
 
-function Valid_PingRespPacketLength(var ABuffer: TDynArrayOfByte): Word;
+function Valid_PingRespPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
   //no properties
 //input args: ABuffer
 //output args: ADestPacket, AErr
@@ -73,12 +73,16 @@ begin
 end;
 
 
-function Valid_PingRespPacketLength(var ABuffer: TDynArrayOfByte): Word;
+function Valid_PingRespPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
 begin
   Result := Decode_PingRespPacketLength(ABuffer);
   if Result = CMQTTDecoderNoErr then
     if ABuffer.Len < 2 {DecodedBufferLen} then
       Result := CMQTTDecoderIncompleteBuffer;
+
+  {$IFDEF GetValidPacketSize}
+    APacketSize := 2;
+  {$ENDIF}
 end;
 
 
