@@ -30,7 +30,7 @@ uses
   Interfaces, Forms, GuiTestRunner, TestProtocolConnectCase, MQTTClient,
   MQTTUtils, MQTTConnectCtrl, MQTTPublishCtrl, MQTTPubAckCtrl, MQTTPubRelCtrl,
   MQTTPubCompCtrl, MQTTSubscribeCtrl, DynArrays, Expectations,
-  TestProtocolConnAckCase, ExpectationsDynArrays,
+  TestProtocolConnAckCase, ExpectationsDynArrays, MemManager,
   TestProtocolPublishClientToServer, TestProtocolPublishServerToClient,
   TestProtocolPubAckCase, MQTTTestUtils, TestProtocolSubscribeCase, 
   TestProtocolUnsubscribeCase;

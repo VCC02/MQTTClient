@@ -801,7 +801,13 @@ begin
       repeat
         //try
         //  TempByte := frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadByte;
-        //  AddByteToDynArray(TempByte, TempReadBuf);
+        //  if not AddByteToDynArray(TempByte, TempReadBuf) then
+        //  begin
+        //    HandleOnMQTTError(0, CMQTT_UserError, CMQTT_UNDEFINED);
+        //    AddToLog('Cannot allocate buffer when reading. TempReadBuf.Len = ' + IntToStr(TempReadBuf.Len));
+        //    MessageBoxFunction('Cannot allocate buffer when reading.', 'th_', 0);
+        //    FreeDynArray(TempReadBuf);
+        //  end;
         //except
         //  on E: Exception do      ////////////////// ToDo: switch to EIdReadTimeout
         //  begin
@@ -831,18 +837,27 @@ begin
 
         try
           TempByte := frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadByte;
-          AddByteToDynArray(TempByte, TempReadBuf);
-
-          if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
+          if not AddByteToDynArray(TempByte, TempReadBuf) then
           begin
-            MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
-            AddToLog('done receiving packet');
-            AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
+            HandleOnMQTTError(0, CMQTT_UserError, CMQTT_UNDEFINED);
+            AddToLog('Cannot allocate buffer when reading. TempReadBuf.Len = ' + IntToStr(TempReadBuf.Len));
+            MessageBoxFunction('Cannot allocate buffer when reading.', 'th_', 0);
+            FreeDynArray(TempReadBuf);
+          end
+          else
+          begin
+            if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
+            begin
+              MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
+              AddToLog('done receiving packet');
+              AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
 
-            frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+              frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
 
-            FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
-            Sleep(1);
+              FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
+              Sleep(1);
+            end;
+
           end;
         except
         end;
@@ -1133,7 +1148,14 @@ end;
 procedure TfrmMQTTClientAppMain.HandleClientOnDisconnected(Sender: TObject);
 begin
   AddToLog('Disconnected from broker...');
-  Th.Terminate;
+
+  try
+    if Th <> nil then
+      Th.Terminate;
+
+    FreeAndNil(Th);
+  except
+  end;
 end;
 
 

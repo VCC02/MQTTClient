@@ -712,8 +712,11 @@ procedure MQTT_FreeAuthProperties(var AProperties: TMQTTAuthProperties);
   function CompareMem(AP1, AP2: PByte; ALength: LongInt): Boolean;
 {$ENDIF}
 
-procedure MQTTPacketToString(APacketType: Byte; var AResult: string {$IFnDEF IsDesktop}[12]{$ENDIF});
+procedure MQTTPacketToString(APacketType: Byte; var AResult: string {$IFnDEF IsDesktop}[12]{$ENDIF}); {$IFDEF IsDesktop} overload; {$ENDIF}
 
+{$IFDEF IsDesktop}
+  function MQTTPacketToString(APacketType: Byte): string; overload;
+{$ENDIF}
 
 implementation
 
@@ -1459,5 +1462,14 @@ begin
     CMQTT_AUTH : AResult := 'AUTH'; //15
   end;
 end;
+
+
+{$IFDEF IsDesktop}
+  function MQTTPacketToString(APacketType: Byte): string;
+  begin
+    Result := 'UNKNOWN';
+    MQTTPacketToString(APacketType, Result);
+  end;
+{$ENDIF}
 
 end.

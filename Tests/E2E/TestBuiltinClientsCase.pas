@@ -170,7 +170,7 @@ end;
 
 const
   CMsg1 = 'First content';
-  CMsg2 = 'Second content';
+  CMsg2 = 'Second content_and_more';
 
 
 procedure TTestE2EBuiltinClientsCase.TestPublish_Client0ToClient1_HappyFlow_MultiPacket_QoS0;

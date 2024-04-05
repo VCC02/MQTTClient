@@ -236,7 +236,7 @@ function MQTT_GetClientToServerResendBuffer(ClientInstance: DWord; var AErr: Wor
 function MQTT_GetServerToClientBuffer(ClientInstance: DWord; var AErr: Word): PMQTTBuffer;  //Err is 0 for success
 
 function MQTT_Process(ClientInstance: DWord): Word; //Should be called in the main loop (not necessarily at every iteration), to do packet processing and trigger events. It should be called for every client. If it returns OutOfMemory, then the application has to be adjusted to call MQTT_Process more often and/or reserve more heap memory for MQTT library.
-function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called. It outputs the APacketSize value as computed by a decoder function (when GetValidPacketSize is defined).
+function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte{; var ATotalSizeToFree: TDynArrayLength} {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called. It outputs the APacketSize value as computed by a decoder function (when GetValidPacketSize is defined).
 
 function MQTT_PutReceivedBufferToMQTTLib(ClientInstance: DWord; var ABuffer: TDynArrayOfByte): Boolean; //Should be called by user code, after receiving data from server. When a valid packet is formed, the MQTT library will process it and call the decoded event.
 function MQTT_CreateClientToServerPacketIdentifier(ClientInstance: DWord): Word;
@@ -2559,7 +2559,7 @@ begin
 
     if Lo(Result) = CMQTTDecoderNoErr then
     begin
-      if not RemoveStartBytesFromDynArray(SizeToFree, BufferPointer^) then //Delete the entire processed packet from ABuffer.
+      if not RemoveStartBytesFromDynArray(SizeToFree, BufferPointer^) then //Delete the entire processed packet from ServerToClientBuffer.Content^[ClientInstance].
       begin
         Result := CMQTT_OutOfMemory + $A shl 8;             //ToDo $A should be defined as constant (error location MQTT_Process)  200 + 11 + 2560 = 2771
         DoOnMQTTError(ClientInstance, Result, PacketType);
@@ -2577,7 +2577,7 @@ begin
 end;
 
 
-function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
+function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte{; var ATotalSizeToFree: TDynArrayLength} {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
 var
   PacketType: Byte;
 begin
@@ -2585,6 +2585,11 @@ begin
 
   PacketType := ABuffer.Content^[0];
   Result := CPacketLengthValidator[(PacketType shr 4) and $0F](ABuffer {$IFDEF GetValidPacketSize}, APacketSize{$ENDIF});
+
+  //ToDo:
+  //implement a while loop, similar to that from above code, to compute ATotalSizeToFree
+  //on every iteration, it should decode valid packets, then increment ATotalSizeToFree as:
+  //ATotalSizeToFree := ATotalSizeToFree + APacketSize;
 end;
 
 
