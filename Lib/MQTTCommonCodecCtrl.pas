@@ -47,7 +47,7 @@ function FillIn_Common(var ACommonFields: TMQTTCommonFields;
                        var ADestPacket: TMQTTControlPacket): Boolean;
 
 
-function Valid_CommonPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function Valid_CommonPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 //input args: ABuffer
 //output args: ADestPacket, AErr
 function Decode_CommonToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
@@ -193,7 +193,7 @@ begin
 end;
 
 
-function Valid_CommonPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function Valid_CommonPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 var
   DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
 begin
@@ -202,9 +202,7 @@ begin
     if ABuffer.Len < DecodedBufferLen then
       Result := CMQTTDecoderIncompleteBuffer;
 
-  {$IFDEF GetValidPacketSize}
-    APacketSize := DecodedBufferLen;
-  {$ENDIF}
+  APacketSize := DecodedBufferLen;
 end;
 
 

@@ -47,7 +47,7 @@ function FillIn_Disconnect(var ADisconnectFields: TMQTTDisconnectFields;
 
 
 function Decode_DisconnectProperties(var AVarHeader: TDynArrayOfByte; APropertiesOffset, APropertyLen: DWord; var ADisconnectProperties: TMQTTDisconnectProperties; var AEnabledProperties: Word): Boolean;
-function Valid_DisconnectPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function Valid_DisconnectPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 
 //input args: ABuffer
 //output args: ADestPacket
@@ -275,7 +275,7 @@ begin
 end;
 
 
-function Valid_DisconnectPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function Valid_DisconnectPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 var
   DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
 begin
@@ -284,9 +284,7 @@ begin
     if ABuffer.Len < DecodedBufferLen then
       Result := CMQTTDecoderIncompleteBuffer;
 
-  {$IFDEF GetValidPacketSize}
-    APacketSize := DecodedBufferLen;
-  {$ENDIF}
+  APacketSize := DecodedBufferLen;
 end;
 
 

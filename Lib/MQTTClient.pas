@@ -236,7 +236,7 @@ function MQTT_GetClientToServerResendBuffer(ClientInstance: DWord; var AErr: Wor
 function MQTT_GetServerToClientBuffer(ClientInstance: DWord; var AErr: Word): PMQTTBuffer;  //Err is 0 for success
 
 function MQTT_Process(ClientInstance: DWord): Word; //Should be called in the main loop (not necessarily at every iteration), to do packet processing and trigger events. It should be called for every client. If it returns OutOfMemory, then the application has to be adjusted to call MQTT_Process more often and/or reserve more heap memory for MQTT library.
-function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte{; var ATotalSizeToFree: TDynArrayLength} {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called. It outputs the APacketSize value as computed by a decoder function (when GetValidPacketSize is defined).
+function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called. It outputs the APacketSize value as computed by a decoder function.
 
 function MQTT_PutReceivedBufferToMQTTLib(ClientInstance: DWord; var ABuffer: TDynArrayOfByte): Boolean; //Should be called by user code, after receiving data from server. When a valid packet is formed, the MQTT library will process it and call the decoded event.
 function MQTT_CreateClientToServerPacketIdentifier(ClientInstance: DWord): Word;
@@ -1714,7 +1714,7 @@ begin
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddPUBResponse_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APubAckFields, APubAckProperties);
+    Result := AddPUBResponse_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APubAckFields, APubAckProperties, APacketType, False);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
@@ -1759,7 +1759,7 @@ begin
 
       //The library assumes that the user code calls CreateClientToServerSubscriptionIdentifier in OnBeforeSendingMQTT_SUBSCRIBE handler.
     end;
-    {$ENDIF}
+  {$ENDIF}
 end;
 
 
@@ -1902,7 +1902,12 @@ begin
     begin
       ResendBuffItemCountM1 := ClientToServerResendBuffer.Content^[TempClientInstance]^.Len - 1;
       for i := 0 to ResendBuffItemCountM1 do
-        MQTT_RemovePacketFromClientToServerResendBufferByIndex(TempClientInstance, 0);
+        if not MQTT_RemovePacketFromClientToServerResendBufferByIndex(TempClientInstance, 0) then
+        begin
+          DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_CONNACK);
+          MQTT_FreeConnAckProperties(TempConnAckProperties);
+          Exit;
+        end;
     end;
   end;
 
@@ -2086,15 +2091,16 @@ begin
             DoOnAfterReceiving_MQTT_PUBCOMP(ClientInstance, TempCommonFields, TempCommonProperties, Err); //Not mandatory
       end;
 
-      MQTT_RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx);
-
-      if PacketIdentifierIdxInResend <> -1 then
-      begin
-        if not MQTT_RemovePacketFromClientToServerResendBufferByIndex(ClientInstance, PacketIdentifierIdxInResend) then
-          Result := CMQTT_OutOfMemory;
-      end
+      if not MQTT_RemoveClientToServerPacketIdentifierByIndex(ClientInstance, PacketIdentifierIdx) then
+        Result := CMQTT_OutOfMemory
       else
-        DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServerResend, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
+        if PacketIdentifierIdxInResend <> -1 then
+        begin
+          if not MQTT_RemovePacketFromClientToServerResendBufferByIndex(ClientInstance, PacketIdentifierIdxInResend) then
+            Result := CMQTT_OutOfMemory;
+        end
+        else
+          DoOnMQTTError(TempClientInstance, CMQTT_PacketIdentifierNotFound_ClientToServerResend, APacketType) //calling the event with APacketType, because this is Process_PUBACK_OR_PUBCOMP
     end;  //PacketIdentifierIdx <> -1
 
     FreeDynArray(TempCommonFields.SrcPayload);
@@ -2434,6 +2440,8 @@ begin
   begin
     MQTT_InitDisconnectProperties(TempDisconnectProperties);
     Result := Decode_Disconnect(TempReceivedPacket, TempDisconnectFields, TempDisconnectProperties);
+    if Result <> CMQTT_Success then
+      DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_DISCONNECT);
 
     DoOnAfterReceiving_MQTT_DISCONNECT(ClientInstance, TempDisconnectFields, TempDisconnectProperties, Err);
     MQTT_FreeDisconnectProperties(TempDisconnectProperties);
@@ -2459,6 +2467,8 @@ begin
   begin
     MQTT_InitAuthProperties(TempAuthProperties);
     Result := Decode_Auth(TempReceivedPacket, TempAuthFields, TempAuthProperties);
+    if Result <> CMQTT_Success then
+      DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_AUTH);
 
     DoOnAfterReceiving_MQTT_AUTH(ClientInstance, TempAuthFields, TempAuthProperties, Err);
     MQTT_FreeAuthProperties(TempAuthProperties);
@@ -2468,18 +2478,16 @@ begin
 end;
 
 
-function DummyValidPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function DummyValidPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 begin
   Result := CMQTTDecoderBadCtrlPacket;
-  {$IFDEF GetValidPacketSize}
-    APacketSize := 0;
-  {$ENDIF}
+  APacketSize := 0;
 end;
 
 
 type
   TMQTTProcessPacket = function(ClientInstance: DWord; var ABuffer: TDynArrayOfByte; var ASizeToFree: DWord): Word;
-  TMQTTValidPacketLength = function(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+  TMQTTValidPacketLength = function(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 
   {$IFnDEF IsDesktop}
     PMQTTProcessPacket = ^TMQTTProcessPacket;
@@ -2577,14 +2585,14 @@ begin
 end;
 
 
-function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte{; var ATotalSizeToFree: TDynArrayLength} {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
+function MQTT_ProcessBufferLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word; //verifies if the buffer starts with a valid packet, so that MQTT_Process can be called
 var
   PacketType: Byte;
 begin
   Result := CMQTT_Success;
 
   PacketType := ABuffer.Content^[0];
-  Result := CPacketLengthValidator[(PacketType shr 4) and $0F](ABuffer {$IFDEF GetValidPacketSize}, APacketSize{$ENDIF});
+  Result := CPacketLengthValidator[(PacketType shr 4) and $0F](ABuffer, APacketSize);
 
   //ToDo:
   //implement a while loop, similar to that from above code, to compute ATotalSizeToFree

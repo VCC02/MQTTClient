@@ -38,7 +38,7 @@ interface
 uses
   Classes, SysUtils, Forms, ExtCtrls,
   fpcunit, testregistry, IdGlobal, IdTCPClient,
-  DynArrays, PollingFIFO;
+  DynArrays, DynArrayFIFO;
 
 
 type
@@ -46,7 +46,7 @@ type
   private
     FClientIndex: Integer;
     FIdTCPClientObj: TIdTCPClient;
-    FRecBufFIFO: TPollingFIFO; //used by the reading thread to pass data to MQTT library
+    FRecBufFIFO: TDynArrayOfByteFIFO; //used by the reading thread to pass data to MQTT library
     tmrProcessRecData: TTimer;
     FMQTTUsername: string;
     FMQTTPassword: string;
@@ -176,7 +176,7 @@ implementation
 uses
   MQTTClient, MQTTUtils,
   MQTTConnectCtrl, MQTTSubscribeCtrl, MQTTUnsubscribeCtrl,
-  Expectations, ExpectationsDynArrays
+  Expectations, ExpectationsDynArrays, E2ETestsUserLoggingForm
   {$IFDEF UsingDynTFT}
     , MemManager
   {$ENDIF}
@@ -204,6 +204,9 @@ begin
 
   if Lo(AErr) = CMQTT_UnhandledPacketType then   // $CA
     TestClients[TempClientInstance].AddToLog('Client error: UnhandledPacketType.');  //Usually appears when an incomplete packet is received, so the packet type by is 0.
+
+  if Lo(AErr) in [CMQTT_ReceiveMaximumExceeded, CMQTT_ReceiveMaximumReset] then   //maybe the server
+    MessageBoxFunction(PChar(IntToStr(AErr)), 'CMQTT_ReceiveMaximum', 0);
 
   TestClients[TempClientInstance].FLatestError := AErr;
   TestClients[TempClientInstance].FLatestPacketOnError := APacketType;
@@ -479,7 +482,7 @@ begin
   TempClientInstance := ClientInstance and CClientIndexMask;
 
   QoS := (APublishFields.PublishCtrlFlags shr 1) and 3;
-  TestClients[TempClientInstance].AddToLog('Publishing "' + FMsgToPublish + '" at QoS = ' + IntToStr(QoS));
+  TestClients[TempClientInstance].AddToLog('Publishing (truncated) "' + Copy(FMsgToPublish, 1, 25) + '" at QoS = ' + IntToStr(QoS));
 
   Result := Result and StringToDynArrayOfByte(FMsgToPublish, APublishFields.ApplicationMessage);
   Result := Result and StringToDynArrayOfByte(FTopicNameToPublish, APublishFields.TopicName);
@@ -547,7 +550,7 @@ begin
   Topic := DynArrayOfByteToString(APublishFields.TopicName); //StringReplace(DynArrayOfByteToString(APublishFields.TopicName), #0, '#0', [rfReplaceAll]);
 
   TestClients[TempClientInstance].AddToLog('Received PUBLISH  ServerPacketIdentifier: ' + IntToStr(ID) +
-                                                 '  Msg: ' + Msg +
+                                                 '  Msg (truncated): ' + Copy(Msg, 1, 25) +
                                                  '  QoS: ' + IntToStr(QoS) +
                                                  '  TopicName: ' + Topic);
 
@@ -712,10 +715,28 @@ begin
 end;
 
 
+
+{$IFDEF IsDesktop}
+  {$IFDEF UsingDynTFT}
+    {$IFDEF LogMem}
+      procedure HandleOnAfterGetMem(ARequestedSize: DWord);
+      begin
+        AddToUserLog(DateTimeToStr(Now) + '(' + IntToStr(GetTickCount64) + ') [GetMem]: Req = ' + IntToStr(ARequestedSize) + ' UsedBlocks: ' + IntToStr(MM_GetNrFreeBlocksUsed)); //MM_GetNrFreeBlocksUsed is a function, declared in MemManager.pas, which returns MM_NrFreeBlocksUsed.
+      end;
+
+      procedure HandleOnAfterFreeMem(ARequestedSize: DWord);
+      begin
+        AddToUserLog(DateTimeToStr(Now) + '(' + IntToStr(GetTickCount64) + ') [FreeMem]: Req = ' + IntToStr(ARequestedSize) + ' UsedBlocks: ' + IntToStr(MM_GetNrFreeBlocksUsed));
+      end;
+    {$ENDIF}
+  {$ENDIF}
+{$ENDIF}
+
+
 constructor TMQTTTestClient.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FRecBufFIFO := TPollingFIFO.Create;
+  FRecBufFIFO := TDynArrayOfByteFIFO.Create;
   FIdTCPClientObj := TIdTCPClient.Create(Self);
   FIdTCPClientObj.OnConnected := @HandleClientOnConnected;
   FIdTCPClientObj.OnDisconnected := @HandleClientOnDisconnected;
@@ -772,7 +793,7 @@ end;
 
 procedure TMQTTTestClient.AddToLog(s: string);
 begin
-  //
+  AddToUserLog(DateTimeToStr(Now) + '(' + IntToStr(GetTickCount64) + ') [Client ' + IntToStr(FClientIndex) + ']: ' + s);
 end;
 
 
@@ -791,7 +812,7 @@ end;
 
 procedure TMQTTTestClient.SyncReceivedBuffer(var AReadBuf: TDynArrayOfByte); //thread safe
 begin
-  FRecBufFIFO.Put(DynArrayOfByteToString(AReadBuf));
+  FRecBufFIFO.Put(AReadBuf);
 end;
 
 
@@ -801,15 +822,19 @@ var
   NewData: string;
   Allow: Boolean;
   PacketType: Byte;
+  ErrMsg: string;
 begin
-  if FRecBufFIFO.Pop(NewData) then
+  //InitDynArrayToEmpty(TempReadBuf);
+
+  if FRecBufFIFO.Pop(TempReadBuf) then
   begin
+    NewData := DynArrayOfByteToString(TempReadBuf);
+
     SetLength(FAllReceivedPackets, Length(FAllReceivedPackets) + 1);
     FAllReceivedPackets[Length(FAllReceivedPackets) - 1] := NewData;
 
-    InitDynArrayToEmpty(TempReadBuf);
     try
-      if Length(NewData) > 0 then
+      if TempReadBuf.Len > 0 then
       begin
         PacketType := Ord(NewData[1]) and $F0;
         Allow := (FAllowReceivingPubAck and (PacketType = CMQTT_PUBACK)) or
@@ -820,13 +845,22 @@ begin
       else
         Allow := True;
 
-      if Allow and StringToDynArrayOfByte(NewData, TempReadBuf) then
+      if Allow then
       begin
-        MQTT_PutReceivedBufferToMQTTLib(FClientIndex, TempReadBuf);
-        MQTT_Process(FClientIndex);
-      end
-      else
-        AddToLog('Out of memory in ProcessReceivedBuffer.');
+        if not MQTT_PutReceivedBufferToMQTTLib(FClientIndex, TempReadBuf) then
+        begin
+          ErrMsg := 'Out of memory when calling MQTT_PutReceivedBufferToMQTTLib. FClientIndex = ' + IntToStr(FClientIndex) {$IFDEF UsingDynTFT} + #13#10 + 'FreeMem: ' + IntToStr(MM_TotalFreeMemSize) + #13#10 + 'LargestFreeMemBlock: ' + IntToStr(MM_LargestFreeMemBlock) {$ENDIF};
+          AddToLog(ErrMsg);
+          MessageBoxFunction(PChar(ErrMsg), 'ProcessReceivedBuffer', 0);
+        end
+        else
+          if MQTT_Process(FClientIndex) and $FF = CMQTT_OutOfMemory then
+          begin
+            ErrMsg := 'Out of memory when calling MQTT_Process. FClientIndex = ' + IntToStr(FClientIndex) {$IFDEF UsingDynTFT} + #13#10 + 'FreeMem: ' + IntToStr(MM_TotalFreeMemSize) + #13#10 + 'LargestFreeMemBlock: ' + IntToStr(MM_LargestFreeMemBlock) {$ENDIF};
+            AddToLog(ErrMsg);
+            MessageBoxFunction(PChar(ErrMsg), 'ProcessReceivedBuffer', 0);
+          end ;
+      end;
     finally
       FreeDynArray(TempReadBuf);
     end;
@@ -931,7 +965,10 @@ end;
 
 procedure TMQTTReceiveThread.AddToLog(s: string);
 begin
-  //TTestE2EBuiltinClientsCase.AddToLog(s);
+  try
+    FClient.AddToLog('[Th]: ' + s);
+  except
+  end;
 end;
 
 
@@ -941,13 +978,10 @@ var
   TempReadBuf, ExactPacket: TDynArrayOfByte;
   TempByte: Byte;
   PacketName: string;
-  {$IFDEF GetValidPacketSize}
-    PacketSize: DWord;
-    //RemainingTempReadBuf: TDynArrayOfByte;
-    TempArr: TIdBytes;
-  {$ENDIF}
+  PacketSize: DWord;
+  TempArr: TIdBytes;
   SuccessfullyDecoded: Boolean;
-  TotalSizeToFree: TDynArrayLength;
+  ProcessBufferLengthResult: Word;
 begin
   try
     InitDynArrayToEmpty(TempReadBuf);
@@ -962,7 +996,6 @@ begin
             //  TempByte := FClient.IdTCPClientObj.IOHandler.ReadByte;
             //  if not AddByteToDynArray(TempByte, TempReadBuf) then
             //  begin
-            //    HandleOnMQTTError(FClient.ClientIndex, CMQTT_UserError, CMQTT_UNDEFINED);
             //    AddToLog('Cannot allocate buffer when reading. TempReadBuf.Len = ' + IntToStr(TempReadBuf.Len));
             //    MessageBoxFunction('Cannot allocate buffer when reading.', 'th_', 0);
             //    FreeDynArray(TempReadBuf);
@@ -971,7 +1004,7 @@ begin
             //  on E: Exception do      ////////////////// ToDo: switch to EIdReadTimeout
             //  begin
             //    if (E.Message = 'Read timed out.') and (TempReadBuf.Len > 0) then
-            //      if MQTT_ProcessBufferLength(TempReadBuf {$IFDEF GetValidPacketSize}, PacketSize{$ENDIF}) = CMQTTDecoderNoErr then
+            //      if MQTT_ProcessBufferLength(TempReadBuf, PacketSize) = CMQTTDecoderNoErr then
             //    begin
             //      MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
             //      AddToLog('done receiving packet: ' + E.Message + {'   ReadCount: ' + IntToStr(ReadCount) +} '   E.ClassName: ' + E.ClassName);
@@ -990,7 +1023,6 @@ begin
             TempByte := FClient.IdTCPClientObj.IOHandler.ReadByte;
             if not AddByteToDynArray(TempByte, TempReadBuf) then
             begin
-              HandleOnMQTTError(FClient.ClientIndex, CMQTT_UserError, CMQTT_UNDEFINED);
               AddToLog('Cannot allocate buffer when reading. TempReadBuf.Len = ' + IntToStr(TempReadBuf.Len));
               MessageBoxFunction('Cannot allocate buffer when reading.', 'th_', 0);
               FreeDynArray(TempReadBuf);
@@ -998,22 +1030,36 @@ begin
             else
             begin
               SuccessfullyDecoded := True;                                         //PacketSize should be the expected size, which can be greater than TempReadBuf.Len
-              if MQTT_ProcessBufferLength(TempReadBuf {$IFDEF GetValidPacketSize}, PacketSize{$ENDIF}) <> CMQTTDecoderNoErr then
-              begin
-                SuccessfullyDecoded := False;
+              ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
 
-                {$IFDEF GetValidPacketSize}
+              if ProcessBufferLengthResult <> CMQTTDecoderNoErr then
+                SuccessfullyDecoded := False
+              else
+                if ProcessBufferLengthResult = CMQTTDecoderIncompleteBuffer then  //PacketSize is successfully decoded, but the packet is incomplete
+                begin
+                  //to get a complete packet, then the number of bytes to be read next is PacketSize - TempReadBuf.Len.
+                  FClient.IdTCPClientObj.IOHandler.ReadTimeout := 1000;
+                  SetLength(TempArr, 0);
+                  FClient.IdTCPClientObj.IOHandler.ReadBytes(TempArr, PacketSize - TempReadBuf.Len);
 
-                {$ENDIF}
-              end;
+                  if Length(TempArr) > 0 then //it should be >0, otherwise there should be a read timeout excption
+                    if not AddBufferToDynArrayOfByte(@TempArr[0], Length(TempArr), TempReadBuf) then
+                    begin
+                      AddToLog('Out of memory on allocating TempReadBuf, for multiple bytes.');
+                      MessageBoxFunction('Cannot allocate buffer when reading multiple bytes.', 'th_', 0);
+                      FreeDynArray(TempReadBuf);
+                    end
+                    else
+                    begin
+                      ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
+                      SuccessfullyDecoded := ProcessBufferLengthResult <> CMQTTDecoderNoErr;
+                    end;
+
+                  FClient.IdTCPClientObj.IOHandler.ReadTimeout := 10;
+                end;
 
               if SuccessfullyDecoded then
               begin
-                //{$IFDEF GetValidPacketSize}
-                //  if PacketSize <> TempReadBuf.Len then
-                //    MessageBoxFunction(PChar('incomplete packet' + #13#10 + 'PacketSize = ' + IntToStr(PacketSize) + #13#10 + 'Read buffer = ' + IntToStr(TempReadBuf.Len)), 'th_', 0);
-                //{$ENDIF}
-
                 MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
                 AddToLog('done receiving packet');
                 AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
@@ -1024,14 +1070,18 @@ begin
                   begin
                     FClient.SyncReceivedBuffer(ExactPacket);
                     FreeDynArray(ExactPacket);
+                    if not RemoveStartBytesFromDynArray(PacketSize, TempReadBuf) then
+                      AddToLog('Cannot remove processed packet from TempReadBuf. Packet type: '+ PacketName);
                   end
                   else
-                    HandleOnMQTTError(FClient.ClientIndex, CMQTT_UserError, TempReadBuf.Content^[0]);
+                    AddToLog('Out of memory on allocating ExactPacket.');
                 end
                 else
+                begin
                   FClient.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+                  FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
+                end;
 
-                FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
                 Sleep(1);
               end; //SuccessfullyDecoded
             end;
@@ -1069,6 +1119,8 @@ procedure TTestE2EBuiltinClientsMain.SetUp;
 var
   i: Integer;
 begin
+  AddToUserLog('Starting test: ' + Self.GetTestName);
+
   {$IFDEF UsingDynTFT}
     MM_Init;
     //MessageBoxFunction(PChar(IntToStr(HEAP_SIZE)), 'HEAP_SIZE', 0);
@@ -1144,54 +1196,58 @@ var
   i, j: Integer;
   s: string;
 begin
-  {$IFDEF UsingDynTFT}
-    Expect(MM_TotalFreeMemSize).ToBeGreaterThan(1000, 'There is no memory left to disconnect.');
-  {$ENDIF}
   try
-    Expect(MQTT_DISCONNECT(0, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet. (Client 0)');
-    Expect(MQTT_DISCONNECT(1, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet. (Client 1)');
-    LoopedExpect(@ClientToServerBufEmpty0, 1500).ToBe(True, 'Buffer 0 should be empty.');
-    LoopedExpect(@ClientToServerBufEmpty1, 1500).ToBe(True, 'Buffer 1 should be empty.');
-  finally
-    TestClients[0].tmrProcessRecData.Enabled := False;
-    TestClients[1].tmrProcessRecData.Enabled := False;
+    {$IFDEF UsingDynTFT}
+      Expect(MM_TotalFreeMemSize).ToBeGreaterThan(1000, 'There is no memory left to disconnect.');
+    {$ENDIF}
+    try
+      Expect(MQTT_DISCONNECT(0, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet. (Client 0)');
+      Expect(MQTT_DISCONNECT(1, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet. (Client 1)');
+      LoopedExpect(@ClientToServerBufEmpty0, 1500).ToBe(True, 'Buffer 0 should be empty.');
+      LoopedExpect(@ClientToServerBufEmpty1, 1500).ToBe(True, 'Buffer 1 should be empty.');
+    finally
+      TestClients[0].tmrProcessRecData.Enabled := False;
+      TestClients[1].tmrProcessRecData.Enabled := False;
 
-    for i := 0 to Length(TestClients) - 1 do
-      Ths[i].Terminate;
+      for i := 0 to Length(TestClients) - 1 do
+        Ths[i].Terminate;
 
-    for i := 0 to Length(TestClients) - 1 do
-    begin
-      LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True, 'Thread ' + IntToStr(i) + ' should be terminated.');
-      FreeAndNil(Ths[i]);
+      for i := 0 to Length(TestClients) - 1 do
+      begin
+        LoopedExpect(PBoolean(@Ths[i].Terminated), 1500).ToBe(True, 'Thread ' + IntToStr(i) + ' should be terminated.');
+        FreeAndNil(Ths[i]);
+      end;
+
+      TestClients[0].IdTCPClientObj.Disconnect(False);
+      TestClients[1].IdTCPClientObj.Disconnect(False);
+
+      MQTT_DestroyClient(1);     //after destroying clients, the value of their ClientIndex property becomes invalid
+      MQTT_DestroyClient(0);
+      MQTT_Done;
+
+      //s := '';
+      //for j := 0 to Length(TestClients[1].FAllReceivedPackets) - 1 do
+      //begin
+      //  s := s + MQTTPacketToString(Ord(TestClients[1].FAllReceivedPackets[j][1])) + '=';
+      //
+      //  for i := 1 to Length(TestClients[1].FAllReceivedPackets[j]) do
+      //    s := s + IntToStr(Ord(TestClients[1].FAllReceivedPackets[j][i])) + ', ';
+      //
+      //  s := s + #13#10;
+      //end;
+      //MessageBoxFunction(PChar(s), 'All received packets', 0);
+
+      SetLength(TestClients[1].FAllReceivedPackets, 0);
+
+      FreeAndNil(TestClients[1]);
+      FreeAndNil(TestClients[0]);
+      SetLength(TestClients, 0);
+
+      SetLength(FSubscribeToTopicNames, 0);
+      SetLength(Ths, 0);
     end;
-
-    TestClients[0].IdTCPClientObj.Disconnect(False);
-    TestClients[1].IdTCPClientObj.Disconnect(False);
-
-    MQTT_DestroyClient(1);     //after destroying clients, the value of their ClientIndex property becomes invalid
-    MQTT_DestroyClient(0);
-    MQTT_Done;
-
-    //s := '';
-    //for j := 0 to Length(TestClients[1].FAllReceivedPackets) - 1 do
-    //begin
-    //  s := s + MQTTPacketToString(Ord(TestClients[1].FAllReceivedPackets[j][1])) + '=';
-    //
-    //  for i := 1 to Length(TestClients[1].FAllReceivedPackets[j]) do
-    //    s := s + IntToStr(Ord(TestClients[1].FAllReceivedPackets[j][i])) + ', ';
-    //
-    //  s := s + #13#10;
-    //end;
-    //MessageBoxFunction(PChar(s), 'All received packets', 0);
-
-    SetLength(TestClients[1].FAllReceivedPackets, 0);
-
-    FreeAndNil(TestClients[1]);
-    FreeAndNil(TestClients[0]);
-    SetLength(TestClients, 0);
-
-    SetLength(FSubscribeToTopicNames, 0);
-    SetLength(Ths, 0);
+  finally
+    AddToUserLog('Done test: ' + Self.GetTestName);
   end;
 end;
 
@@ -1249,5 +1305,15 @@ begin
   LoopedExpect(PBoolean(@TestClients[AClientIndex].FReceivedSessionPresentFlag)).ToBe(AExpectSessionPresentFlag, 'Should receive a ConAck with SessionPresent flag');
 end;
 
+
+initialization
+  {$IFDEF IsDesktop}
+    {$IFDEF UsingDynTFT}
+      {$IFDEF LogMem}
+        OnAfterGetMem := @HandleOnAfterGetMem;
+        OnAfterFreeMem := @HandleOnAfterFreeMem;
+      {$ENDIF}
+    {$ENDIF}
+  {$ENDIF}
 end.
 

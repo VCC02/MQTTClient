@@ -122,7 +122,7 @@ begin
                                '.  Err = ' + IntToStr(TestClients[1].LatestError) +
                                '  ErrOnPacket: ' + PacketName +
                                '  Current duration: ' + IntToStr(GetTickCount64 - tk) + 'ms.' +
-                               '  Available time left: ' + IntToStr(ATimeout - (GetTickCount64 - tk)) + 'ms.' +
+                               '  Available time left: ' + IntToStr(Int64(ATimeout) - Int64(GetTickCount64 - tk)) + 'ms.' +
                                {$IFDEF UsingDynTFT}
                                  '  FreeMem = ' + IntToStr(MM_TotalFreeMemSize) + 'B.' +
                                  '  LargestFreeBlock = ' + IntToStr(MM_LargestFreeMemBlock) + 'B.' +

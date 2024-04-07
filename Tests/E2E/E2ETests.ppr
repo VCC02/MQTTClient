@@ -27,15 +27,18 @@ program E2ETests;
 {$mode objfpc}{$H+}
 
 uses
-  Interfaces, Forms, GuiTestRunner, TestBuiltinClientsCase, MQTTTestUtils,
-  DynArrays, Expectations, PollingFIFO, MemManager, MQTTClient, MQTTUtils,
-  TestE2EUtils, TestBuiltinClientsStressCase;
+  Interfaces, Forms, GUITestRunner, TestBuiltinClientsCase, MQTTTestUtils,
+  DynArrays, Expectations, PollingFIFO, DynArrayFIFO, MemManager, MQTTClient,
+  MQTTUtils, TestE2EUtils, TestBuiltinClientsStressCase,
+  E2ETestsUserLoggingForm;
 
 {$R *.res}
+
 
 begin
   Application.Initialize;
   Application.CreateForm(TGuiTestRunner, TestRunner);
+  Application.CreateForm(TfrmE2ETestsUserLogging, frmE2ETestsUserLogging);
   Application.Run;
 end.
 

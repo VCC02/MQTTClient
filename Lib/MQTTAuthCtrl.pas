@@ -46,7 +46,7 @@ function FillIn_Auth(var AAuthFields: TMQTTAuthFields;
                      var ADestPacket: TMQTTControlPacket): Boolean;
 
 function Decode_AuthProperties(var AVarHeader: TDynArrayOfByte; APropertiesOffset, APropertyLen: DWord; var AAuthProperties: TMQTTAuthProperties; var AEnabledProperties: Word): Boolean;
-function Valid_AuthPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function Valid_AuthPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 
 //input args: ABuffer
 //output args: ADestPacket
@@ -280,7 +280,7 @@ begin
 end;
 
 
-function Valid_AuthPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function Valid_AuthPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 var
   DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen, ActualVarAndPayloadLen: DWord;
 begin
@@ -289,9 +289,7 @@ begin
     if ABuffer.Len < DecodedBufferLen then
       Result := CMQTTDecoderIncompleteBuffer;
 
-  {$IFDEF GetValidPacketSize}
-    APacketSize := DecodedBufferLen;
-  {$ENDIF}
+  APacketSize := DecodedBufferLen;
 end;
 
 

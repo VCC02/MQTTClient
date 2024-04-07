@@ -22,6 +22,9 @@
     </RunParams>
     <RequiredPackages>
       <Item>
+        <PackageName Value="pl_VirtualTrees"/>
+      </Item>
+      <Item>
         <PackageName Value="pl_Indy"/>
       </Item>
       <Item>
@@ -80,6 +83,18 @@
         <Filename Value="D:\DynTFT\MemManager.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
+      <Unit>
+        <Filename Value="..\..\..\MiscUtils\DynArrayFIFO.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="E2ETestsUserLoggingForm.pas"/>
+        <FRMtype Value="200"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="frmE2ETestsUserLogging"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -106,11 +121,11 @@
       </ConfigFile>
       <CustomOptions Value="-d_SkipSendingUnAck
 -d_UsingDynTFT
--dGetValidPacketSize
 -dMaxMMAtProjectLevel
 -dMMFreeBlocks
 -dConvExMsg
--dTruncateDiffMsg"/>
+-dTruncateDiffMsg
+-d_LogMem"/>
     </Other>
   </CompilerOptions>
   <Debugging>

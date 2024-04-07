@@ -46,7 +46,7 @@ function FillIn_ConnAck(var AConnAckFields: TMQTTConnAckFields;
                         var ADestPacket: TMQTTControlPacket): Boolean;
 
 function Decode_ConnAckProperties(var AVarHeader: TDynArrayOfByte; APropertiesOffset, APropertyLen: DWord; var AConnAckProperties: TMQTTConnAckProperties; var AEnabledProperties: DWord): Boolean;
-function Valid_ConnAckPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function Valid_ConnAckPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 function Decode_ConnAckToCtrlPacket(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var ADecodedBufferLen: DWord): Word;
 function Decode_ConnAck(var AReceivedPacket: TMQTTControlPacket;
                         var AConnAckFields: TMQTTConnAckFields;  //bits 7-1 are reserved. Bit 0 is the Session Present flag
@@ -445,7 +445,7 @@ begin
 end;
 
 
-function Valid_ConnAckPacketLength(var ABuffer: TDynArrayOfByte {$IFDEF GetValidPacketSize}; var APacketSize: DWord{$ENDIF}): Word;
+function Valid_ConnAckPacketLength(var ABuffer: TDynArrayOfByte; var APacketSize: DWord): Word;
 var
   DecodedBufferLen, FixedHeaderLen, ExpectedVarAndPayloadLen: DWord;
 begin
@@ -454,9 +454,7 @@ begin
     if ABuffer.Len < DecodedBufferLen then
       Result := CMQTTDecoderIncompleteBuffer;
 
-  {$IFDEF GetValidPacketSize}
-    APacketSize := DecodedBufferLen;
-  {$ENDIF}
+  APacketSize := DecodedBufferLen;
 end;
 
 
