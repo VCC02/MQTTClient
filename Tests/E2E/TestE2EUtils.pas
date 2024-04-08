@@ -226,7 +226,7 @@ begin
     TestClients[TempClientInstance].SendPacketToServer(ClientInstance);
   except
     on E: Exception do
-      TestClients[TempClientInstance].AddToLog('Cannot send ' + PacketName + ' packet... Ex: ' + E.Message);
+      TestClients[TempClientInstance].AddToLog('Cannot send ' + PacketName + ' packet... Ex: "' + E.Message + '"  Length(TestClients): ' + IntToStr(Length(TestClients)) + '  ClientInstance: ' + IntToStr(ClientInstance));
   end;
 end;
 
@@ -715,18 +715,78 @@ begin
 end;
 
 
-
 {$IFDEF IsDesktop}
   {$IFDEF UsingDynTFT}
     {$IFDEF LogMem}
-      procedure HandleOnAfterGetMem(ARequestedSize: DWord);
+      type
+        TMemRec = record
+          Address, Size: DWord;
+        end;
+
+        TMemRecArr = array of TMemRec;
+
+      var
+        MemArr: TMemRecArr;
+
+      function GetMemArrItemIndex(AAllocatedAddress: DWord): Integer;
+      var
+        i: Integer;
       begin
-        AddToUserLog(DateTimeToStr(Now) + '(' + IntToStr(GetTickCount64) + ') [GetMem]: Req = ' + IntToStr(ARequestedSize) + ' UsedBlocks: ' + IntToStr(MM_GetNrFreeBlocksUsed)); //MM_GetNrFreeBlocksUsed is a function, declared in MemManager.pas, which returns MM_NrFreeBlocksUsed.
+        Result := -1;
+        for i := 0 to Length(MemArr) - 1 do
+          if MemArr[i].Address = AAllocatedAddress then
+          begin
+            Result := i;
+            Break;
+          end;
       end;
 
-      procedure HandleOnAfterFreeMem(ARequestedSize: DWord);
+      procedure HandleOnAfterGetMem(AAllocatedAddress, ARequestedSize: DWord);
+      var
+        FoundIndex: Integer;
       begin
-        AddToUserLog(DateTimeToStr(Now) + '(' + IntToStr(GetTickCount64) + ') [FreeMem]: Req = ' + IntToStr(ARequestedSize) + ' UsedBlocks: ' + IntToStr(MM_GetNrFreeBlocksUsed));
+        //AddToUserLog(DateTimeToStr(Now) + '(' + IntToStr(GetTickCount64) + ') [GetMem]: Req = ' + IntToStr(ARequestedSize) + ' UsedBlocks: ' + IntToStr(MM_GetNrFreeBlocksUsed)); //MM_GetNrFreeBlocksUsed is a function, declared in MemManager.pas, which returns MM_NrFreeBlocksUsed.
+
+        FoundIndex := GetMemArrItemIndex(AAllocatedAddress);
+        if FoundIndex > -1 then
+        begin
+          AddToUserLog('============================ Reallocation error.  OldSize: ' + IntToStr(MemArr[FoundIndex].Size) + '  NewSize: ' + IntToStr(ARequestedSize));
+          MemArr[FoundIndex].Size := ARequestedSize;
+          frmE2ETestsUserLogging.Caption := 'Re';
+        end
+        else
+        begin
+          SetLength(MemArr, Length(MemArr) + 1);
+          MemArr[Length(MemArr) - 1].Address := AAllocatedAddress;
+          MemArr[Length(MemArr) - 1].Size := ARequestedSize;
+        end;
+      end;
+
+      procedure HandleOnAfterFreeMem(AAllocatedAddress, ARequestedSize: DWord);
+      var
+        FoundIndex, i: Integer;
+      begin
+        //AddToUserLog(DateTimeToStr(Now) + '(' + IntToStr(GetTickCount64) + ') [FreeMem]: Req = ' + IntToStr(ARequestedSize) + ' UsedBlocks: ' + IntToStr(MM_GetNrFreeBlocksUsed));
+
+        FoundIndex := GetMemArrItemIndex(AAllocatedAddress);
+        if FoundIndex > -1 then
+        begin
+          if ARequestedSize <> MemArr[FoundIndex].Size then
+          begin
+            AddToUserLog('============================ Free error. Attempting to free a different size.  ExistingSize: ' + IntToStr(MemArr[FoundIndex].Size) + '  ReqSize: ' + IntToStr(ARequestedSize));;
+            frmE2ETestsUserLogging.Caption := 'Err1';
+          end;
+
+          for i := FoundIndex to Length(MemArr) - 2 do
+            MemArr[i] := MemArr[i + 1];
+
+          SetLength(MemArr, Length(MemArr) - 1);
+        end
+        else
+        begin
+          AddToUserLog('============================ Free error. Attempting to free from unallocated address: ' + IntToStr(AAllocatedAddress) + '  ReqSize = ' + IntToStr(ARequestedSize));
+          frmE2ETestsUserLogging.Caption := 'Err2';
+        end;
       end;
     {$ENDIF}
   {$ENDIF}
@@ -946,12 +1006,14 @@ begin
   BufferPointer := MQTT_GetClientToServerBuffer(ClientInstance, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
   SendDynArrayOfByte(BufferPointer^);
 
+  //AddToLog('---Before removing packet from buffer');
   {$IFnDEF SingleOutputBuffer}
     if not MQTT_RemovePacketFromClientToServerBuffer(ClientInstance) then
       AddToLog('Can''t remove latest packet from send buffer.');
   {$ELSE}
     raise Exception.Create('MQTT_RemovePacketFromClientToServerBuffer not implemented for SingleOutputBuffer.');
   {$ENDIF}
+  //AddToLog('---After removing packet from buffer');
 end;
 
 
@@ -1123,6 +1185,9 @@ begin
 
   {$IFDEF UsingDynTFT}
     MM_Init;
+    {$IFDEF LogMem}
+      SetLength(MemArr, 0);
+    {$ENDIF}
     //MessageBoxFunction(PChar(IntToStr(HEAP_SIZE)), 'HEAP_SIZE', 0);
   {$ENDIF}
 
