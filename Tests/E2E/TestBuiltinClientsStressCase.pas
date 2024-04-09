@@ -87,7 +87,7 @@ begin
   SetLength(Durations, 0);
   tk := GetTickCount64;
   repeat
-    SetLength(FMsgToPublish, AMinDataSize + Random(16));
+    SetLength(FMsgToPublish, AMinDataSize);
     for i := 1 to Length(FMsgToPublish) do
       FMsgToPublish[i] := Chr(1 + Random(255));  //hopefully, this content does not affect test result
 

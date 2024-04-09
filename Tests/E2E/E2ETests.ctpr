@@ -125,7 +125,8 @@
 -dMMFreeBlocks
 -dConvExMsg
 -dTruncateDiffMsg
--d_LogMem"/>
+-dLogMem
+-dRoundAlloc"/>
     </Other>
   </CompilerOptions>
   <Debugging>

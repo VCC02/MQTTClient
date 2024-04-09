@@ -1260,10 +1260,25 @@ procedure TTestE2EBuiltinClientsMain.TearDown;
 var
   i, j: Integer;
   s: string;
+  MemLeft, MemTrackedByMemArr: DWord;
 begin
   try
     {$IFDEF UsingDynTFT}
-      Expect(MM_TotalFreeMemSize).ToBeGreaterThan(1000, 'There is no memory left to disconnect.');
+      MemLeft := MM_TotalFreeMemSize;
+      AddToUserLog('Memory left before disconnecting: ' + IntToStr(MemLeft) + ' / ' + IntToStr(HEAP_SIZE) + '    FreeBlocksUsed: ' + IntToStr(MM_GetNrFreeBlocksUsed));
+
+      {$IFDEF LogMem}
+        MemTrackedByMemArr := 0;
+        for i := 0 to Length(MemArr) - 1 do
+        begin
+          Inc(MemTrackedByMemArr, MemArr[i].Size);
+          AddToUserLog('MemArr[' + IntToStr(i) + '].Addr = ' + IntToStr(MemArr[i].Address) + '   MemArr[' + IntToStr(i) + '].Size = ' + IntToStr(MemArr[i].Size));
+        end;
+
+        AddToUserLog('Memory left before disconnecting (tracked by MemArr): ' + IntToStr(HEAP_SIZE - MemTrackedByMemArr) + ' / ' + IntToStr(HEAP_SIZE) + '   Used: ' + IntToStr(MemTrackedByMemArr) + '   AllocationsCount: ' + IntToStr(Length(MemArr)));
+      {$ENDIF}
+
+      Expect(MemLeft).ToBeGreaterThan(1000, 'There is no memory left to disconnect.');
     {$ENDIF}
     try
       Expect(MQTT_DISCONNECT(0, 0)).ToBe(True, 'Can''t prepare MQTTDisconnect packet. (Client 0)');
@@ -1312,6 +1327,9 @@ begin
       SetLength(Ths, 0);
     end;
   finally
+    {$IFDEF LogMem}
+      SetLength(MemArr, 0);
+    {$ENDIF}
     AddToUserLog('Done test: ' + Self.GetTestName);
   end;
 end;
