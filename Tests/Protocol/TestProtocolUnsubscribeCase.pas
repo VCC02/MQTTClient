@@ -52,7 +52,11 @@ implementation
 
 
 uses
-  MQTTClient, MQTTUtils, DynArrays, MQTTUnsubscribeCtrl, Expectations;
+  MQTTClient, MQTTUtils, DynArrays, MQTTUnsubscribeCtrl, Expectations
+  {$IFDEF UsingDynTFT}
+    , MemManager
+  {$ENDIF}
+  ;
 
 
 var
@@ -91,6 +95,10 @@ end;
 
 procedure TTestProtocolUnsubscribeCase.SetUp;
 begin
+  {$IFDEF UsingDynTFT}
+    MM_Init;
+  {$ENDIF}
+
   MQTT_Init;
   MQTT_CreateClient; //create a client
 

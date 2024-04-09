@@ -1,5 +1,5 @@
 {
-    Copyright (C) 2023 VCC
+    Copyright (C) 2024 VCC
     creation date: 01 Aug 2023
     initial release date: 26 Sep 2023
 
@@ -58,7 +58,11 @@ implementation
 
 
 uses
-  MQTTClient, MQTTUtils, DynArrays, MQTTConnectCtrl, Expectations;
+  MQTTClient, MQTTUtils, DynArrays, MQTTConnectCtrl, Expectations
+  {$IFDEF UsingDynTFT}
+    , MemManager
+  {$ENDIF}
+  ;
 
 
 var
@@ -118,6 +122,10 @@ end;
 
 procedure TTestProtocolConnectCase.SetUp;
 begin
+  {$IFDEF UsingDynTFT}
+    MM_Init;
+  {$ENDIF}
+
   MQTT_Init;
   MQTT_CreateClient; //create a client
 

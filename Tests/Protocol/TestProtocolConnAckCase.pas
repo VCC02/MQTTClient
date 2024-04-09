@@ -58,7 +58,11 @@ implementation
 
 uses
   MQTTClient, MQTTUtils, MQTTTestUtils, DynArrays, MQTTConnAckCtrl,
-  Expectations, ExpectationsDynArrays;
+  Expectations, ExpectationsDynArrays
+  {$IFDEF UsingDynTFT}
+    , MemManager
+  {$ENDIF}
+  ;
 
 
 type
@@ -98,6 +102,10 @@ end;
 
 procedure TTestProtocolConnAckCase.SetUp;
 begin
+  {$IFDEF UsingDynTFT}
+    MM_Init;
+  {$ENDIF}
+
   MQTT_Init;
   MQTT_CreateClient; //create a client
 

@@ -147,7 +147,8 @@
     <Other>
       <CustomOptions Value="-d_SingleOutputBuffer
 -dUsingDynTFT
--dMaxMMAtProjectLevel"/>
+-dMaxMMAtProjectLevel
+-dMMFreeBlocks"/>
     </Other>
   </CompilerOptions>
   <Debugging>

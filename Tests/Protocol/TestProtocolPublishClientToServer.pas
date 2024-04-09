@@ -1,5 +1,5 @@
 {
-    Copyright (C) 2023 VCC
+    Copyright (C) 2024 VCC
     creation date: 25 Sep 2023
     initial release date: 26 Sep 2023
 
@@ -76,7 +76,11 @@ implementation
 
 
 uses
-  MQTTClient, MQTTUtils, DynArrays, MQTTPublishCtrl, Expectations;
+  MQTTClient, MQTTUtils, DynArrays, MQTTPublishCtrl, Expectations
+  {$IFDEF UsingDynTFT}
+    , MemManager
+  {$ENDIF}
+  ;
 
 
 var
@@ -127,6 +131,10 @@ end;
 
 procedure TTestProtocolSendPublishCase.SetUp;
 begin
+  {$IFDEF UsingDynTFT}
+    MM_Init;
+  {$ENDIF}
+
   MQTT_Init;
   MQTT_CreateClient; //create a client
 
@@ -293,6 +301,7 @@ var
   DecodedPublishFields: TMQTTPublishFields;
   DecodedPublishProperties: TMQTTPublishProperties;
 begin
+  Expect(MQTT_CONNECT(0, 0)).ToBe(True);
   Expect(MQTT_PUBLISH(0, 0, AQoS)).ToBe(True);  //add a PUBLISH packet to ClientToServer buffer
 
   BufferPointer := MQTT_GetClientToServerBuffer(0, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};

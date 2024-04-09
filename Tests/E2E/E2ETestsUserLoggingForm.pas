@@ -52,9 +52,6 @@ uses
   ComCtrls, PollingFIFO, VirtualTrees
   {$IFDEF UsingDynTFT}    //UsingDynTFT should be defined in all DynTFT projects (MCU or Desktop), which will include this unit (DynArrays).
     , MemManager          //there is only the DynTFT type of MM for MCU
-    {$IFDEF UsingDynTFT}
-    , DynTFTTypes
-    {$ENDIF}
   {$ENDIF}
   ;
 
@@ -142,7 +139,6 @@ procedure TfrmE2ETestsUserLogging.AddMemInfoToLog;
 {$IFDEF UsingDynTFT}
   var
     i, j: Integer;
-    BlockWidth, BlockLeft, BlockRight: Integer;
     Offset, Size, Offset2, Size2: Int64;
 {$ENDIF}
 begin
@@ -151,17 +147,8 @@ begin
     begin
       MM_GetBlock(i, Offset, Size);    //If the compiler returns an error about not knowing what is MM_GetBlock, then users have to add it to MemManager.pas. See requirements above.
 
-      BlockWidth := Round((Size {* 65536} shl 16) / HEAP_SIZE); //px
-      if BlockWidth > 0 then
-      begin
-        if BlockWidth < 2 then
-          BlockWidth := 2;
-
-        BlockLeft := Round((Offset {* 65536} shl 16) / HEAP_SIZE); //px
-        BlockRight := BlockLeft + BlockWidth;  // +/- 1
-
-        AddToUserLog('Offset: ' + IntToStr(Offset) + '  Size: ' + IntToStr(Size) + '   BlockWidth: ' + IntToStr(BlockWidth) + 'px   BlockLeft: ' + IntToStr(BlockLeft) + 'px');
-      end;
+      if Size > 0 then
+        AddToUserLog('Offset: ' + IntToStr(Offset) + '  Size: ' + IntToStr(Size));
     end;
 
     for i := 0 to NR_FREE_BLOCKS - 1 do
