@@ -122,6 +122,10 @@
         <Filename Value="..\..\MiscUtils\PollingFIFO.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
+      <Unit>
+        <Filename Value="D:\DynTFT\MemManager.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -132,7 +136,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="..\..\MiscUtils;..\Lib"/>
+      <OtherUnitFiles Value="..\..\MiscUtils;..\Lib;D:\DynTFT\"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Linking>
@@ -145,6 +149,12 @@
         </Win32>
       </Options>
     </Linking>
+    <Other>
+      <CustomOptions Value="-d_UsingDynTFT
+-dMaxMMAtProjectLevel
+-dMMFreeBlocks
+-dRoundAlloc"/>
+    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions>

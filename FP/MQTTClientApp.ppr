@@ -38,7 +38,11 @@ uses
   MQTTPublishCtrl, MQTTPubAckCtrl, MQTTPubRecCtrl, MQTTPubRelCtrl,
   MQTTPubCompCtrl, MQTTSubscribeCtrl, MQTTSubAckCtrl, MQTTUnsubscribeCtrl,
   MQTTUnsubAckCtrl, MQTTPingReqCtrl, MQTTPingRespCtrl, MQTTDisconnectCtrl,
-  MQTTAuthCtrl, MQTTClient, DynArrays, PollingFIFO;
+  MQTTAuthCtrl, MQTTClient, DynArrays, PollingFIFO
+  {$IFDEF UsingDynTFT}
+    , MemManager
+  {$ENDIF}
+  ;
 
 {$R *.res}
 

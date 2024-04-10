@@ -2712,6 +2712,12 @@ begin
   Err := CMQTT_Success;
   Result := DoOnBeforeSendingMQTT_PUBLISH(ClientInstance, TempPublishFields, TempPublishProperties, Err, ACallbackID);
 
+  if not Result then
+  begin
+    DoOnMQTTError(ClientInstance, CMQTT_OutOfMemory, CMQTT_UNDEFINED);  //
+    Exit;
+  end;
+
   NewQoS := (TempPublishFields.PublishCtrlFlags shr 1) and $F;
   if NewQoS <> AQoS then  //if the user changed the QoS, using the handler, so allocate a PacketIdentifier
   begin

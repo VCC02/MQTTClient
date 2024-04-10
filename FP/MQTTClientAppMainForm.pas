@@ -125,7 +125,11 @@ implementation
 {$R *.frm}
 
 uses
-  MQTTUtils, MQTTClient, MQTTConnectCtrl, MQTTConnAckCtrl, MQTTSubscribeCtrl, MQTTUnsubscribeCtrl;
+  MQTTUtils, MQTTClient, MQTTConnectCtrl, MQTTConnAckCtrl, MQTTSubscribeCtrl, MQTTUnsubscribeCtrl
+  {$IFDEF UsingDynTFT}
+    , MemManager
+  {$ENDIF}
+  ;
 
 
 var
@@ -786,11 +790,15 @@ end;
 
 procedure TMQTTReceiveThread.Execute;
 var
-  TempReadBuf: TDynArrayOfByte;
+  TempReadBuf, ExactPacket: TDynArrayOfByte;
   //ReadCount: Integer;
   TempByte: Byte;
   PacketName: string;
+  PacketSize: DWord;
   LoggedDisconnection: Boolean;
+  TempArr: TIdBytes;
+  SuccessfullyDecoded: Boolean;
+  ProcessBufferLengthResult: Word;
 begin
   try
     //ReadCount := 0;
@@ -846,18 +854,61 @@ begin
           end
           else
           begin
-            if MQTT_ProcessBufferLength(TempReadBuf) = CMQTTDecoderNoErr then
+            SuccessfullyDecoded := True;                                         //PacketSize should be the expected size, which can be greater than TempReadBuf.Len
+            ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
+
+            if ProcessBufferLengthResult <> CMQTTDecoderNoErr then
+              SuccessfullyDecoded := False
+            else
+              if ProcessBufferLengthResult = CMQTTDecoderIncompleteBuffer then  //PacketSize is successfully decoded, but the packet is incomplete
+              begin
+                //to get a complete packet, then the number of bytes to be read next is PacketSize - TempReadBuf.Len.
+                frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadTimeout := 1000;
+                SetLength(TempArr, 0);
+                frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadBytes(TempArr, PacketSize - TempReadBuf.Len);
+
+                if Length(TempArr) > 0 then //it should be >0, otherwise there should be a read timeout excption
+                  if not AddBufferToDynArrayOfByte(@TempArr[0], Length(TempArr), TempReadBuf) then
+                  begin
+                    AddToLog('Out of memory on allocating TempReadBuf, for multiple bytes.');
+                    MessageBoxFunction('Cannot allocate buffer when reading multiple bytes.', 'th_', 0);
+                    FreeDynArray(TempReadBuf);
+                  end
+                  else
+                  begin
+                    ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
+                    SuccessfullyDecoded := ProcessBufferLengthResult <> CMQTTDecoderNoErr;
+                  end;
+
+                frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadTimeout := 10;
+              end;
+
+            if SuccessfullyDecoded then
             begin
               MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
               AddToLog('done receiving packet');
               AddToLog('Buffer size: ' + IntToStr(TempReadBuf.Len) + '  Packet header: $' + IntToHex(TempReadBuf.Content^[0]) + ' (' + PacketName + ')');
 
-              frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+              if PacketSize <> TempReadBuf.Len then
+              begin
+                if CopyFromDynArray(ExactPacket, TempReadBuf, 0, PacketSize) then
+                begin
+                  frmMQTTClientAppMain.SyncReceivedBuffer(ExactPacket);
+                  FreeDynArray(ExactPacket);
+                  if not RemoveStartBytesFromDynArray(PacketSize, TempReadBuf) then
+                    AddToLog('Cannot remove processed packet from TempReadBuf. Packet type: '+ PacketName);
+                end
+                else
+                  AddToLog('Out of memory on allocating ExactPacket.');
+              end
+              else
+              begin
+                frmMQTTClientAppMain.SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+                FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
+              end;
 
-              FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
               Sleep(1);
-            end;
-
+            end; //SuccessfullyDecoded
           end;
         except
         end;
@@ -1130,6 +1181,10 @@ begin
   finally
     Content.Free;
   end;
+
+  {$IFDEF UsingDynTFT}
+    MM_Init;
+  {$ENDIF}
 
   MQTT_Init;
   if not MQTT_CreateClient then
