@@ -1327,8 +1327,10 @@ begin
       SetLength(Ths, 0);
     end;
   finally
-    {$IFDEF LogMem}
-      SetLength(MemArr, 0);
+    {$IFDEF UsingDynTFT}
+      {$IFDEF LogMem}
+        SetLength(MemArr, 0);
+      {$ENDIF}
     {$ENDIF}
     AddToUserLog('Done test: ' + Self.GetTestName);
   end;
