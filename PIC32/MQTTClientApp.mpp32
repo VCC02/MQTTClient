@@ -63,7 +63,8 @@ Path0=..\Lib\
 Path1=..\..\MiscUtils\
 Count=2
 [PLDS]
-Count=0
+File0=MQTTClientApp.pld
+Count=1
 [Useses]
 File0=String
 File1=C_Stdlib

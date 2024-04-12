@@ -230,11 +230,13 @@ begin
   Expect(StringToDynArrayOfByte('five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/five/seven/zero/', TempPublishFields.TopicName)).ToBe(True);
   Expect(StringToDynArrayOfByte('this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.this is the content.', TempPublishFields.ApplicationMessage)).ToBe(True);
 
-  Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', PublishProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', PublishProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', PublishProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', PublishProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', PublishProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', PublishProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', PublishProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', PublishProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', PublishProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', PublishProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
   Expect(FillIn_Publish(TempPublishFields, PublishProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedPubBuffer);
@@ -369,7 +371,7 @@ var
   DecodedTopicNameStr: string;
 begin
   TempPublishFields.PublishCtrlFlags := 1 shl 1;  //bits 3-0:  Dup(3), QoS(2-1), Retain(0)
-  TempPublishFields.EnabledProperties := 255; //all properties
+  TempPublishFields.EnabledProperties := 255 {$IFnDEF EnUserProperty} xor CMQTTPublish_EnUserProperty {$ENDIF}; //all properties
   TempPublishFields.PacketIdentifier := 47;
   Expect(StringToDynArrayOfByte('five/seven/zero', TempPublishFields.TopicName)).ToBe(True);
   Expect(StringToDynArrayOfByte('this is the content', TempPublishFields.ApplicationMessage)).ToBe(True);
@@ -398,17 +400,19 @@ begin
 
     Expect(DecodedPublishProperties.ResponseTopic.Len).ToBe(Length('some/name'));
     Expect(DecodedPublishProperties.CorrelationData.Len).ToBe(3);
-    Expect(DecodedPublishProperties.UserProperty.Len).ToBe(3);
+    {$IFDEF EnUserProperty}
+      Expect(DecodedPublishProperties.UserProperty.Len).ToBe(3);
+    {$ENDIF}
     Expect(DecodedPublishProperties.SubscriptionIdentifier.Len).ToBe(3);
     Expect(DecodedPublishProperties.ContentType.Len).ToBe(3);
 
     Expect(@DecodedPublishProperties.ResponseTopic.Content^, 9).ToBe(@['some/name']);
     Expect(@DecodedPublishProperties.CorrelationData.Content^, 3).ToBe(@[40, 50, 60]);
-
-    Expect(@DecodedPublishProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
-    Expect(@DecodedPublishProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
-    Expect(@DecodedPublishProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
-
+    {$IFDEF EnUserProperty}
+      Expect(@DecodedPublishProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
+      Expect(@DecodedPublishProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
+      Expect(@DecodedPublishProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$ENDIF}
     Expect(@DecodedPublishProperties.SubscriptionIdentifier.Content^, 3 shl 2).ToBe(@[$A0, $0F, 0, 0,  $88, $13, 0, 0,  $40, $1F, 0, 0]);   //DWords: 4000, 5000, 8000
     Expect(@DecodedPublishProperties.ContentType.Content^, 3).ToBe(@[70, 80, 90]);
 

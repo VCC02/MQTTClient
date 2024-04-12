@@ -193,11 +193,13 @@ procedure THeaderConnectEncoderCase.Test_FillIn_Connect_Decoder_HappyFlow_LongSt
 const
   CConnectFlags = 255;
 begin
-  Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', ConnectProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', ConnectProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
   TempWillProperties.WillDelayInterval := 123;
   TempWillProperties.PayloadFormatIndicator := 158;
@@ -205,7 +207,9 @@ begin
   Expect(StringToDynArrayOfByte('some sort of text', TempWillProperties.ContentType)).ToBe(True);
   Expect(StringToDynArrayOfByte('/my/very/long/name', TempWillProperties.ResponseTopic)).ToBe(True);
   Expect(StringToDynArrayOfByte('some unique identifier', TempWillProperties.CorrelationData)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('some string', TempWillProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('some string', TempWillProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
   Expect(FillIn_PayloadWillProperties(TempWillProperties, TempConnectFields.PayloadContent.WillProperties)).ToBe(True);
 
   Expect(StringToDynArrayOfByte('This is the longest ClientID ever. It can contain anything.', TempConnectFields.PayloadContent.ClientID)).ToBe(True);
@@ -352,9 +356,12 @@ begin
   ConnectProperties.TopicAliasMaximum := 345;
   ConnectProperties.RequestResponseInformation := 1;
   ConnectProperties.RequestProblemInformation := 1;
-  Expect(AddStringToDynOfDynArrayOfByte('first_user_property.', ConnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('second_user_property.', ConnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('third_user_property.', ConnectProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('first_user_property.', ConnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('second_user_property.', ConnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('third_user_property.', ConnectProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
+
   Expect(StringToDynArrayOfByte('some auth method', ConnectProperties.AuthenticationMethod)).ToBe(True);
   Expect(StringToDynArrayOfByte('some auth data', ConnectProperties.AuthenticationData)).ToBe(True);
 
@@ -364,7 +371,9 @@ begin
   Expect(StringToDynArrayOfByte('some sort of text', TempWillProperties.ContentType)).ToBe(True);
   Expect(StringToDynArrayOfByte('/my/very/long/name', TempWillProperties.ResponseTopic)).ToBe(True);
   Expect(StringToDynArrayOfByte('some unique identifier', TempWillProperties.CorrelationData)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('some string', TempWillProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('some string', TempWillProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
   Expect(FillIn_PayloadWillProperties(TempWillProperties, TempConnectFields.PayloadContent.WillProperties)).ToBe(True);
 
   Expect(StringToDynArrayOfByte('ClientID.', TempConnectFields.PayloadContent.ClientID)).ToBe(True);
@@ -376,7 +385,7 @@ begin
 
   TempConnectFields.ConnectFlags := CConnectFlags;
   TempConnectFields.KeepAlive := CKeepAlive;
-  TempConnectFields.EnabledProperties := $1FF; //all properties
+  TempConnectFields.EnabledProperties := $1FF {$IFnDEF EnUserProperty} xor CMQTTConnect_EnUserProperty {$ENDIF}; //all properties
   Expect(FillIn_Connect(TempConnectFields, ConnectProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedConnectBuffer);
 
@@ -400,13 +409,16 @@ begin
     Expect(DecodedConnectProperties.TopicAliasMaximum).ToBe(345);
     Expect(DecodedConnectProperties.RequestResponseInformation).ToBe(1);
     Expect(DecodedConnectProperties.RequestProblemInformation).ToBe(1);
-    Expect(DecodedConnectProperties.UserProperty.Len).ToBe(3);
+    {$IFDEF EnUserProperty}
+      Expect(DecodedConnectProperties.UserProperty.Len).ToBe(3);
+    {$ENDIF}
     Expect(DecodedConnectProperties.AuthenticationMethod.Len).ToBe(16);
     Expect(DecodedConnectProperties.AuthenticationData.Len).ToBe(14);
-    //
-    Expect(@DecodedConnectProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
-    Expect(@DecodedConnectProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
-    Expect(@DecodedConnectProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$IFDEF EnUserProperty}
+      Expect(@DecodedConnectProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
+      Expect(@DecodedConnectProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
+      Expect(@DecodedConnectProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$ENDIF}
     Expect(@DecodedConnectProperties.AuthenticationMethod.Content^, 16).ToBe(@['some auth method']);
     Expect(@DecodedConnectProperties.AuthenticationData.Content^, 14).ToBe(@['some auth data']);
 

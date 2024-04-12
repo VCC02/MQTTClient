@@ -86,12 +86,14 @@ begin
       Exit;
   end;
 
-  if AEnabledProperties and CMQTTDisconnect_EnUserProperty = CMQTTDisconnect_EnUserProperty then
-  begin
-    Result := MQTT_AddUserPropertyToPacket(ADisconnectProperties.UserProperty, AVarHeader);
-    if not Result then
-      Exit;
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTDisconnect_EnUserProperty = CMQTTDisconnect_EnUserProperty then
+    begin
+      Result := MQTT_AddUserPropertyToPacket(ADisconnectProperties.UserProperty, AVarHeader);
+      if not Result then
+        Exit;
+    end;
+  {$ENDIF}
 
   if AEnabledProperties and CMQTTDisconnect_EnServerReference = CMQTTDisconnect_EnServerReference then
   begin
@@ -194,15 +196,17 @@ begin
         MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, ADisconnectProperties.ReasonString);
       end;
 
-      CMQTT_UserProperty_PropID: //
-      begin
-        AEnabledProperties := AEnabledProperties or CMQTTDisconnect_EnUserProperty;
-        MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, TempBinData);
-        if not AddDynArrayOfByteToDynOfDynOfByte(ADisconnectProperties.UserProperty, TempBinData) then
-          Exit;
+      {$IFDEF EnUserProperty}
+        CMQTT_UserProperty_PropID: //
+        begin
+          AEnabledProperties := AEnabledProperties or CMQTTDisconnect_EnUserProperty;
+          MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, TempBinData);
+          if not AddDynArrayOfByteToDynOfDynOfByte(ADisconnectProperties.UserProperty, TempBinData) then
+            Exit;
 
-        FreeDynArray(TempBinData);
-      end;
+          FreeDynArray(TempBinData);
+        end;
+      {$ENDIF}
 
       CMQTT_ServerReference_PropID: //
       begin

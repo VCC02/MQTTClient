@@ -108,12 +108,14 @@ begin
       Exit;
   end;
 
-  if AEnabledProperties and CMQTTConnect_EnUserProperty = CMQTTConnect_EnUserProperty then
-  begin
-    Result := MQTT_AddUserPropertyToPacket(AConnectProperties.UserProperty, AVarHeader);
-    if not Result then
-      Exit;
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTConnect_EnUserProperty = CMQTTConnect_EnUserProperty then
+    begin
+      Result := MQTT_AddUserPropertyToPacket(AConnectProperties.UserProperty, AVarHeader);
+      if not Result then
+        Exit;
+    end;
+  {$ENDIF}
 
   if AEnabledProperties and CMQTTConnect_EnAuthenticationMethod = CMQTTConnect_EnAuthenticationMethod then
   begin
@@ -193,9 +195,11 @@ begin
   if not Result then
     Exit;
 
-  Result := MQTT_AddUserPropertyToPacket(AProperties.UserProperty, ADestWillProperties);
-  if not Result then
-    Exit;
+  {$IFDEF EnUserProperty}
+    Result := MQTT_AddUserPropertyToPacket(AProperties.UserProperty, ADestWillProperties);
+    if not Result then
+      Exit;
+  {$ENDIF}
 
   Result := True;
 end;
@@ -336,15 +340,17 @@ begin
         MQTT_DecodeByte(AVarHeader, CurrentBufferPointer, AConnectProperties.RequestProblemInformation);
       end;
 
-      CMQTT_UserProperty_PropID: //
-      begin
-        AEnabledProperties := AEnabledProperties or CMQTTConnect_EnUserProperty;
-        MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, TempBinData);
-        if not AddDynArrayOfByteToDynOfDynOfByte(AConnectProperties.UserProperty, TempBinData) then
-          Exit;
+      {$IFDEF EnUserProperty}
+        CMQTT_UserProperty_PropID: //
+        begin
+          AEnabledProperties := AEnabledProperties or CMQTTConnect_EnUserProperty;
+          MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, TempBinData);
+          if not AddDynArrayOfByteToDynOfDynOfByte(AConnectProperties.UserProperty, TempBinData) then
+            Exit;
 
-        FreeDynArray(TempBinData);
-      end;
+          FreeDynArray(TempBinData);
+        end;
+      {$ENDIF}
 
       CMQTT_AuthenticationMethod_PropID: //
       begin

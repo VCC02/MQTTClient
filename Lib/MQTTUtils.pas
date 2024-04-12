@@ -131,7 +131,7 @@ type
     TopicAliasMaximum: TMQTTProp_TopicAliasMaximum;
     RequestResponseInformation: TMQTTProp_RequestResponseInformation;
     RequestProblemInformation: TMQTTProp_RequestProblemInformation;
-    UserProperty: TMQTTProp_UserProperty;
+    {$IFDEF EnUserProperty} UserProperty: TMQTTProp_UserProperty; {$ENDIF}
     AuthenticationMethod: TMQTTProp_AuthenticationMethod;
     AuthenticationData: TMQTTProp_AuthenticationData;
   end;
@@ -143,7 +143,7 @@ type
     ContentType: TMQTTProp_ContentType;
     ResponseTopic: TMQTTProp_ResponseTopic;
     CorrelationData: TMQTTProp_CorrelationData;
-    UserProperty: TMQTTProp_UserProperty;
+    {$IFDEF EnUserProperty} UserProperty: TMQTTProp_UserProperty; {$ENDIF}
   end;
 
   TMQTTConnectPayloadContent = record  //  The Will Message consists of the Will Properties, Will Topic, and Will Payload fields in the CONNECT Payload.
@@ -166,7 +166,7 @@ type
     AssignedClientIdentifier: TMQTTProp_AssignedClientIdentifier;
     TopicAliasMaximum: TMQTTProp_TopicAliasMaximum;
     ReasonString: TMQTTProp_ReasonString;
-    UserProperty: TMQTTProp_UserProperty;
+    {$IFDEF EnUserProperty} UserProperty: TMQTTProp_UserProperty; {$ENDIF}
     WildcardSubscriptionAvailable: TMQTTProp_WildcardSubscriptionAvailable;
     SubscriptionIdentifierAvailable: TMQTTProp_SubscriptionIdentifierAvailable;
     SharedSubscriptionAvailable: TMQTTProp_SharedSubscriptionAvailable;
@@ -185,7 +185,7 @@ type
     TopicAlias: TMQTTProp_TopicAlias;
     ResponseTopic: TMQTTProp_ResponseTopic;
     CorrelationData: TMQTTProp_CorrelationData;
-    UserProperty: TMQTTProp_UserProperty; //UTF-8 string pairs
+    {$IFDEF EnUserProperty} UserProperty: TMQTTProp_UserProperty; {$ENDIF} //UTF-8 string pairs
     SubscriptionIdentifier: TMQTTProp_SubscriptionIdentifier;    //These are VarInts on protocol only. The array stores DWords.
     ContentType: TMQTTProp_ContentType;
   end;
@@ -194,7 +194,7 @@ type
 
   TMQTTCommonProperties = record
     ReasonString: TMQTTProp_ReasonString;
-    UserProperty: TMQTTProp_UserProperty; //UTF-8 string pairs
+    {$IFDEF EnUserProperty} UserProperty: TMQTTProp_UserProperty; {$ENDIF} //UTF-8 string pairs
   end;
 
   /////////////////
@@ -217,7 +217,7 @@ type
 
   TMQTTSubscribeProperties = record
     SubscriptionIdentifier: TMQTTProp_SingleSubscriptionIdentifier;    //This is VarInt on protocol only.
-    UserProperty: TMQTTProp_UserProperty; //UTF-8 string pairs
+    {$IFDEF EnUserProperty} UserProperty: TMQTTProp_UserProperty; {$ENDIF} //UTF-8 string pairs
   end;
 
   /////////////////
@@ -227,7 +227,13 @@ type
   /////////////////
 
   TMQTTUnsubscribeProperties = record
-    UserProperty: TMQTTProp_UserProperty; //UTF-8 string pairs
+    {$IFDEF EnUserProperty}
+      UserProperty: TMQTTProp_UserProperty;  //UTF-8 string pairs
+    {$ELSE}
+      {$IFDEF IsMCU}
+        Dummy: Byte; //something, to avoid having an empty structure
+      {$ENDIF}
+    {$ENDIF}
   end;
 
   /////////////////
@@ -256,7 +262,7 @@ type
   TMQTTDisconnectProperties = record
     SessionExpiryInterval: TMQTTProp_SessionExpiryInterval; //[s]
     ReasonString: TMQTTProp_ReasonString;
-    UserProperty: TMQTTProp_UserProperty; //UTF-8 string pairs
+    {$IFDEF EnUserProperty} UserProperty: TMQTTProp_UserProperty; {$ENDIF} //UTF-8 string pairs
     ServerReference: TMQTTProp_ServerReference;
   end;
 
@@ -266,7 +272,7 @@ type
     AuthenticationMethod: TMQTTProp_AuthenticationMethod;
     AuthenticationData: TMQTTProp_AuthenticationData;
     ReasonString: TMQTTProp_ReasonString;
-    UserProperty: TMQTTProp_UserProperty; //UTF-8 string pairs
+    {$IFDEF EnUserProperty} UserProperty: TMQTTProp_UserProperty; {$ENDIF} //UTF-8 string pairs
   end;
 
   //////////////////// Fields
@@ -1202,7 +1208,9 @@ begin
   AProperties.RequestResponseInformation := 1;
   AProperties.RequestProblemInformation := 1;
 
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
   InitDynArrayToEmpty(AProperties.AuthenticationMethod);
   InitDynArrayToEmpty(AProperties.AuthenticationData);
 end;
@@ -1210,7 +1218,9 @@ end;
 
 procedure MQTT_FreeConnectProperties(var AProperties: TMQTTConnectProperties);
 begin
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
   FreeDynArray(AProperties.AuthenticationMethod);
   FreeDynArray(AProperties.AuthenticationData);
 end;
@@ -1225,7 +1235,9 @@ begin
   InitDynArrayToEmpty(AProperties.ContentType);
   InitDynArrayToEmpty(AProperties.ResponseTopic);
   InitDynArrayToEmpty(AProperties.CorrelationData);
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
@@ -1234,7 +1246,9 @@ begin
   FreeDynArray(AProperties.ContentType);
   FreeDynArray(AProperties.ResponseTopic);
   FreeDynArray(AProperties.CorrelationData);
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
@@ -1265,7 +1279,9 @@ begin
   //AProperties.SessionExpiryInterval := 4; //init to some dummy value, instead of displaying random data on err in logs
   InitDynArrayToEmpty(AProperties.AssignedClientIdentifier);
   InitDynArrayToEmpty(AProperties.ReasonString);
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
   InitDynArrayToEmpty(AProperties.ResponseInformation);
   InitDynArrayToEmpty(AProperties.ServerReference);
   InitDynArrayToEmpty(AProperties.AuthenticationMethod);
@@ -1277,7 +1293,9 @@ procedure MQTT_FreeConnAckProperties(var AProperties: TMQTTConnAckProperties);
 begin
   FreeDynArray(AProperties.AssignedClientIdentifier);
   FreeDynArray(AProperties.ReasonString);
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
   FreeDynArray(AProperties.ResponseInformation);
   FreeDynArray(AProperties.ServerReference);
   FreeDynArray(AProperties.AuthenticationMethod);
@@ -1295,7 +1313,9 @@ begin
   ConcatDynArrays(ADestProperties.AssignedClientIdentifier, ASrcProperties.AssignedClientIdentifier);
   ADestProperties.TopicAliasMaximum := ASrcProperties.TopicAliasMaximum;
   ConcatDynArrays(ADestProperties.ReasonString, ASrcProperties.ReasonString);
-  ConcatDynOfDynOfByteArrays(ADestProperties.UserProperty, ASrcProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    ConcatDynOfDynOfByteArrays(ADestProperties.UserProperty, ASrcProperties.UserProperty);
+  {$ENDIF}
   ADestProperties.WildcardSubscriptionAvailable := ASrcProperties.WildcardSubscriptionAvailable;
   ADestProperties.SubscriptionIdentifierAvailable := ASrcProperties.SubscriptionIdentifierAvailable;
   ADestProperties.SharedSubscriptionAvailable := ASrcProperties.SharedSubscriptionAvailable;
@@ -1313,7 +1333,9 @@ begin
   InitDynArrayToEmpty(AProperties.ContentType);
   InitDynArrayToEmpty(AProperties.ResponseTopic);
   InitDynArrayToEmpty(AProperties.CorrelationData);
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
   InitDynArrayOfDWordToEmpty(AProperties.SubscriptionIdentifier);
 end;
 
@@ -1323,7 +1345,9 @@ begin
   FreeDynArray(AProperties.ContentType);
   FreeDynArray(AProperties.ResponseTopic);
   FreeDynArray(AProperties.CorrelationData);
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
   FreeDynArrayOfDWord(AProperties.SubscriptionIdentifier);
 end;
 
@@ -1335,7 +1359,9 @@ begin
   ADestProperties.TopicAlias := ASrcProperties.TopicAlias;
   ConcatDynArrays(ADestProperties.ResponseTopic, ASrcProperties.ResponseTopic);
   ConcatDynArrays(ADestProperties.CorrelationData, ASrcProperties.CorrelationData);
-  ConcatDynOfDynOfByteArrays(ADestProperties.UserProperty, ASrcProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    ConcatDynOfDynOfByteArrays(ADestProperties.UserProperty, ASrcProperties.UserProperty);
+  {$ENDIF}
   ConcatDynArraysOfDWord(ADestProperties.SubscriptionIdentifier, ASrcProperties.SubscriptionIdentifier);
   ConcatDynArrays(ADestProperties.ContentType, ASrcProperties.ContentType);
 end;
@@ -1344,40 +1370,52 @@ end;
 procedure MQTT_InitCommonProperties(var AProperties: TMQTTCommonProperties);
 begin
   InitDynArrayToEmpty(AProperties.ReasonString);
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
 procedure MQTT_FreeCommonProperties(var AProperties: TMQTTCommonProperties);
 begin
   FreeDynArray(AProperties.ReasonString);
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
 procedure MQTT_InitSubscribeProperties(var AProperties: TMQTTSubscribeProperties);
 begin
   AProperties.SubscriptionIdentifier := 3; //some valid init value
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
 procedure MQTT_FreeSubscribeProperties(var AProperties: TMQTTSubscribeProperties);
 begin
   AProperties.SubscriptionIdentifier := 3000; //something for debugging
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
 procedure MQTT_InitUnsubscribeProperties(var AProperties: TMQTTUnsubscribeProperties);
 begin
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
 procedure MQTT_FreeUnsubscribeProperties(var AProperties: TMQTTUnsubscribeProperties);
 begin
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
@@ -1385,7 +1423,9 @@ procedure MQTT_InitDisconnectProperties(var AProperties: TMQTTDisconnectProperti
 begin
   AProperties.SessionExpiryInterval := 3600; //[s]
   InitDynArrayToEmpty(AProperties.ReasonString);
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
   InitDynArrayToEmpty(AProperties.ServerReference);
 end;
 
@@ -1393,7 +1433,9 @@ end;
 procedure MQTT_FreeDisconnectProperties(var AProperties: TMQTTDisconnectProperties);
 begin
   FreeDynArray(AProperties.ReasonString);
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
   FreeDynArray(AProperties.ServerReference);
 end;
 
@@ -1403,7 +1445,9 @@ begin
   InitDynArrayToEmpty(AProperties.AuthenticationMethod);
   InitDynArrayToEmpty(AProperties.AuthenticationData);
   InitDynArrayToEmpty(AProperties.ReasonString);
-  InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 
@@ -1412,7 +1456,9 @@ begin
   FreeDynArray(AProperties.AuthenticationMethod);
   FreeDynArray(AProperties.AuthenticationData);
   FreeDynArray(AProperties.ReasonString);
-  FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(AProperties.UserProperty);
+  {$ENDIF}
 end;
 
 

@@ -75,12 +75,14 @@ begin
       Exit;
   end;
 
-  if AEnabledProperties and CMQTTSubscribe_EnUserProperty = CMQTTSubscribe_EnUserProperty then
-  begin
-    Result := MQTT_AddUserPropertyToPacket(ASubscribeProperties.UserProperty, AVarHeader);
-    if not Result then
-      Exit;
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTSubscribe_EnUserProperty = CMQTTSubscribe_EnUserProperty then
+    begin
+      Result := MQTT_AddUserPropertyToPacket(ASubscribeProperties.UserProperty, AVarHeader);
+      if not Result then
+        Exit;
+    end;
+  {$ENDIF}
 
   {$IFDEF FPC}
     if AEnabledProperties and CMQTTUnknownPropertyWord = CMQTTUnknownPropertyWord then
@@ -178,17 +180,20 @@ begin
       begin
         AEnabledProperties := AEnabledProperties or CMQTTSubscribe_EnSubscriptionIdentifier;
         MQTT_DecodeVarInt(AVarHeader, CurrentBufferPointer, ASubscribeProperties.SubscriptionIdentifier);
-      end;
-
-      CMQTT_UserProperty_PropID: //
-      begin
-        AEnabledProperties := AEnabledProperties or CMQTTSubscribe_EnUserProperty;
-        MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, TempBinData);
-        if not AddDynArrayOfByteToDynOfDynOfByte(ASubscribeProperties.UserProperty, TempBinData) then
-          Exit;
-
-        FreeDynArray(TempBinData);
       end
+      
+      {$IFDEF EnUserProperty}
+        ;
+        CMQTT_UserProperty_PropID: //
+        begin
+          AEnabledProperties := AEnabledProperties or CMQTTSubscribe_EnUserProperty;
+          MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, TempBinData);
+          if not AddDynArrayOfByteToDynOfDynOfByte(ASubscribeProperties.UserProperty, TempBinData) then
+            Exit;
+
+          FreeDynArray(TempBinData);
+        end
+      {$ENDIF}
 
       else
       begin

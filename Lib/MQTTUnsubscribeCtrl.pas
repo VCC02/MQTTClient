@@ -71,12 +71,14 @@ begin
   Result := False;
   APropLen := AVarHeader.Len;
 
-  if AEnabledProperties and CMQTTUnsubscribe_EnUserProperty = CMQTTUnsubscribe_EnUserProperty then
-  begin
-    Result := MQTT_AddUserPropertyToPacket(AUnsubscribeProperties.UserProperty, AVarHeader);
-    if not Result then
-      Exit;
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTUnsubscribe_EnUserProperty = CMQTTUnsubscribe_EnUserProperty then
+    begin
+      Result := MQTT_AddUserPropertyToPacket(AUnsubscribeProperties.UserProperty, AVarHeader);
+      if not Result then
+        Exit;
+    end;
+  {$ENDIF}
 
   {$IFDEF FPC}
     if AEnabledProperties and CMQTTUnknownPropertyWord = CMQTTUnknownPropertyWord then
@@ -148,29 +150,35 @@ begin
   Result := False;
   AEnabledProperties := 0;
 
+  {$IFnDEF EnUserProperty}
+    Exit;
+  {$ENDIF}
+
   MaxBufferPointer := APropertiesOffset + APropertyLen;
   CurrentBufferPointer := APropertiesOffset;
   repeat
     PropType := AVarHeader.Content^[CurrentBufferPointer];
     CurrentBufferPointer := CurrentBufferPointer + 1; // SizeOf(PropType)
 
-    case PropType of
-      CMQTT_UserProperty_PropID: //
-      begin
-        AEnabledProperties := AEnabledProperties or CMQTTUnsubscribe_EnUserProperty;
-        MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, TempBinData);
-        if not AddDynArrayOfByteToDynOfDynOfByte(AUnsubscribeProperties.UserProperty, TempBinData) then
-          Exit;
+    {$IFDEF EnUserProperty}
+      case PropType of
 
-        FreeDynArray(TempBinData);
-      end
+        CMQTT_UserProperty_PropID: //
+        begin
+          AEnabledProperties := AEnabledProperties or CMQTTUnsubscribe_EnUserProperty;
+          MQTT_DecodeBinaryData(AVarHeader, CurrentBufferPointer, TempBinData);
+          if not AddDynArrayOfByteToDynOfDynOfByte(AUnsubscribeProperties.UserProperty, TempBinData) then
+            Exit;
 
-      else
-      begin
-        AEnabledProperties := CMQTTUnknownPropertyWord or PropType;
-        Break;
-      end;
-    end;  //case
+          FreeDynArray(TempBinData);
+        end
+        else
+        begin
+          AEnabledProperties := CMQTTUnknownPropertyWord or PropType;
+          Break;
+        end;
+      end;  //case
+    {$ENDIF}
   until CurrentBufferPointer >= MaxBufferPointer;
 
   Result := True;

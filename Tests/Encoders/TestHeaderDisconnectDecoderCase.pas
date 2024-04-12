@@ -105,7 +105,9 @@ begin
   StringToDynArrayOfByte('abc', DisconnectProperties.ReasonString);
   StringToDynArrayOfByte('new server address', DisconnectProperties.ServerReference);
   DisconnectProperties.SessionExpiryInterval := $1234567;
-  Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', DisconnectProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', DisconnectProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
   Expect(FillIn_Disconnect(TempDisconnectFields, DisconnectProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedDisconnectBuffer);
@@ -148,13 +150,15 @@ procedure THeaderDisconnectDecoderCase.Test_FillIn_Disconnect_Decoder_HappyFlow_
 const
   CPropertiesPresent = 1;
 begin
-  Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', DisconnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', DisconnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', DisconnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', DisconnectProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', DisconnectProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', DisconnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', DisconnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', DisconnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', DisconnectProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', DisconnectProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
-  HappyFlowContent(CPropertiesPresent, 3);
+  HappyFlowContent(CPropertiesPresent, 3 {$IFnDEF EnUserProperty} -1 {$ENDIF});
 end;
 
 
@@ -272,7 +276,7 @@ var
   DecodedDisconnectProperties: TMQTTDisconnectProperties;
   DecodedDisconnectFields: TMQTTDisconnectFields;
 begin
-  TempDisconnectFields.EnabledProperties := $F; //all properties
+  TempDisconnectFields.EnabledProperties := $F {$IFnDEF EnUserProperty} xor CMQTTDisconnect_EnUserProperty {$ENDIF}; //all properties
   TempDisconnectFields.DisconnectReasonCode := 47;
 
   Expect(FillIn_DisconnectPropertiesForTest(TempDisconnectFields.EnabledProperties, DisconnectProperties)).ToBe(True);
@@ -291,14 +295,18 @@ begin
     Expect(DecodedDisconnectFields.EnabledProperties).ToBe(TempDisconnectFields.EnabledProperties);
 
     Expect(DecodedDisconnectProperties.ReasonString.Len).ToBe(13);
-    Expect(DecodedDisconnectProperties.UserProperty.Len).ToBe(3);
+    {$IFDEF EnUserProperty}
+      Expect(DecodedDisconnectProperties.UserProperty.Len).ToBe(3);
+    {$ENDIF}
     Expect(DecodedDisconnectProperties.ServerReference.Len).ToBe(10);
     //
     Expect(DecodedDisconnectProperties.SessionExpiryInterval).ToBe(DWord($08ABCDEF));
     Expect(@DecodedDisconnectProperties.ReasonString.Content^[0], 13).ToBe(@['for no reason']);
-    Expect(@DecodedDisconnectProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
-    Expect(@DecodedDisconnectProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
-    Expect(@DecodedDisconnectProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$IFDEF EnUserProperty}
+      Expect(@DecodedDisconnectProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
+      Expect(@DecodedDisconnectProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
+      Expect(@DecodedDisconnectProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$ENDIF}
     Expect(@DecodedDisconnectProperties.ServerReference.Content^[0], 10).ToBe(@['new server']);
   finally
     MQTT_FreeDisconnectProperties(DecodedDisconnectProperties);

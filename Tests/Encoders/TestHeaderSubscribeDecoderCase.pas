@@ -115,7 +115,9 @@ begin
   Expect(FillIn_SubscribePayload('another payload entry', 85, TempSubscribeFields.TopicFilters)).ToBe(True);
 
   SubscribeProperties.SubscriptionIdentifier := 1234;
-  Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', SubscribeProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', SubscribeProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
   Expect(FillIn_Subscribe(TempSubscribeFields, SubscribeProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedSubscribeBuffer);
@@ -168,13 +170,15 @@ procedure THeaderSubscribeDecoderCase.Test_FillIn_Subscribe_Decoder_HappyFlow_Lo
 const
   CPropertiesPresent = 1;
 begin
-  Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', SubscribeProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', SubscribeProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', SubscribeProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', SubscribeProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', SubscribeProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', SubscribeProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', SubscribeProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', SubscribeProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', SubscribeProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', SubscribeProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
-  HappyFlowContent(CPropertiesPresent, 3);
+  HappyFlowContent(CPropertiesPresent, 3 {$IFnDEF EnUserProperty} -1 {$ENDIF});
 end;
 
 
@@ -278,7 +282,7 @@ var
   DecodedSubscribeProperties: TMQTTSubscribeProperties;
   DecodedSubscribeFields: TMQTTSubscribeFields;
 begin
-  TempSubscribeFields.EnabledProperties := $3; //all properties
+  TempSubscribeFields.EnabledProperties := $3 {$IFnDEF EnUserProperty} xor CMQTTSubscribe_EnUserProperty {$ENDIF}; //all properties
   TempSubscribeFields.PacketIdentifier := 1234;
   Expect(FillIn_SubscribePayload('some payload..', 90, TempSubscribeFields.TopicFilters)).ToBe(True);
 
@@ -302,12 +306,14 @@ begin
       FreeDynArray(DecodedSubscribeFields.TopicFilters);
     end;
 
-    Expect(DecodedSubscribeProperties.UserProperty.Len).ToBe(3);
-    //
-    Expect(DecodedSubscribeProperties.SubscriptionIdentifier).ToBe(DWord($08ABCDEF));
-    Expect(@DecodedSubscribeProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
-    Expect(@DecodedSubscribeProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
-    Expect(@DecodedSubscribeProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$IFDEF EnUserProperty}
+      Expect(DecodedSubscribeProperties.UserProperty.Len).ToBe(3);
+      //
+      Expect(DecodedSubscribeProperties.SubscriptionIdentifier).ToBe(DWord($08ABCDEF));
+      Expect(@DecodedSubscribeProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
+      Expect(@DecodedSubscribeProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
+      Expect(@DecodedSubscribeProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$ENDIF}
   finally
     MQTT_FreeSubscribeProperties(DecodedSubscribeProperties);
   end;

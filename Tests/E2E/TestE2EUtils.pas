@@ -279,8 +279,11 @@ begin
   StringToDynArrayOfByte('SomeType', TempWillProperties.ContentType);
   StringToDynArrayOfByte('SomeTopicName', TempWillProperties.ResponseTopic);
   StringToDynArrayOfByte('MyCorrelationData', TempWillProperties.CorrelationData);
-  AddStringToDynOfDynArrayOfByte('Key=Value', TempWillProperties.UserProperty);
-  AddStringToDynOfDynArrayOfByte('NewKey=NewValue', TempWillProperties.UserProperty);
+
+  {$IFDEF EnUserProperty}
+    AddStringToDynOfDynArrayOfByte('Key=Value', TempWillProperties.UserProperty);
+    AddStringToDynOfDynArrayOfByte('NewKey=NewValue', TempWillProperties.UserProperty);
+  {$ENDIF}
 
   FillIn_PayloadWillProperties(TempWillProperties, AConnectFields.PayloadContent.WillProperties);
   MQTT_FreeWillProperties(TempWillProperties);
@@ -297,7 +300,11 @@ begin
   AConnectProperties.TopicAliasMaximum := 100;
   AConnectProperties.RequestResponseInformation := 1;
   AConnectProperties.RequestProblemInformation := 1;
-  AddStringToDynOfDynArrayOfByte('UserProp=Value', AConnectProperties.UserProperty);
+
+  {$IFDEF EnUserProperty}
+    AddStringToDynOfDynArrayOfByte('UserProp=Value', AConnectProperties.UserProperty);
+  {$ENDIF}
+
   StringToDynArrayOfByte('SCRAM-SHA-1', AConnectProperties.AuthenticationMethod);       //some example from spec, pag 108   the server may add to its log: "bad AUTH method"
   StringToDynArrayOfByte('client-first-data', AConnectProperties.AuthenticationData);   //some example from spec, pag 108
 
@@ -325,7 +332,11 @@ begin
   TestClients[TempClientInstance].AddToLog('AssignedClientIdentifier: ' + StringReplace(DynArrayOfByteToString(AConnAckProperties.AssignedClientIdentifier), #0, '#0', [rfReplaceAll]));
   TestClients[TempClientInstance].AddToLog('TopicAliasMaximum: ' + IntToStr(AConnAckProperties.TopicAliasMaximum));
   TestClients[TempClientInstance].AddToLog('ReasonString: ' + StringReplace(DynArrayOfByteToString(AConnAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  TestClients[TempClientInstance].AddToLog('UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AConnAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    TestClients[TempClientInstance].AddToLog('UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AConnAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
+
   TestClients[TempClientInstance].AddToLog('WildcardSubscriptionAvailable: ' + IntToStr(AConnAckProperties.WildcardSubscriptionAvailable));
   TestClients[TempClientInstance].AddToLog('SubscriptionIdentifierAvailable: ' + IntToStr(AConnAckProperties.SubscriptionIdentifierAvailable));
   TestClients[TempClientInstance].AddToLog('SharedSubscriptionAvailable: ' + IntToStr(AConnAckProperties.SharedSubscriptionAvailable));
@@ -411,7 +422,10 @@ begin
     TestClients[TempClientInstance].AddToLog('ASubAckFields.ReasonCodes[' + IntToStr(i) + ']: ' + IntToStr(ASubAckFields.SrcPayload.Content^[i]));
 
   TestClients[TempClientInstance].AddToLog('ASubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(ASubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  TestClients[TempClientInstance].AddToLog('ASubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(ASubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    TestClients[TempClientInstance].AddToLog('ASubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(ASubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 
   TestClients[TempClientInstance].SubAckPacketID := ASubAckFields.PacketIdentifier;
   TestClients[TempClientInstance].AddToLog('');
@@ -462,7 +476,10 @@ begin
     TestClients[TempClientInstance].AddToLog('AUnsubAckFields.ReasonCodes[' + IntToStr(i) + ']: ' + IntToStr(AUnsubAckFields.SrcPayload.Content^[i]));
 
   TestClients[TempClientInstance].AddToLog('AUnsubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(AUnsubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  TestClients[TempClientInstance].AddToLog('AUnsubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AUnsubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    TestClients[TempClientInstance].AddToLog('AUnsubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AUnsubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 
   TestClients[TempClientInstance].UnsubAckPacketID := AUnsubAckFields.PacketIdentifier;
   TestClients[TempClientInstance].AddToLog('');
@@ -508,7 +525,10 @@ begin
   TestClients[TempClientInstance].AddToLog('APubAckFields.ReasonCode: ' + IntToStr(APubAckFields.ReasonCode));
 
   TestClients[TempClientInstance].AddToLog('APubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(APubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  TestClients[TempClientInstance].AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    TestClients[TempClientInstance].AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 
   TestClients[TempClientInstance].AddToLog('');
   //This handler can be used to override what is being sent to server as a reply to PUBLISH
@@ -529,7 +549,10 @@ begin
   TestClients[TempClientInstance].AddToLog('APubAckFields.ReasonCode: ' + IntToStr(APubAckFields.ReasonCode));
 
   TestClients[TempClientInstance].AddToLog('APubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(APubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  TestClients[TempClientInstance].AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    TestClients[TempClientInstance].AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 
   TestClients[TempClientInstance].AddToLog('');
 end;
@@ -676,7 +699,10 @@ begin
   TestClients[TempClientInstance].AddToLog('ADisconnectProperties.SessionExpiryInterval' + IntToStr(ADisconnectProperties.SessionExpiryInterval));
   TestClients[TempClientInstance].AddToLog('ADisconnectProperties.ReasonString' + StringReplace(DynArrayOfByteToString(ADisconnectProperties.ReasonString), #0, '#0', [rfReplaceAll]));
   TestClients[TempClientInstance].AddToLog('ADisconnectProperties.ServerReference' + StringReplace(DynArrayOfByteToString(ADisconnectProperties.ServerReference), #0, '#0', [rfReplaceAll]));
-  TestClients[TempClientInstance].AddToLog('ADisconnectProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(ADisconnectProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    TestClients[TempClientInstance].AddToLog('ADisconnectProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(ADisconnectProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 end;
 
 
@@ -711,7 +737,10 @@ begin
   TestClients[TempClientInstance].AddToLog('AAuthProperties.ReasonString' + StringReplace(DynArrayOfByteToString(AAuthProperties.ReasonString), #0, '#0', [rfReplaceAll]));
   TestClients[TempClientInstance].AddToLog('AAuthProperties.ServerReference' + StringReplace(DynArrayOfByteToString(AAuthProperties.AuthenticationMethod), #0, '#0', [rfReplaceAll]));
   TestClients[TempClientInstance].AddToLog('AAuthProperties.ServerReference' + StringReplace(DynArrayOfByteToString(AAuthProperties.AuthenticationData), #0, '#0', [rfReplaceAll]));
-  TestClients[TempClientInstance].AddToLog('AAuthProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(AAuthProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    TestClients[TempClientInstance].AddToLog('AAuthProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(AAuthProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 end;
 
 

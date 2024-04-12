@@ -157,7 +157,9 @@ begin
   StringToDynArrayOfByte('Some_identifier', PropertiesToSend.AssignedClientIdentifier);
   PropertiesToSend.TopicAliasMaximum := 80;
   StringToDynArrayOfByte('Some_ReasonString', PropertiesToSend.ReasonString);
-  AddStringToDynOfDynArrayOfByte('Some_userprop', PropertiesToSend.UserProperty);
+  {$IFDEF EnUserProperty}
+    AddStringToDynOfDynArrayOfByte('Some_userprop', PropertiesToSend.UserProperty);
+  {$ENDIF}
   PropertiesToSend.WildcardSubscriptionAvailable := 31;
   PropertiesToSend.SubscriptionIdentifierAvailable := 45;
   PropertiesToSend.SharedSubscriptionAvailable := 65;
@@ -180,7 +182,10 @@ begin
   Expect(DecodedConnAckPropertiesArr[APacketIndex].AssignedClientIdentifier).ToMatchContentOf(PropertiesToSend.AssignedClientIdentifier);
   Expect(DecodedConnAckPropertiesArr[APacketIndex].TopicAliasMaximum).ToBe(PropertiesToSend.TopicAliasMaximum);
   Expect(DecodedConnAckPropertiesArr[APacketIndex].ReasonString).ToMatchContentOf(PropertiesToSend.ReasonString);
-  Expect(DecodedConnAckPropertiesArr[APacketIndex].UserProperty).ToMatchContentOf(PropertiesToSend.UserProperty);
+
+  {$IFDEF EnUserProperty}
+    Expect(DecodedConnAckPropertiesArr[APacketIndex].UserProperty).ToMatchContentOf(PropertiesToSend.UserProperty);
+  {$ENDIF}
 
   Expect(DecodedConnAckPropertiesArr[APacketIndex].WildcardSubscriptionAvailable).ToBe(PropertiesToSend.WildcardSubscriptionAvailable);
   Expect(DecodedConnAckPropertiesArr[APacketIndex].SubscriptionIdentifierAvailable).ToBe(PropertiesToSend.SubscriptionIdentifierAvailable);
@@ -211,7 +216,7 @@ begin
   MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
 
-  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF);
+  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF {$IFnDEF EnUserProperty} xor CMQTTConnAck_EnUserProperty {$ENDIF});
   Expect(DecodedConnAckFields.SessionPresentFlag).ToBe(1);
   Expect(DecodedConnAckFields.ConnectReasonCode).ToBe(0);
 
@@ -238,7 +243,7 @@ begin
   MQTT_PutReceivedBufferToMQTTLib(0, TempBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Successful processing');
 
-  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF);
+  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF {$IFnDEF EnUserProperty} xor CMQTTConnAck_EnUserProperty {$ENDIF});
   Expect(DecodedConnAckFields.SessionPresentFlag).ToBe(1);
   Expect(DecodedConnAckFields.ConnectReasonCode).ToBe(0);
 
@@ -299,7 +304,7 @@ begin
 
   Expect(MQTT_Process(0)).ToBe(CMQTT_UnhandledPacketType, 'Bad processing');
 
-  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF); //these should be valid from the first packet
+  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF {$IFnDEF EnUserProperty} xor CMQTTConnAck_EnUserProperty {$ENDIF}); //these should be valid from the first packet
   Expect(DecodedConnAckFields.SessionPresentFlag).ToBe(1);
   Expect(DecodedConnAckFields.ConnectReasonCode).ToBe(0);
 
@@ -364,7 +369,7 @@ begin
 
   Expect(MQTT_Process(0)).ToBe(CMQTTDecoderIncompleteBuffer, 'Bad processing');
 
-  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF); //these should be valid from the first packet
+  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF {$IFnDEF EnUserProperty} xor CMQTTConnAck_EnUserProperty {$ENDIF}); //these should be valid from the first packet
   Expect(DecodedConnAckFields.SessionPresentFlag).ToBe(1);
   Expect(DecodedConnAckFields.ConnectReasonCode).ToBe(0);
 
@@ -425,7 +430,7 @@ begin
   MQTT_PutReceivedBufferToMQTTLib(0, RemainingBuffer);
   Expect(MQTT_Process(0)).ToBe(CMQTT_Success, 'Expecting a full buffer.');
 
-  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF);
+  Expect(DecodedConnAckFields.EnabledProperties).ToBe($1FFFF {$IFnDEF EnUserProperty} xor CMQTTConnAck_EnUserProperty {$ENDIF});
   Expect(DecodedConnAckFields.SessionPresentFlag).ToBe(1);
   Expect(DecodedConnAckFields.ConnectReasonCode).ToBe(0);
 

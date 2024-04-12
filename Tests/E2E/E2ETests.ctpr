@@ -126,7 +126,8 @@
 -dConvExMsg
 -dTruncateDiffMsg
 -dLogMem
--dRoundAlloc"/>
+-dRoundAlloc
+-dEnUserProperty"/>
     </Other>
   </CompilerOptions>
   <Debugging>

@@ -98,8 +98,11 @@ begin
   StringToDynArrayOfByte('SomeType', TempWillProperties.ContentType);
   StringToDynArrayOfByte('SomeTopicName', TempWillProperties.ResponseTopic);
   StringToDynArrayOfByte('MyCorrelationData', TempWillProperties.CorrelationData);
-  AddStringToDynOfDynArrayOfByte('Key=Value', TempWillProperties.UserProperty);
-  AddStringToDynOfDynArrayOfByte('NewKey=NewValue', TempWillProperties.UserProperty);
+
+  {$IFDEF EnUserProperty}
+    AddStringToDynOfDynArrayOfByte('Key=Value', TempWillProperties.UserProperty);
+    AddStringToDynOfDynArrayOfByte('NewKey=NewValue', TempWillProperties.UserProperty);
+  {$ENDIF}
 
   FillIn_PayloadWillProperties(TempWillProperties, AConnectFields.PayloadContent.WillProperties);
   MQTT_FreeWillProperties(TempWillProperties);
@@ -114,7 +117,9 @@ begin
   AConnectProperties.TopicAliasMaximum := 100;
   AConnectProperties.RequestResponseInformation := 1;
   AConnectProperties.RequestProblemInformation := 1;
-  AddStringToDynOfDynArrayOfByte('UserProp=Value', AConnectProperties.UserProperty);
+  {$IFDEF EnUserProperty}
+    AddStringToDynOfDynArrayOfByte('UserProp=Value', AConnectProperties.UserProperty);
+  {$ENDIF}
   StringToDynArrayOfByte('MyAuthMethod', AConnectProperties.AuthenticationMethod);
   StringToDynArrayOfByte('MyAuthData', AConnectProperties.AuthenticationData);
 end;

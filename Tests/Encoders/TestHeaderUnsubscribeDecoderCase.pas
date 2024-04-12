@@ -111,7 +111,9 @@ begin
   Expect(FillIn_UnsubscribePayload('some simple payload entry', TempUnsubscribeFields.TopicFilters)).ToBe(True);
   Expect(FillIn_UnsubscribePayload('another payload entry', TempUnsubscribeFields.TopicFilters)).ToBe(True);
 
-  Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', UnsubscribeProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', UnsubscribeProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
   Expect(FillIn_Unsubscribe(TempUnsubscribeFields, UnsubscribeProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedUnsubscribeBuffer);
@@ -160,13 +162,15 @@ procedure THeaderUnsubscribeDecoderCase.Test_FillIn_Unsubscribe_Decoder_HappyFlo
 const
   CPropertiesPresent = 1;
 begin
-  Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', UnsubscribeProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', UnsubscribeProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', UnsubscribeProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', UnsubscribeProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', UnsubscribeProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', UnsubscribeProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', UnsubscribeProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', UnsubscribeProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', UnsubscribeProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', UnsubscribeProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
-  HappyFlowContent(CPropertiesPresent, 3);
+  HappyFlowContent(CPropertiesPresent, 3 {$IFnDEF EnUserProperty} -1 {$ENDIF});
 end;
 
 
@@ -270,7 +274,7 @@ var
   DecodedUnsubscribeProperties: TMQTTUnsubscribeProperties;
   DecodedUnsubscribeFields: TMQTTUnsubscribeFields;
 begin
-  TempUnsubscribeFields.EnabledProperties := $1; //all properties
+  TempUnsubscribeFields.EnabledProperties := $1 {$IFnDEF EnUserProperty} xor CMQTTUnsubscribe_EnUserProperty {$ENDIF}; //all properties
   TempUnsubscribeFields.PacketIdentifier := 1234;
   Expect(FillIn_UnsubscribePayload('some payload..', TempUnsubscribeFields.TopicFilters)).ToBe(True);
 
@@ -294,11 +298,13 @@ begin
       FreeDynArray(DecodedUnsubscribeFields.TopicFilters);
     end;
 
-    Expect(DecodedUnsubscribeProperties.UserProperty.Len).ToBe(3);
-    //
-    Expect(@DecodedUnsubscribeProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
-    Expect(@DecodedUnsubscribeProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
-    Expect(@DecodedUnsubscribeProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$IFDEF EnUserProperty}
+      Expect(DecodedUnsubscribeProperties.UserProperty.Len).ToBe(3);
+      //
+      Expect(@DecodedUnsubscribeProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
+      Expect(@DecodedUnsubscribeProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
+      Expect(@DecodedUnsubscribeProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$ENDIF}
   finally
     MQTT_FreeUnsubscribeProperties(DecodedUnsubscribeProperties);
   end;
@@ -318,13 +324,15 @@ begin
   Expect(Decode_UnsubscribeToCtrlPacket(EncodedUnsubscribeBuffer, DecodedUnsubscribePacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
   Expect(DecodedBufferLen).ToBe(EncodedUnsubscribeBuffer.Len);
 
-  MQTT_InitUnsubscribeProperties(DecodedUnsubscribeProperties);
-  try
-    Expect(Decode_Unsubscribe({DestPacket} DecodedUnsubscribePacket, DecodedUnsubscribeFields, DecodedUnsubscribeProperties)).ToBe(CMQTTDecoderUnknownProperty);
-    Expect(DecodedUnsubscribeFields.EnabledProperties and $FF).ToBe(CMQTT_UnknownProperty_PropID);
-  finally
-    MQTT_FreeUnsubscribeProperties(DecodedUnsubscribeProperties);
-  end;
+  {$IFDEF EnUserProperty}
+    MQTT_InitUnsubscribeProperties(DecodedUnsubscribeProperties);
+    try
+      Expect(Decode_Unsubscribe({DestPacket} DecodedUnsubscribePacket, DecodedUnsubscribeFields, DecodedUnsubscribeProperties)).ToBe(CMQTTDecoderUnknownProperty);
+      Expect(DecodedUnsubscribeFields.EnabledProperties and $FF).ToBe(CMQTT_UnknownProperty_PropID);
+    finally
+      MQTT_FreeUnsubscribeProperties(DecodedUnsubscribeProperties);
+    end;
+  {$ENDIF}
 end;
 
 

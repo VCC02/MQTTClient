@@ -149,13 +149,15 @@ procedure THeaderConnAckDecoderCase.Test_FillIn_ConnAck_Decoder_HappyFlow_LongSt
 const
   CSessionPresent = 0;
 begin
-  Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnAckProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnAckProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnAckProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnAckProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', ConnAckProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnAckProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnAckProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnAckProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', ConnAckProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', ConnAckProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
-  HappyFlowContent(CSessionPresent, 3);
+  HappyFlowContent(CSessionPresent, 3 {$IFnDEF EnUserProperty} - 1 {$ENDIF});
 end;
 
 
@@ -293,7 +295,7 @@ var
   DecodedConnAckProperties: TMQTTConnAckProperties;
   DecodedConnAckFields: TMQTTConnAckFields;
 begin
-  TempConnAckFields.EnabledProperties := $1FFFF; //all properties
+  TempConnAckFields.EnabledProperties := $1FFFF {$IFnDEF EnUserProperty} xor CMQTTConnAck_EnUserProperty {$ENDIF}; //all properties
   TempConnAckFields.ConnectReasonCode := 0; //0 = no err
   TempConnAckFields.SessionPresentFlag := 1;
 
@@ -315,7 +317,9 @@ begin
 
     Expect(DecodedConnAckProperties.AssignedClientIdentifier.Len).ToBe(32);
     Expect(DecodedConnAckProperties.ReasonString.Len).ToBe(13);
-    Expect(DecodedConnAckProperties.UserProperty.Len).ToBe(3);
+    {$IFDEF EnUserProperty}
+      Expect(DecodedConnAckProperties.UserProperty.Len).ToBe(3);
+    {$ENDIF}
     Expect(DecodedConnAckProperties.ResponseInformation.Len).ToBe(11);
     Expect(DecodedConnAckProperties.ServerReference.Len).ToBe(24);
     Expect(DecodedConnAckProperties.AuthenticationMethod.Len).ToBe(26);
@@ -323,9 +327,11 @@ begin
     //
     Expect(@DecodedConnAckProperties.AssignedClientIdentifier.Content^, 32).ToBe(@['Client name, assigned by server.']);
     Expect(@DecodedConnAckProperties.ReasonString.Content^, 13).ToBe(@['for no reason']);
-    Expect(@DecodedConnAckProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
-    Expect(@DecodedConnAckProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
-    Expect(@DecodedConnAckProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$IFDEF EnUserProperty}
+      Expect(@DecodedConnAckProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
+      Expect(@DecodedConnAckProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
+      Expect(@DecodedConnAckProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$ENDIF}
     Expect(@DecodedConnAckProperties.ResponseInformation.Content^, 11).ToBe(@['no new info']);
     Expect(@DecodedConnAckProperties.ServerReference.Content^, 24).ToBe(@['address_of_backup_server']);
     Expect(@DecodedConnAckProperties.AuthenticationMethod.Content^, 26).ToBe(@['some authentication method']);

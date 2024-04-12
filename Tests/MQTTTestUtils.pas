@@ -94,12 +94,14 @@ begin
     Result := Result and StringToDynArrayOfByte(TempStr, ADestProperties.ReasonString);
   end;
 
-  if AEnabledProperties and CMQTTConnAck_EnUserProperty = CMQTTConnAck_EnUserProperty then
-  begin
-    Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTConnAck_EnUserProperty = CMQTTConnAck_EnUserProperty then
+    begin
+      Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
+    end;
+  {$ENDIF}
 
   if AEnabledProperties and CMQTTConnAck_EnWildcardSubscriptionAvailable = CMQTTConnAck_EnWildcardSubscriptionAvailable then
     ADestProperties.WildcardSubscriptionAvailable := 1
@@ -176,12 +178,14 @@ begin
     ADestProperties.CorrelationData.Content^[2] := 60;
   end;
 
-  if AEnabledProperties and CMQTTPublish_EnUserProperty = CMQTTPublish_EnUserProperty then
-  begin
-    Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTPublish_EnUserProperty = CMQTTPublish_EnUserProperty then
+    begin
+      Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
+    end;
+  {$ENDIF}
 
   if AEnabledProperties and CMQTTPublish_EnSubscriptionIdentifier = CMQTTPublish_EnSubscriptionIdentifier then
   begin
@@ -208,12 +212,14 @@ begin
   if AEnabledProperties and CMQTTCommon_EnReasonString = CMQTTCommon_EnReasonString then
     Result := Result and StringToDynArrayOfByte('for no reason', ADestProperties.ReasonString);
 
-  if AEnabledProperties and CMQTTCommon_EnUserProperty = CMQTTCommon_EnUserProperty then
-  begin
-    Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTCommon_EnUserProperty = CMQTTCommon_EnUserProperty then
+    begin
+      Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
+    end;
+  {$ENDIF}
 end;
 
 
@@ -224,12 +230,14 @@ begin
   if AEnabledProperties and CMQTTSubscribe_EnSubscriptionIdentifier = CMQTTSubscribe_EnSubscriptionIdentifier then
     ADestProperties.SubscriptionIdentifier := $08ABCDEF;
 
-  if AEnabledProperties and CMQTTSubscribe_EnUserProperty = CMQTTSubscribe_EnUserProperty then
-  begin
-    Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTSubscribe_EnUserProperty = CMQTTSubscribe_EnUserProperty then
+    begin
+      Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
+    end;
+  {$ENDIF}
 end;
 
 
@@ -237,12 +245,14 @@ function FillIn_UnsubscribePropertiesForTest(AEnabledProperties: Word; var ADest
 begin
   Result := True;
 
-  if AEnabledProperties and CMQTTUnsubscribe_EnUserProperty = CMQTTUnsubscribe_EnUserProperty then
-  begin
-    Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTUnsubscribe_EnUserProperty = CMQTTUnsubscribe_EnUserProperty then
+    begin
+      Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
+    end;
+  {$ENDIF}
 end;
 
 
@@ -256,12 +266,14 @@ begin
   if AEnabledProperties and CMQTTDisconnect_EnReasonString = CMQTTDisconnect_EnReasonString then
     Result := Result and StringToDynArrayOfByte('for no reason', ADestProperties.ReasonString);
 
-  if AEnabledProperties and CMQTTDisconnect_EnUserProperty = CMQTTDisconnect_EnUserProperty then
-  begin
-    Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTDisconnect_EnUserProperty = CMQTTDisconnect_EnUserProperty then
+    begin
+      Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
+    end;
+  {$ENDIF}
 
   if AEnabledProperties and CMQTTDisconnect_EnServerReference = CMQTTDisconnect_EnServerReference then
     Result := Result and StringToDynArrayOfByte('new server', ADestProperties.ServerReference);
@@ -281,12 +293,14 @@ begin
   if AEnabledProperties and CMQTTAuth_EnReasonString = CMQTTAuth_EnReasonString then
     Result := Result and StringToDynArrayOfByte('for no reason', ADestProperties.ReasonString);
 
-  if AEnabledProperties and CMQTTAuth_EnUserProperty = CMQTTAuth_EnUserProperty then
-  begin
-    Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
-    Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
-  end;
+  {$IFDEF EnUserProperty}
+    if AEnabledProperties and CMQTTAuth_EnUserProperty = CMQTTAuth_EnUserProperty then
+    begin
+      Result := Result and AddStringToDynOfDynArrayOfByte('first_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('second_user_property', ADestProperties.UserProperty);
+      Result := Result and AddStringToDynOfDynArrayOfByte('third_user_property', ADestProperties.UserProperty);
+    end;
+  {$ENDIF}
 end;
 
 

@@ -231,7 +231,10 @@ begin
   ReceivedPubRelFields.ReasonCode := 0;
   InitDynArrayToEmpty(ReceivedPubRelFields.SrcPayload);
   InitDynArrayToEmpty(ReceivedPubRelProperties.ReasonString);
-  InitDynOfDynOfByteToEmpty(ReceivedPubRelProperties.UserProperty);
+
+  {$IFDEF EnUserProperty}
+    InitDynOfDynOfByteToEmpty(ReceivedPubRelProperties.UserProperty);
+  {$ENDIF}
 
   MQTT_InitPublishProperties(ReceivedPublishProperties);
   MQTT_InitControlPacket(DestPacket);
@@ -258,7 +261,10 @@ begin
 
   FreeDynArray(ReceivedPubRelFields.SrcPayload);
   FreeDynArray(ReceivedPubRelProperties.ReasonString);
-  FreeDynOfDynOfByteArray(ReceivedPubRelProperties.UserProperty);
+
+  {$IFDEF EnUserProperty}
+    FreeDynOfDynOfByteArray(ReceivedPubRelProperties.UserProperty);
+  {$ENDIF}
 
   for i := 0 to Length(DecodedPublishPropertiesArr) - 1 do
     MQTT_FreePublishProperties(DecodedPublishPropertiesArr[i]);

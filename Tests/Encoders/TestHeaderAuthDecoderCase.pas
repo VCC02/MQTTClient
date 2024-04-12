@@ -105,7 +105,9 @@ begin
   StringToDynArrayOfByte('abc', AuthProperties.ReasonString);
   StringToDynArrayOfByte('auth data', AuthProperties.AuthenticationData);
   StringToDynArrayOfByte('auth method', AuthProperties.AuthenticationMethod);
-  Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', AuthProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', AuthProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
   Expect(FillIn_Auth(TempAuthFields, AuthProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedAuthBuffer);
@@ -148,13 +150,15 @@ procedure THeaderAuthDecoderCase.Test_FillIn_Auth_Decoder_HappyFlow_LongStrings;
 const
   CPropertiesPresent = 1;
 begin
-  Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', AuthProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', AuthProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', AuthProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', AuthProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', AuthProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', AuthProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', AuthProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', AuthProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', AuthProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', AuthProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
-  HappyFlowContent(CPropertiesPresent, 3);
+  HappyFlowContent(CPropertiesPresent, 3 {$IFnDEF EnUserProperty} -1 {$ENDIF});
 end;
 
 
@@ -257,7 +261,7 @@ var
   DecodedAuthProperties: TMQTTAuthProperties;
   DecodedAuthFields: TMQTTAuthFields;
 begin
-  TempAuthFields.EnabledProperties := $F; //all properties
+  TempAuthFields.EnabledProperties := $F{$IFnDEF EnUserProperty} xor CMQTTAuth_EnUserProperty {$ENDIF}; //all properties
   TempAuthFields.AuthReasonCode := 47;
 
   Expect(FillIn_AuthPropertiesForTest(TempAuthFields.EnabledProperties, AuthProperties)).ToBe(True);
@@ -276,14 +280,18 @@ begin
     Expect(DecodedAuthFields.EnabledProperties).ToBe(TempAuthFields.EnabledProperties);
 
     Expect(DecodedAuthProperties.ReasonString.Len).ToBe(13);
-    Expect(DecodedAuthProperties.UserProperty.Len).ToBe(3);
+    {$IFDEF EnUserProperty}
+      Expect(DecodedAuthProperties.UserProperty.Len).ToBe(3);
+    {$ENDIF}
     Expect(DecodedAuthProperties.AuthenticationMethod.Len).ToBe(11);
     Expect(DecodedAuthProperties.AuthenticationData.Len).ToBe(10);
     //
     Expect(@DecodedAuthProperties.ReasonString.Content^[0], 13).ToBe(@['for no reason']);
-    Expect(@DecodedAuthProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
-    Expect(@DecodedAuthProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
-    Expect(@DecodedAuthProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$IFDEF EnUserProperty}
+      Expect(@DecodedAuthProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
+      Expect(@DecodedAuthProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
+      Expect(@DecodedAuthProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$ENDIF}
     Expect(@DecodedAuthProperties.AuthenticationMethod.Content^[0], 11).ToBe(@['some method']);
     Expect(@DecodedAuthProperties.AuthenticationData.Content^[0], 10).ToBe(@['some data.']);
   finally

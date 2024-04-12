@@ -154,8 +154,9 @@ begin
   AddAPayload;
 
   Expect(StringToDynArrayOfByte('five/seven/zero', CommonProperties.ReasonString)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', CommonProperties.UserProperty)).ToBe(True);
-
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('Some content for user property.', CommonProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
   Expect(FillIn_Common(TempCommonFields, CommonProperties, FPacketType, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedCommonBuffer);
 
@@ -236,13 +237,15 @@ const
   CPropertiesPresent = 1;
   CReasonCode = 24;
 begin
-  Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', CommonProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', CommonProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', CommonProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', CommonProperties.UserProperty)).ToBe(True);
-  Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', CommonProperties.UserProperty)).ToBe(True);
+  {$IFDEF EnUserProperty}
+    Expect(AddStringToDynOfDynArrayOfByte('First_user_property with a very long content. This is intended to cause total string length to be greater than 255.', CommonProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Second_user_property with a very long content. This is intended to cause total string length to be greater than 255.', CommonProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Third_user_property with a very long content. This is intended to cause total string length to be greater than 255.', CommonProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('Fourth_user_property with a very long content. This is intended to cause total string length to be greater than 255.', CommonProperties.UserProperty)).ToBe(True);
+    Expect(AddStringToDynOfDynArrayOfByte('One more string, to cause the buffer to go past 512 bytes.', CommonProperties.UserProperty)).ToBe(True);
+  {$ENDIF}
 
-  HappyFlowContent(CPropertiesPresent, 3, CReasonCode);
+  HappyFlowContent(CPropertiesPresent, 3 {$IFnDEF EnUserProperty} -1 {$ENDIF}, CReasonCode);
 end;
 
 
@@ -354,7 +357,7 @@ var
   DecodedCommonProperties: TMQTTCommonProperties;
   DecodedCommonFields: TMQTTCommonFields;
 begin
-  TempCommonFields.EnabledProperties := $3; //all properties
+  TempCommonFields.EnabledProperties := $3 {$IFnDEF EnUserProperty} xor CMQTTCommon_EnUserProperty {$ENDIF}; //all properties
   TempCommonFields.ReasonCode := 97;
   TempCommonFields.PacketIdentifier := 1234;
 
@@ -380,12 +383,14 @@ begin
     Expect(DecodedCommonFields.EnabledProperties).ToBe(TempCommonFields.EnabledProperties);
 
     Expect(DecodedCommonProperties.ReasonString.Len).ToBe(13);
-    Expect(DecodedCommonProperties.UserProperty.Len).ToBe(3);
-    //
-    Expect(@DecodedCommonProperties.ReasonString.Content^, 13).ToBe(@['for no reason']);
-    Expect(@DecodedCommonProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
-    Expect(@DecodedCommonProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
-    Expect(@DecodedCommonProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$IFDEF EnUserProperty}
+      Expect(DecodedCommonProperties.UserProperty.Len).ToBe(3);
+      //
+      Expect(@DecodedCommonProperties.ReasonString.Content^, 13).ToBe(@['for no reason']);
+      Expect(@DecodedCommonProperties.UserProperty.Content^[0]^.Content^, 19).ToBe(@['first_user_property']);
+      Expect(@DecodedCommonProperties.UserProperty.Content^[1]^.Content^, 20).ToBe(@['second_user_property']);
+      Expect(@DecodedCommonProperties.UserProperty.Content^[2]^.Content^, 19).ToBe(@['third_user_property']);
+    {$ENDIF}
 
     if FPacketType in [CMQTT_SUBACK, CMQTT_UNSUBACK] then
     begin

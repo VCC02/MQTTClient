@@ -204,6 +204,9 @@
         </Win32>
       </Options>
     </Linking>
+    <Other>
+      <CustomOptions Value="-dEnUserProperty"/>
+    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions>

@@ -217,8 +217,11 @@ begin
   StringToDynArrayOfByte('SomeType', TempWillProperties.ContentType);
   StringToDynArrayOfByte('SomeTopicName', TempWillProperties.ResponseTopic);
   StringToDynArrayOfByte('MyCorrelationData', TempWillProperties.CorrelationData);
-  AddStringToDynOfDynArrayOfByte('Key=Value', TempWillProperties.UserProperty);
-  AddStringToDynOfDynArrayOfByte('NewKey=NewValue', TempWillProperties.UserProperty);
+
+  {$IFDEF EnUserProperty}
+    AddStringToDynOfDynArrayOfByte('Key=Value', TempWillProperties.UserProperty);
+    AddStringToDynOfDynArrayOfByte('NewKey=NewValue', TempWillProperties.UserProperty);
+  {$ENDIF}
 
   FillIn_PayloadWillProperties(TempWillProperties, AConnectFields.PayloadContent.WillProperties);
   MQTT_FreeWillProperties(TempWillProperties);
@@ -235,7 +238,11 @@ begin
   AConnectProperties.TopicAliasMaximum := 100;
   AConnectProperties.RequestResponseInformation := 1;
   AConnectProperties.RequestProblemInformation := 1;
-  AddStringToDynOfDynArrayOfByte('UserProp=Value', AConnectProperties.UserProperty);
+
+  {$IFDEF EnUserProperty}
+    AddStringToDynOfDynArrayOfByte('UserProp=Value', AConnectProperties.UserProperty);
+  {$ENDIF}
+
   StringToDynArrayOfByte('SCRAM-SHA-1', AConnectProperties.AuthenticationMethod);       //some example from spec, pag 108   the server may add to its log: "bad AUTH method"
   StringToDynArrayOfByte('client-first-data', AConnectProperties.AuthenticationData);   //some example from spec, pag 108
 
@@ -267,7 +274,11 @@ begin
   frmMQTTClientAppMain.AddToLog('AssignedClientIdentifier: ' + StringReplace(DynArrayOfByteToString(AConnAckProperties.AssignedClientIdentifier), #0, '#0', [rfReplaceAll]));
   frmMQTTClientAppMain.AddToLog('TopicAliasMaximum: ' + IntToStr(AConnAckProperties.TopicAliasMaximum));
   frmMQTTClientAppMain.AddToLog('ReasonString: ' + StringReplace(DynArrayOfByteToString(AConnAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  frmMQTTClientAppMain.AddToLog('UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AConnAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    frmMQTTClientAppMain.AddToLog('UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AConnAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
+
   frmMQTTClientAppMain.AddToLog('WildcardSubscriptionAvailable: ' + IntToStr(AConnAckProperties.WildcardSubscriptionAvailable));
   frmMQTTClientAppMain.AddToLog('SubscriptionIdentifierAvailable: ' + IntToStr(AConnAckProperties.SubscriptionIdentifierAvailable));
   frmMQTTClientAppMain.AddToLog('SharedSubscriptionAvailable: ' + IntToStr(AConnAckProperties.SharedSubscriptionAvailable));
@@ -373,7 +384,10 @@ begin
     frmMQTTClientAppMain.AddToLog('ASubAckFields.ReasonCodes[' + IntToStr(i) + ']: ' + IntToStr(ASubAckFields.SrcPayload.Content^[i]));
 
   frmMQTTClientAppMain.AddToLog('ASubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(ASubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  frmMQTTClientAppMain.AddToLog('ASubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(ASubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    frmMQTTClientAppMain.AddToLog('ASubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(ASubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 
   frmMQTTClientAppMain.btnSubscribeTo.Enabled := True;
   frmMQTTClientAppMain.AddToLog('');
@@ -414,7 +428,10 @@ begin
     frmMQTTClientAppMain.AddToLog('AUnsubAckFields.ReasonCodes[' + IntToStr(i) + ']: ' + IntToStr(AUnsubAckFields.SrcPayload.Content^[i]));
 
   frmMQTTClientAppMain.AddToLog('AUnsubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(AUnsubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  frmMQTTClientAppMain.AddToLog('AUnsubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AUnsubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    frmMQTTClientAppMain.AddToLog('AUnsubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(AUnsubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 
   frmMQTTClientAppMain.btnUnSubscribeFrom.Enabled := True;
   frmMQTTClientAppMain.AddToLog('');
@@ -464,7 +481,10 @@ begin
   frmMQTTClientAppMain.AddToLog('APubAckFields.ReasonCode: ' + IntToStr(APubAckFields.ReasonCode));
 
   frmMQTTClientAppMain.AddToLog('APubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(APubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  frmMQTTClientAppMain.AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    frmMQTTClientAppMain.AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 
   frmMQTTClientAppMain.AddToLog('');
   //This handler can be used to override what is being sent to server as a reply to PUBLISH
@@ -482,7 +502,10 @@ begin
   frmMQTTClientAppMain.AddToLog('APubAckFields.ReasonCode: ' + IntToStr(APubAckFields.ReasonCode));
 
   frmMQTTClientAppMain.AddToLog('APubAckProperties.ReasonString: ' + StringReplace(DynArrayOfByteToString(APubAckProperties.ReasonString), #0, '#0', [rfReplaceAll]));
-  frmMQTTClientAppMain.AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    frmMQTTClientAppMain.AddToLog('APubAckProperties.UserProperty: ' + StringReplace(DynOfDynArrayOfByteToString(APubAckProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 
   frmMQTTClientAppMain.AddToLog('');
 end;
@@ -591,7 +614,10 @@ begin
   frmMQTTClientAppMain.AddToLog('ADisconnectProperties.SessionExpiryInterval' + IntToStr(ADisconnectProperties.SessionExpiryInterval));
   frmMQTTClientAppMain.AddToLog('ADisconnectProperties.ReasonString' + StringReplace(DynArrayOfByteToString(ADisconnectProperties.ReasonString), #0, '#0', [rfReplaceAll]));
   frmMQTTClientAppMain.AddToLog('ADisconnectProperties.ServerReference' + StringReplace(DynArrayOfByteToString(ADisconnectProperties.ServerReference), #0, '#0', [rfReplaceAll]));
-  frmMQTTClientAppMain.AddToLog('ADisconnectProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(ADisconnectProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    frmMQTTClientAppMain.AddToLog('ADisconnectProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(ADisconnectProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 end;
 
 
@@ -620,7 +646,10 @@ begin
   frmMQTTClientAppMain.AddToLog('AAuthProperties.ReasonString' + StringReplace(DynArrayOfByteToString(AAuthProperties.ReasonString), #0, '#0', [rfReplaceAll]));
   frmMQTTClientAppMain.AddToLog('AAuthProperties.ServerReference' + StringReplace(DynArrayOfByteToString(AAuthProperties.AuthenticationMethod), #0, '#0', [rfReplaceAll]));
   frmMQTTClientAppMain.AddToLog('AAuthProperties.ServerReference' + StringReplace(DynArrayOfByteToString(AAuthProperties.AuthenticationData), #0, '#0', [rfReplaceAll]));
-  frmMQTTClientAppMain.AddToLog('AAuthProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(AAuthProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+
+  {$IFDEF EnUserProperty}
+    frmMQTTClientAppMain.AddToLog('AAuthProperties.UserProperty' + StringReplace(DynOfDynArrayOfByteToString(AAuthProperties.UserProperty), #0, '#0', [rfReplaceAll]));
+  {$ENDIF}
 end;
 
 
