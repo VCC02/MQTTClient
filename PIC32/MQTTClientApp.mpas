@@ -28,15 +28,34 @@ uses
   MQTTUtils, MQTTClient;
   
   
+type
+  PSOCKET_Intern_Dsc = ^SOCKET_Intern_Dsc;
+
+
+var
+  MQTTToEthFIFO: TDynArrayOfTDynArrayOfByte;
+  EthToMQTTFIFO: TDynArrayOfTDynArrayOfByte;
+  RecFIFO: TDynArrayOfByte;  //filled in by Eth handler with raw data
+  
+const
+  HEAP_START: DWord = $A0000FDC;
+  HEAP_SIZE: DWord = 30000;
+
+var
+  SomeCondition: Boolean;
+  MainLoopCounter: Byte;
+
+var
+  MyMacAddr   : array[6] of byte; // my MAC address
+  MyIpAddr    : array[4] of byte; // my IP address
+  GWIpAddr    : array[4] of byte; // gateway (router) IP address
+  IpMask      : array[4] of byte; // network mask (for example : 255.255.255.0)
+  DnsIpAddr   : array[4] of byte; // DNS server IP address
+
+
 procedure AddToLog(var AMsg: string[100000]);
 begin
-  UART1_Write_Text(AMsg);
-end;
-
-
-procedure SendDynArrayOfByte(var AArr: TDynArrayOfByte);
-begin
-  //Send AArr.Content^ buffer of AArr.Len length
+  //UART1_Write_Text(AMsg);
 end;
 
 
@@ -46,7 +65,9 @@ var
   Err: Word;
 begin
   BufferPointer := MQTT_GetClientToServerBuffer(ClientInstance, Err){$IFnDEF SingleOutputBuffer}^.Content^[0]{$ENDIF};
-  SendDynArrayOfByte(BufferPointer^);
+
+  if not AddDynArrayOfByteToDynOfDynOfByte(MQTTToEthFIFO, BufferPointer^) then
+    AddToLog('Not enough memory in SendPacketToServer');
 
   {$IFnDEF SingleOutputBuffer}
     if not MQTT_RemovePacketFromClientToServerBuffer(ClientInstance) then
@@ -73,6 +94,9 @@ begin
 
   if Lo(AErr) = CMQTT_PacketIdentifierNotFound_ClientToServer then   // $CE
     AddToLog('Client error: PacketIdentifierNotFound.');
+    
+  if Lo(AErr) = CMQTT_UnhandledPacketType then   // $CA
+    AddToLog('Client error: UnhandledPacketType.');  //Usually appears when an incomplete packet is received, so the packet type by is 0.
 end;
 
 
@@ -104,8 +128,8 @@ begin
 
   //Id := Chr((ClientInstance and $FF) + 48);
   //ClientId := 'MyClient' + Id;
-  UserName := 'MyUsername';
-  Password := 'MyPassword';
+  UserName := ''; //'MyUsername';
+  Password := ''; //'MyPassword';
 
   //StringToDynArrayOfByte(ClientId, AConnectFields.PayloadContent.ClientID);
   StringToDynArrayOfByte(UserName, AConnectFields.PayloadContent.UserName);
@@ -396,6 +420,175 @@ begin
 end;
 
 
+procedure SyncReceivedBuffer(var AReadBuf: TDynArrayOfByte);
+begin
+  if not AddDynArrayOfByteToDynOfDynOfByte(EthToMQTTFIFO, AReadBuf) then
+    AddToLog('Out of memory on adding to ReceivedBuffer FIFO.');
+end;
+
+
+var
+  TempReadBuf: TDynArrayOfByte;  //This is a global var on MCU, because Net_Ethernet_Intern_UserTCP adds to it over multiple calls.
+
+procedure RecFIFOToMQTT;
+var
+  ExactPacket: TDynArrayOfByte;
+  TempByte: Byte;
+  PacketName: string[30];
+  PacketSize: DWord;
+  LoggedDisconnection: Boolean;
+  TempArr: TDynArrayOfByte;
+  SuccessfullyDecoded, SuccessfullyRead: Boolean;
+  ProcessBufferLengthResult: Word;
+begin
+  //InitDynArrayToEmpty(TempReadBuf); //Do not initialize here! The content of this array is accumulated over multiple calls to Net_Ethernet_Intern_UserTCP
+  SuccessfullyRead := False;
+  repeat
+    if RecFIFO.Len = 0 then    // An IOHandler.ReadByte call would throw an exception when attempting to read more that available.
+      Exit;
+
+    TempByte := RecFIFO.Content^[0];
+    if not RemoveStartBytesFromDynArray(1, RecFIFO) then
+    begin
+      AddToLog('Out of memory when removing a byte from RecFIFO.');
+      Exit;
+    end;
+
+    if not AddByteToDynArray(TempByte, TempReadBuf) then
+    begin
+      HandleOnMQTTError(0, CMQTT_UserError, CMQTT_UNDEFINED);
+      AddToLog('Cannot allocate buffer when reading.');
+      FreeDynArray(TempReadBuf);
+    end
+    else
+    begin
+      SuccessfullyDecoded := True;                                         //PacketSize should be the expected size, which can be greater than TempReadBuf.Len
+      ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
+
+      if ProcessBufferLengthResult <> CMQTTDecoderNoErr then
+        SuccessfullyDecoded := False
+      else
+        if ProcessBufferLengthResult = CMQTTDecoderIncompleteBuffer then  //PacketSize is successfully decoded, but the packet is incomplete
+        begin
+          //to get a complete packet, the number of bytes to be read next is PacketSize - TempReadBuf.Len.
+
+          if RecFIFO.Len < PacketSize - TempReadBuf.Len then    // An IOHandler.ReadBytes call would throw an exception when attempting to read more that available.
+            Exit;
+
+          InitDynArrayToEmpty(TempArr);
+          CopyFromDynArray(TempArr, RecFIFO, 0, PacketSize - TempReadBuf.Len);
+
+          if not RemoveStartBytesFromDynArray(TempArr.Len, RecFIFO) then
+          begin
+            AddToLog('Out of memory when removing a byte from RecFIFO.');
+            Exit;
+          end;
+
+          if TempArr.Len > 0 then   //it should be >0, otherwise this loop wouldn't have been executed
+            if not ConcatDynArrays(TempReadBuf, TempArr) then
+            begin
+              AddToLog('Out of memory on allocating TempReadBuf, for multiple bytes.');
+              FreeDynArray(TempReadBuf);
+            end
+            else
+            begin
+              ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
+              SuccessfullyDecoded := ProcessBufferLengthResult <> CMQTTDecoderNoErr;
+            end;
+
+          FreeDynArray(TempArr);
+        end;
+
+      if SuccessfullyDecoded then
+      begin
+        MQTTPacketToString(TempReadBuf.Content^[0], PacketName);
+        AddToLog('done receiving packet:');
+        AddToLog(PacketName);
+
+        if PacketSize <> TempReadBuf.Len then
+        begin
+          if CopyFromDynArray(ExactPacket, TempReadBuf, 0, PacketSize) then
+          begin
+            SyncReceivedBuffer(ExactPacket);
+            FreeDynArray(ExactPacket);
+            if not RemoveStartBytesFromDynArray(PacketSize, TempReadBuf) then
+              AddToLog('Cannot remove processed packet from TempReadBuf.');
+          end
+          else
+            AddToLog('Out of memory on allocating ExactPacket.');
+        end
+        else
+        begin
+          SyncReceivedBuffer(TempReadBuf);   //MQTT_Process returns an error for unknown and incomplete packets
+          FreeDynArray(TempReadBuf);   //freed here, only when a valid packet is formed
+        end;
+
+        //Sleep(1);
+      end; //SuccessfullyDecoded
+    end;
+
+  until SuccessfullyRead;
+end;
+
+
+procedure Net_Ethernet_Intern_UserTCP(socket: PSOCKET_Intern_Dsc);   //callback for receiving data
+var
+  Arr: TDynArrayOfByte;
+begin
+  if socket^.dataLength > 0 then
+  begin
+    InitDynArrayToEmpty(Arr);
+    if not SetDynLength(Arr, socket^.dataLength) then
+    begin
+      HandleOnMQTTError(socket^.ID, CMQTT_OutOfMemory, 0);
+      Exit;
+    end;
+
+    Net_Ethernet_Intern_getBytes(PByte(Arr.Content), $FFFF, Arr.Len);
+
+    if not ConcatDynArrays(RecFIFO, Arr) then
+      HandleOnMQTTError(socket^.ID, CMQTT_OutOfMemory, 0);
+
+    FreeDynArray(Arr);
+    RecFIFOToMQTT;
+  end;
+
+  if MQTTToEthFIFO.Len > 0 then
+  begin
+    Net_Ethernet_Intern_putBytesTCP(DWord(MQTTToEthFIFO.Content^[0]^.Content), MQTTToEthFIFO.Content^[0]^.Len, @socket_Intern[0]);
+    DeleteItemFromDynOfDynOfByte(MQTTToEthFIFO, 0);
+  end;
+end;
+
+
+function Net_Ethernet_Intern_UserUDP(udpDsc: ^UDP_Intern_Dsc): Word;
+begin
+  Result := 0;
+end;
+
+
+procedure ProcessReceivedBuffer;  //called by a timer, to process received data
+var
+  TempReadBuf: TDynArrayOfByte;
+begin
+  if EthToMQTTFIFO.Len > 0 then
+  begin
+    InitDynArrayToEmpty(TempReadBuf);
+
+    if MQTT_PutReceivedBufferToMQTTLib(0, EthToMQTTFIFO.Content^[0]^) then
+    begin
+      if not DeleteItemFromDynOfDynOfByte(EthToMQTTFIFO, 0) then
+        AddToLog('Out of memory in ProcessReceivedBuffer.');
+
+      MQTT_Process(0);
+    end
+    else
+      AddToLog('Out of memory in ProcessReceivedBuffer.');
+
+    FreeDynArray(TempReadBuf);
+  end;
+end;
+
 
 procedure InitHandlers;
 begin
@@ -450,16 +643,115 @@ begin
   {$ENDIF}
 end;
 
-
-const 
-  HEAP_START: DWord = $A0000FDC;
-  HEAP_SIZE: DWord = 30000;
   
-var
-  SomeCondition: Boolean;
-  TempReadBuf: TDynArrayOfByte;
+procedure PrepareManualIPAndMAC(OptionIndex: Integer);
+begin
+  // set mac address
+  myMacAddr[0] := 0x00;
+  myMacAddr[1] := 0x14;
+  myMacAddr[2] := 0xA5;
+  myMacAddr[3] := 0x76;
+  myMacAddr[4] := 0x19;
+  myMacAddr[5] := 0x3F;
+
+  // set IP address and gateway
+
+  case OptionIndex of
+    0:
+    begin
+      myIpAddr[0] := 192;
+      myIpAddr[1] := 168;
+      myIpAddr[2] := 0;
+      myIpAddr[3] := 103;
+
+      gwIpAddr[0]  := 192;
+      gwIpAddr[1]  := 168;
+      gwIpAddr[2]  := 0;
+      gwIpAddr[3]  := 1;
+    end;
+
+    1:
+    begin
+      myIpAddr[0] := 192;
+      myIpAddr[1] := 168;
+      myIpAddr[2] := 1;
+      myIpAddr[3] := 103;
+
+      gwIpAddr[0]  := 192;
+      gwIpAddr[1]  := 168;
+      gwIpAddr[2]  := 1;
+      gwIpAddr[3]  := 1;
+    end;
+
+    2:
+    begin
+      myIpAddr[0] := 10;
+      myIpAddr[1] := 101;
+      myIpAddr[2] := 14;
+      myIpAddr[3] := 52;
+
+      gwIpAddr[0]  := 10;
+      gwIpAddr[1]  := 101;
+      gwIpAddr[2]  := 14;
+      gwIpAddr[3]  := 1;
+    end;
+
+    3:
+    begin
+      myIpAddr[0] := 192;
+      myIpAddr[1] := 168;
+      myIpAddr[2] := 15;
+      myIpAddr[3] := 103;
+
+      gwIpAddr[0]  := 192;
+      gwIpAddr[1]  := 168;
+      gwIpAddr[2]  := 15;
+      gwIpAddr[3]  := 1;
+    end;
+
+    4:
+    begin
+      myIpAddr[0] := 192;
+      myIpAddr[1] := 168;
+      myIpAddr[2] := 6;
+      myIpAddr[3] := 103;
+
+      gwIpAddr[0]  := 192;
+      gwIpAddr[1]  := 168;
+      gwIpAddr[2]  := 6;
+      gwIpAddr[3]  := 1;
+    end;
+  end;  //case
+
+  // set dns address
+  dnsIpAddr[0] := 1;
+  dnsIpAddr[1] := 1;
+  dnsIpAddr[2] := 1;
+  dnsIpAddr[3] := 1;
+
+  // set subnet mask
+  ipMask[0]    := 255;
+  ipMask[1]    := 255;
+  ipMask[2]    := 255;
+  ipMask[3]    := 0;
+end;
+
+
+procedure ManualIPAndMACConfiguration(OptionIndex: Integer);
+begin
+  PrepareManualIPAndMAC(OptionIndex);
+  Net_Ethernet_Intern_confNetwork(@ipMask, @GWIpAddr, @DnsIpAddr);
+end;
+
   
 begin
+  Delay_ms(100);
+  
+  InitDynOfDynOfByteToEmpty(MQTTToEthFIFO);
+  InitDynOfDynOfByteToEmpty(EthToMQTTFIFO);
+  InitDynArrayToEmpty(RecFIFO);
+  InitDynArrayToEmpty(TempReadBuf);
+  
   MM_Init;
   
   MQTT_Init;
@@ -468,11 +760,24 @@ begin
 
   InitHandlers;
   
-  //init some Eth lib
+  Net_Ethernet_Intern_stackInitTCP;
+  ManualIPAndMACConfiguration(0);
+  Net_Ethernet_Intern_Init(@myMacAddr, @myIpAddr, Net_Eth_Int_AUTO_NEGOTIATION or Net_Eth_Int_DEFAULT_MAC or Net_Eth_Int_SPEED_100 or Net_Eth_Int_FULLDUPLEX);
+
   
   SomeCondition := True;
+  MainLoopCounter := 0;
   
   repeat
+    Inc(MainLoopCounter);
+    Net_Ethernet_Intern_doPacket;
+    
+    if MainLoopCounter >= 10 then
+    begin
+      MainLoopCounter := 0;
+      ProcessReceivedBuffer;
+    end;
+    
     if SomeCondition then
     begin
       SomeCondition := False;
@@ -492,12 +797,7 @@ begin
       if not MQTT_DISCONNECT(0, 0) then
         AddToLog('Can''t prepare MQTTDisconnect packet.');
     end;
-    
-    InitDynArrayToEmpty(TempReadBuf);
-    //AddByteToDynArray(TempByte, TempReadBuf);  //call this or something similar in Eth callback when receiving data
-    MQTT_PutReceivedBufferToMQTTLib(0, TempReadBuf);  //optionally, pass TempReadBuf through a FIFO
-    MQTT_Process(0);  //0 is the client instance
-    FreeDynArray(TempReadBuf);
+
   until False;
     
   MQTT_Done;

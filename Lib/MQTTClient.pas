@@ -1669,16 +1669,14 @@ function MQTT_PUBLISH_NoCallback(ClientInstance: DWord;  //ClientInstance identi
                                  var APublishFields: TMQTTPublishFields;                    //user code has to fill-in this parameter
                                  var APublishProperties: TMQTTPublishProperties): Boolean;  //user code has to fill-in this parameter
 var
-  {$IFnDEF SingleOutputBuffer}
-    n: LongInt;
-  {$ENDIF}
+  n: LongInt;
   TempClientInstance: DWord;
 begin
   // APublishFields and APublishProperties should be initialized by user code
 
   TempClientInstance := ClientInstance and CClientIndexMask;
   {$IFDEF SingleOutputBuffer}
-    Result := AddPUBLISH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APublishFields, APublishProperties);
+    Result := AddPUBLISH_ToBuffer(ClientToServerBuffer.Content^[TempClientInstance]^, APublishFields, APublishProperties, False);
   {$ELSE}
     n := ClientToServerBuffer.Content^[TempClientInstance]^.Len;
     Result := SetDynOfDynOfByteLength(ClientToServerBuffer.Content^[TempClientInstance]^, n + 1);
@@ -1705,9 +1703,7 @@ function MQTT_PUBResponse_NoCallback(ClientInstance: DWord;  //ClientInstance id
                                      var APubAckFields: TMQTTCommonFields;                    //user code has to fill-in this parameter
                                      var APubAckProperties: TMQTTCommonProperties): Boolean;  //user code has to fill-in this parameter
 var
-  {$IFnDEF SingleOutputBuffer}
-    n: LongInt;
-  {$ENDIF}
+  n: LongInt;
   TempClientInstance: DWord;
 begin
   // APubAckFields and APubAckProperties should be initialized by user code

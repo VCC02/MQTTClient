@@ -891,7 +891,7 @@ begin
             else
               if ProcessBufferLengthResult = CMQTTDecoderIncompleteBuffer then  //PacketSize is successfully decoded, but the packet is incomplete
               begin
-                //to get a complete packet, then the number of bytes to be read next is PacketSize - TempReadBuf.Len.
+                //to get a complete packet, the number of bytes to be read next is PacketSize - TempReadBuf.Len.
                 frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadTimeout := 1000;
                 SetLength(TempArr, 0);
                 frmMQTTClientAppMain.IdTCPClient1.IOHandler.ReadBytes(TempArr, PacketSize - TempReadBuf.Len);

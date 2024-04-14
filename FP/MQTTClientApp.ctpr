@@ -154,7 +154,8 @@
 -dMaxMMAtProjectLevel
 -dMMFreeBlocks
 -dRoundAlloc
--dEnUserProperty"/>
+-dEnUserProperty
+-d_SingleOutputBuffer"/>
     </Other>
   </CompilerOptions>
   <Debugging>
