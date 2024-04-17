@@ -36,7 +36,8 @@ File16=..\Lib\MQTTPingRespCtrl.mpas
 File17=..\Lib\MQTTDisconnectCtrl.mpas
 File18=..\Lib\MQTTAuthCtrl.mpas
 File19=..\..\MiscUtils\DynArrays.mpas
-Count=20
+File20=NetEthInternal_Defs.mpas
+Count=21
 [BINARIES]
 Count=0
 [IMAGES]
@@ -75,8 +76,11 @@ File3=UART
 File4=Conversions
 File5=MemManager
 File6=Net_Ethernet_Internal
-File7=Net_Ethernet_Internal_Defs
-Count=8
+File7=STMPE610
+File8=I2C
+File9=TFT
+File10=TFT_Defs
+Count=11
 [INTERRUPT_DEFS]
 EBASE=9D000000
 VECTOR_SPACEING=32
