@@ -81,6 +81,7 @@ var //TFT_BLED_Direction : sbit  at TRISC2_bit;
   UpdateSeconds: Boolean;
   Net_Ethernet_Intern_UserTimerSec_5s: Byte;
   HasDataToSend: Boolean;
+  FirstSocket: PSOCKET_Intern_Dsc;
   
   
 procedure PMPWaitBusy();
@@ -229,6 +230,10 @@ begin
 
   TMR1 := 0;
   T1IF_bit := 0; // clear interrupt flag
+
+  asm
+    EI;
+  end;
 end;
 
   
@@ -303,6 +308,10 @@ begin
   //ShouldCheckEthConnection := False;
   Net_Ethernet_Intern_UserTimerSec_5s := 0;
   HasDataToSend := False;
+
+  UART1_Init(256000);    //FT232R
+  TRISF.2 := 1; //U1RX
+  TRISF.8 := 0; //U1TX
 end;
 
 
@@ -342,7 +351,9 @@ end;
 
 procedure AddToLog(var AMsg: string[100000]);
 begin
-  //UART1_Write_Text(AMsg);
+  UART1_Write_Text(AMsg);
+  UART1_Write(#13);
+  UART1_Write(#10);
 end;
 
 
@@ -362,6 +373,8 @@ begin
   {$ELSE}
     AddToLog('MQTT_RemovePacketFromClientToServerBuffer not implemented for SingleOutputBuffer.');
   {$ENDIF}
+  
+  Net_Ethernet_Intern_startSendTCP(FirstSocket);
 end;
 
 
@@ -824,6 +837,7 @@ end;
 procedure Net_Ethernet_Intern_UserTCP(socket: PSOCKET_Intern_Dsc);   //callback for receiving data
 var
   Arr: TDynArrayOfByte;
+  s: string[30];
 begin
   if socket^.dataLength > 0 then
   begin
@@ -844,12 +858,26 @@ begin
   end;
 
   if MQTTToEthFIFO.Len > 0 then
+  begin
     if Net_Ethernet_Intern_bufferEmptyTCP(@socket_Intern[0]) = 1 then //1 = buffer empty
     begin
       HasDataToSend := True;
+
+      AddToLog('------- Sending data to Eth of ');
+      LongWordToStr(MQTTToEthFIFO.Content^[0]^.Len, s);
+      strcat(s, ' bytes');
+      AddToLog(s);
+      //DynArrayOfByteToString(MQTTToEthFIFO.Content^[0]^, s);
+      //AddToLog(s);
+      
       Net_Ethernet_Intern_putBytesTCP(DWord(MQTTToEthFIFO.Content^[0]^.Content), MQTTToEthFIFO.Content^[0]^.Len, @socket_Intern[0]);
       DeleteItemFromDynOfDynOfByte(MQTTToEthFIFO, 0);
-    end;
+    end
+    else
+      AddToLog('output buffer is full');
+  end
+  //else
+  //  AddToLog('MQTTToEthFIFO.Len = 0');
 end;
 
 
@@ -1040,8 +1068,8 @@ var
   AssignedIpAddr, BrokerIPAddr: array[4] of Byte;  // user IP address buffer
   TPConstsStruct: TTPConstants;
   ProcCounter: DWord;
-  FirstSocket: PSOCKET_Intern_Dsc;
   ConRes: Byte;
+  EthPort: Word;
   TempStr: string[10];
   
 begin
@@ -1112,12 +1140,13 @@ begin
   repeat
     Inc(MainCounter);
     Net_Ethernet_Intern_doPacket;
-    if HasDataToSend then
-    begin
-      Net_Ethernet_Intern_startSendTCP(FirstSocket);
-      HasDataToSend := False;
-    end;
-    
+    //if HasDataToSend then
+    //begin
+    //  AddToLog('HasDataToSend..');
+    //  HasDataToSend := False;
+    //  AddToLog('Sent some data to Eth..');
+    //end;
+
     memcpy(@AssignedIpAddr, Net_Ethernet_Intern_getIpAddress(), 4);
     
     if MainCounter >= 10 then
@@ -1130,10 +1159,12 @@ begin
       ProcessReceivedBuffer;
     end;
     
-    if ProcCounter = 3900 then
+    if ProcCounter = 2000 then
     begin
-      //ConRes := Net_Ethernet_Intern_connectTCP(@BrokerIPAddr, 1883, 20000, @FirstSocket);
-      ConRes := Net_Ethernet_Intern_connectTCP(@BrokerIPAddr, 2358, 20000, @FirstSocket); //the connection is established, but the function can't find an available socket in the structure (altough all are available)
+      Inc(ProcCounter);
+      //EthPort := 2358;    //2358 is a simple TCP server for debugging
+      EthPort := 1883;    //1883 is the MQTT port
+      ConRes := Net_Ethernet_Intern_connectTCP(@BrokerIPAddr, EthPort, 20000, @FirstSocket);
       
       if ConRes <> 1 then
       begin
@@ -1142,44 +1173,63 @@ begin
         TFT_Write_Text(TempStr, 80, 0);
         
         AddToLog('Can''t connect to broker');
+      end
+      else
+      begin
+        AddToLog('Connected to broker at port: ');
+        WordToStr(EthPort, TempStr);
+        AddToLog(TempStr);
       end;
     end;
 
     if ProcCounter = 4000 then
+    begin
+      Inc(ProcCounter);
       if not MQTT_CONNECT(0, 0) then
       begin
         TFT_Write_Text('MQTTConnect', 0, 20);
         AddToLog('Can''t prepare MQTTConnect packet.');
       end;
+    end;
         
     if ProcCounter = 9000 then
+    begin
+      Inc(ProcCounter);
       if not MQTT_PUBLISH(0, 0, 2) then
       begin
         TFT_Write_Text('MQTT_PUBLISH', 0, 40);
         AddToLog('Can''t prepare MQTT_PUBLISH packet.');
       end;
+    end;
 
-    if ProcCounter = 12000 then
-      if not MQTT_DISCONNECT(0, 0) then
-      begin
+    if ProcCounter = 20000 then
+    begin
+      Inc(ProcCounter);
+      if not MQTT_DISCONNECT(0, 0) then                         //Either after MQTT_DISCONNECT or after Net_Ethernet_Intern_disconnectTCP,
+      begin                                                     //the broker remains in FIN_WAIT2 and will not allow new connections, unless manually reset.
         TFT_Write_Text('MQTTDisconnect', 0, 60);
         AddToLog('Can''t prepare MQTTDisconnect packet.');
       end;
+    end;
         
-    if ProcCounter = 15000 then
+    if ProcCounter = 21000 then
+    begin
+      Inc(ProcCounter);
       if Net_Ethernet_Intern_disconnectTCP(FirstSocket) = 0 then
       begin
         TFT_Write_Text('disconnect', 0, 60);
         AddToLog('Can''t disconnect.');
       end;
+    end;
       
-    if ProcCounter = 16000 then
+    if ProcCounter = 25000 then
     begin
+      Inc(ProcCounter);
       TFT_Write_Text('done cycle', 0, 80);
       AddToLog('done cycle.');
     end;
     
-    if ProcCounter = 17000 then
+    if ProcCounter = 26000 then
     begin
       ProcCounter := 65534; //0;
       //TFT_Rectangle(0, 0, 480, 272);
