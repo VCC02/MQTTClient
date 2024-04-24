@@ -1,0 +1,109 @@
+unit NetEthInternal_Defs;
+
+{*
+ * library globals
+ *}
+var
+  EMACxMINDbits : dword at EMACxMIND;
+  ETHSTATbits   : dword at ETHSTAT;
+  EMACxIPGRbits : dword at EMACxIPGR;
+  EMACxCLRTbits : dword at EMACxCLRT;
+  ETHCON1bits   : dword at ETHCON1;  
+ 
+type Net_Ethernet_Intern_arpCacheStruct = record
+    valid : char; // valid/invalid entry flag
+    tmr   : dword; // timestamp
+    ip : array[4] of byte; // IP address
+    mac: array[6] of byte; // MAC address behind the IP address
+end;
+
+
+var Net_Ethernet_Intern_macAddr : array[6] of byte; external; // MAC address of the controller
+var Net_Ethernet_Intern_ipAddr : array[4] of byte; external;  // IP address of the device
+var Net_Ethernet_Intern_gwIpAddr : array[4] of byte; external;// GW
+var Net_Ethernet_Intern_ipMask : array[4] of byte; external;  // network mask
+var Net_Ethernet_Intern_dnsIpAddr : array[4] of byte; external;// DNS serveur IP
+var Net_Ethernet_Intern_rmtIpAddr : array[4] of byte; external;// remote IP Address of host (DNS server reply)
+
+var Net_Ethernet_Intern_userTimerSec : dword; external;        // must be incremented by user 1 time per second
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type UDP_Intern_Dsc = record
+
+  remoteIP : array[4] of byte;                 // Remote IP address
+  remoteMAC : array[6] of byte;                // Remote MAC address
+  remotePort : word;          // Remote TCP port
+  destPort : word;            // Destination TCP port
+  dataLength : word;          // Current TCP payload size
+  broadcastMark : word;       // =0 -> Not broadcast; =1 -> Broadcast
+end;
+// Each field refers to the last received package
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//** Socket structure definition
+type SOCKET_Intern_Dsc = record
+  remoteIP        : array[4] of byte;// Remote IP address
+  remoteMAC       : array[6] of byte;// Remote MAC address
+  remotePort      : word;            // Remote TCP port
+  destPort        : word;            // Destination TCP port
+
+  dataLength      : word;           // TCP payload size (refers to the last received package)
+  remoteMSS       : word;           // Remote Max Segment Size
+  myWin           : word;           // My Window
+  myMSS           : word;           // My Max Segment Size
+  mySeq           : dword;          // My Current sequence
+  myACK           : dword;          // ACK
+
+  stateTimer      : char;            // State timer
+  retransmitTimer : char;            // Retransmit timer
+  packetID        : word;            // ID of packet
+  open            : char;            // =0 -> Socket busy;  =1 -> Socket free
+  ID              : char;            // ID of socket
+  broadcastMark   : char;            // =0 -> Not broadcast; =1 -> Broadcast
+  state           : char;            // State table:
+                                     //             0 - connection closed
+                                     //             1 - remote SYN segment received, our SYN segment sent, and We wait for ACK (server mode)
+                                     //             3 - connection established
+                                     //             4 - our SYN segment sent, and We wait for SYN response (client mode)
+                                     //             5 - FIN segment sent, wait for ACK.
+                                     //             6 - Received ACK on our FIN, wait for remote FIN.
+                                     //             7 - Expired ACK wait time. We retransmit last sent packet, and again set Wait-Timer. If this happen again
+                                     //                 connection close.
+  // Buffer....................//
+  nextSend        : word;      //    // "Pointer" on first byte in buffer we want to send.
+  lastACK         : word;      //    // "Pointer" on last acknowledged byte in buffer.
+  lastSent        : word;      //    // "Pointer" on last sent byte in buffer.
+  lastWritten     : word;      //    // "Pointer" on last written byte in buffer which not sent yet.
+  numToSend       : word;      //    // Number of bytes in buffer to be sent.
+  buffState       : char;      //    // Private variable.
+  txBuffer        : ^char;     //    // Pointer on Tx bafer.
+  //...........................//
+
+end;
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+// Arp variables/////////////////////////////////////////////////////////////////////////////////////////////
+const ARPCACHESIZE_Intern : char = 3;     // Size of arpcache.                                             //
+var   Net_Ethernet_Intern_arpCache : array[ARPCACHESIZE_Intern] of Net_Ethernet_Intern_arpCacheStruct;     //
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+// TCP variables/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+const NUM_OF_SOCKET_Intern    : char = 7;     // Max number of socket We can open.                                                                 //
+const TCP_TX_SIZE_Intern      : word = 4096;{256;}   // Size of Tx buffer in RAM.  (power of 2)                                                                       //
+const MY_MSS_Intern           : word = 4300;//1300; //30;   // Our maximum segment size.                                                                         //
+const SYN_FIN_WAIT_Intern     : word = 6; //3;     // Wait-time (in second) on remote SYN/FIN segment.                                                  //
+const RETRANSMIT_WAIT_Intern  : word = 6; //3;   // Wait-time (in second) on ACK which we expect.                                                     //
+                                                                                                                                                   //
+var tx_buffers_Intern : array[NUM_OF_SOCKET_Intern] of array[TCP_TX_SIZE_Intern] of byte;   // Tx buffers. Every socket has its buffer.        //
+var udpRecord_Intern : UDP_Intern_Dsc;                                             // This record contains properties of last received UDP packet. //
+var socket_Intern : array[NUM_OF_SOCKET_Intern] of SOCKET_Intern_Dsc;              // This record contains properties of each socket.          //
+                                                                                                                                                   //
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+end.

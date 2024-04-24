@@ -78,9 +78,7 @@ File5=MemManager
 File6=Net_Ethernet_Internal
 File7=STMPE610
 File8=I2C
-File9=TFT
-File10=TFT_Defs
-Count=11
+Count=9
 [INTERRUPT_DEFS]
 EBASE=9D000000
 VECTOR_SPACEING=32
