@@ -924,10 +924,8 @@ begin
   InitDynOfDynOfByteToEmpty(MQTTToEthFIFO);
   InitDynOfDynOfByteToEmpty(EthToMQTTFIFO);
   InitDynArrayToEmpty(RecFIFO);
-  InitDynOfDynOfByteToEmpty(TempReadBuf);
-  
-  SetDynOfDynOfByteLength(TempReadBuf, 2); //allocate buffer for two sockets
-  
+  InitDynArrayToEmpty(TempReadBuf);
+
   MM_Init;
   Init_MCU;
   
