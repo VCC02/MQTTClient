@@ -731,9 +731,10 @@ begin
       ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
 
       if ProcessBufferLengthResult <> CMQTTDecoderNoErr then
-        SuccessfullyDecoded := False
-      else
-        if ProcessBufferLengthResult = CMQTTDecoderIncompleteBuffer then  //PacketSize is successfully decoded, but the packet is incomplete
+      begin
+        SuccessfullyDecoded := False;
+
+        if (ProcessBufferLengthResult = CMQTTDecoderIncompleteBuffer) and (PacketSize > 0) then  //PacketSize is successfully decoded, but the packet is incomplete
         begin
           //to get a complete packet, the number of bytes to be read next is PacketSize - TempReadBuf.Content^[CSocket0]^.Len.
 
@@ -750,6 +751,7 @@ begin
           end;
 
           if TempArr.Len > 0 then   //it should be >0, otherwise this loop wouldn't have been executed
+          begin
             if not ConcatDynArrays(TempReadBuf, TempArr) then
             begin
               AddToLog('Out of memory on allocating TempReadBuf, for multiple bytes.');
@@ -758,11 +760,13 @@ begin
             else
             begin
               ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
-              SuccessfullyDecoded := ProcessBufferLengthResult <> CMQTTDecoderNoErr;
+              SuccessfullyDecoded := ProcessBufferLengthResult = CMQTTDecoderNoErr;
             end;
+          end;
 
           FreeDynArray(TempArr);
         end;
+      end;
 
       if SuccessfullyDecoded then
       begin

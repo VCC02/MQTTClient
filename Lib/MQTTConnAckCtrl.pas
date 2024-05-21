@@ -418,6 +418,12 @@ begin
     Exit;
   end;
 
+  if ABuffer.Len < 4 then    //without this verification, the function ends up returning an invalid ADecodedBufferLen
+  begin
+    Result := CMQTTDecoderIncompleteBuffer;
+    Exit;
+  end;
+
   MemMove(@TempArr4, @ABuffer.Content^[1], 4);
   AExpectedVarAndPayloadLen := VarIntToDWord(TempArr4, VarIntLen, ConvErr);    //this is more of the VarHeader length, because there is no payload
 

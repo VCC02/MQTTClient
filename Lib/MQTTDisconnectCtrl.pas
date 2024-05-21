@@ -244,6 +244,12 @@ begin
     Exit;
   end;
 
+  if ABuffer.Len < 4 then    //without this verification, the function ends up returning an invalid ADecodedBufferLen
+  begin
+    Result := CMQTTDecoderIncompleteBuffer;
+    Exit;
+  end;
+
   if ABuffer.Content^[0] and $0F > 0 then
   begin
     Result := CMQTTDecoderBadCtrlPacketOnDisconnect;

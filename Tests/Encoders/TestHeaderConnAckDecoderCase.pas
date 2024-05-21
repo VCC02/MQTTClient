@@ -173,7 +173,7 @@ begin
   Expect(FillIn_ConnAck(TempConnAckFields, ConnAckProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedConnAckBuffer);
 
-  Expect(Decode_ConnAckToCtrlPacket(EncodedConnAckBuffer, DecodedConnAckPacket, DecodedBufferLen)).ToBe(CReasonCode shl 8 + CMQTTDecoderServerErr);
+  Expect(Decode_ConnAckToCtrlPacket(EncodedConnAckBuffer, DecodedConnAckPacket, DecodedBufferLen)).ToBe(CReasonCode shl 8 + CMQTTDecoderServerErr, 'Some decoder error');
   Expect(DecodedConnAckPacket.Header.Content^[0]).ToBe(CMQTT_CONNACK);
   Expect(DecodedBufferLen).ToBe(EncodedConnAckBuffer.Len);
 
@@ -373,7 +373,7 @@ begin
   Expect(FillIn_ConnAck(TempConnAckFields, ConnAckProperties, DestPacket)).ToBe(True);
   EncodeControlPacketToBuffer(DestPacket, EncodedConnAckBuffer);
 
-  Expect(Decode_ConnAckToCtrlPacket(EncodedConnAckBuffer, DecodedConnAckPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr);
+  Expect(Decode_ConnAckToCtrlPacket(EncodedConnAckBuffer, DecodedConnAckPacket, DecodedBufferLen)).ToBe(CMQTTDecoderNoErr, 'Expected no error on a ' + IntToStr(DestPacket.Header.Len + DestPacket.VarHeader.Len + DestPacket.Payload.Len) + ' bytes long packet.');
   Expect(DecodedBufferLen).ToBe(EncodedConnAckBuffer.Len);
 
   MQTT_InitConnAckProperties(DecodedConnAckProperties);

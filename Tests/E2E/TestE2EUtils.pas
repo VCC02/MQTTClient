@@ -1124,16 +1124,19 @@ begin
               ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
 
               if ProcessBufferLengthResult <> CMQTTDecoderNoErr then
-                SuccessfullyDecoded := False
-              else
-                if ProcessBufferLengthResult = CMQTTDecoderIncompleteBuffer then  //PacketSize is successfully decoded, but the packet is incomplete
+              begin
+                SuccessfullyDecoded := False;
+
+                if (ProcessBufferLengthResult = CMQTTDecoderIncompleteBuffer) and (PacketSize > 0) then  //PacketSize is successfully decoded, but the packet is incomplete
                 begin
                   //to get a complete packet, then the number of bytes to be read next is PacketSize - TempReadBuf.Len.
-                  FClient.IdTCPClientObj.IOHandler.ReadTimeout := 1000;
+                  FClient.IdTCPClientObj.IOHandler.ReadTimeout := 10;
+
                   SetLength(TempArr, 0);
                   FClient.IdTCPClientObj.IOHandler.ReadBytes(TempArr, PacketSize - TempReadBuf.Len);
 
-                  if Length(TempArr) > 0 then //it should be >0, otherwise there should be a read timeout excption
+                  if Length(TempArr) > 0 then //it should be >0, otherwise there should be a read timeout exception
+                  begin
                     if not AddBufferToDynArrayOfByte(@TempArr[0], Length(TempArr), TempReadBuf) then
                     begin
                       AddToLog('Out of memory on allocating TempReadBuf, for multiple bytes.');
@@ -1142,12 +1145,15 @@ begin
                     end
                     else
                     begin
+                      SetLength(TempArr, 0);
                       ProcessBufferLengthResult := MQTT_ProcessBufferLength(TempReadBuf, PacketSize);
-                      SuccessfullyDecoded := ProcessBufferLengthResult <> CMQTTDecoderNoErr;
+                      SuccessfullyDecoded := ProcessBufferLengthResult = CMQTTDecoderNoErr;
                     end;
+                  end;
 
-                  FClient.IdTCPClientObj.IOHandler.ReadTimeout := 10;
+                  FClient.IdTCPClientObj.IOHandler.ReadTimeout := 10; //restore timeout
                 end;
+              end;
 
               if SuccessfullyDecoded then
               begin
