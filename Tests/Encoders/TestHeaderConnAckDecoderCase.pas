@@ -175,7 +175,7 @@ begin
 
   Expect(Decode_ConnAckToCtrlPacket(EncodedConnAckBuffer, DecodedConnAckPacket, DecodedBufferLen)).ToBe(CReasonCode shl 8 + CMQTTDecoderServerErr, 'Some decoder error');
   Expect(DecodedConnAckPacket.Header.Content^[0]).ToBe(CMQTT_CONNACK);
-  Expect(DecodedBufferLen).ToBe(EncodedConnAckBuffer.Len);
+  Expect(DecodedBufferLen).ToBe(EncodedConnAckBuffer.Len, 'DecodedBufferLen is different than EncodedConnAckBuffer.Len');
 
   Expect(DestPacket.Header.Len).ToBe(2);
   Expect(DecodedConnAckPacket.Header.Len).ToBe(DestPacket.Header.Len, 'Header len mismatch');
