@@ -250,11 +250,11 @@ begin
     Exit;
   end;
 
-  if ABuffer.Len < 2 then    //without this verification, the function ends up returning an invalid ADecodedBufferLen
-  begin
-    Result := CMQTTDecoderIncompleteBuffer;
-    Exit;
-  end;
+  //if ABuffer.Len < 2 then    //without this verification, the function ends up returning an invalid ADecodedBufferLen
+  //begin                      //no longer needed, see how TempArr4 is initialized below:
+  //  Result := CMQTTDecoderIncompleteBuffer;
+  //  Exit;
+  //end;
 
   if ABuffer.Content^[0] and $0F > 0 then
   begin
@@ -262,7 +262,7 @@ begin
     Exit;
   end;
 
-  MemMove(@TempArr4, @ABuffer.Content^[1], 4);
+  InitVarIntDecoderArr(ABuffer, TempArr4);
   AExpectedVarAndPayloadLen := VarIntToDWord(TempArr4, VarIntLen, ConvErr);
 
   if ConvErr then
@@ -271,11 +271,11 @@ begin
     Exit;
   end;
 
-  if (VarIntLen > 1) and (ABuffer.Len < VarIntLen + 1) then    //without this verification, the function ends up returning an invalid ADecodedBufferLen
-  begin
-    Result := CMQTTDecoderIncompleteBuffer;
-    Exit;
-  end;
+  //if (VarIntLen > 1) and (ABuffer.Len < VarIntLen + 1) then    //without this verification, the function ends up returning an invalid ADecodedBufferLen
+  //begin                                                        //no longer needed, see how TempArr4 is initialized above:
+  //  Result := CMQTTDecoderIncompleteBuffer;
+  //  Exit;
+  //end;
 
   //if AExpectedVarAndPayloadLen = 0 then     //auth packets can have a 0-len VarHeader, when there is no reason code and no properties
   //begin

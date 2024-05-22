@@ -643,6 +643,10 @@ const
   CMQTT_DefaultReceiveMaximum = $0003; //Some valid value, greater than 0, used to initialize the ReceiveMaximum property. The greater the value, the greater the number of Publish packets can be sent from this client without a PubAck or PubRec response.
 
 
+const
+  CFFArr: array[0..4] of Byte = ($FF, $FF, $FF, $FF, $FF);  //Used by decoders to initialize remaining buffer with invalid data (i.e. $FF, instead of random data found in memory).
+
+
 type
   TCtrlPacketDecoderFunc = function(var ABuffer: TDynArrayOfByte; var ADestPacket: TMQTTControlPacket; var AErr: Word): Boolean;
   PCtrlPacketDecoderFunc = ^TCtrlPacketDecoderFunc;
@@ -723,6 +727,9 @@ procedure MQTTPacketToString(APacketType: Byte; var AResult: string {$IFnDEF IsD
 {$IFDEF IsDesktop}
   function MQTTPacketToString(APacketType: Byte): string; overload;
 {$ENDIF}
+
+procedure InitVarIntDecoderArr(var ABuffer: TDynArrayOfByte; var DestTempArr4: T4ByteArray);
+
 
 implementation
 
@@ -1517,5 +1524,12 @@ end;
     MQTTPacketToString(APacketType, Result);
   end;
 {$ENDIF}
+
+
+procedure InitVarIntDecoderArr(var ABuffer: TDynArrayOfByte; var DestTempArr4: T4ByteArray);
+begin
+  MemMove(@DestTempArr4, @CFFArr[0], 4); //init DestTempArr4
+  MemMove(@DestTempArr4, @ABuffer.Content^[1], Min32(4, ABuffer.Len - 1));
+end;
 
 end.
