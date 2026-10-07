@@ -747,6 +747,9 @@ begin
     if X > 0 then
       EncodedByte := EncodedByte or 128;
 
+    if Result >= 4 then
+      Break;
+
     AVarInt[Result] := EncodedByte;
     Inc(Result);
   until X = 0;
@@ -879,6 +882,12 @@ var
   TempArr: TDynArrayOfByte;
   i: Integer;
 begin
+  if APropertyLen > 4 then  //Avoid going past AProperty boundary. This verification is not needed if the function is properly called (i.e. APropertyLen should be obtained from DWordToVarInt).
+  begin
+    Result := False;
+    Exit;
+  end;
+
   InitDynArrayToEmpty(TempArr);
   Result := SetDynLength(TempArr, 1 + APropertyLen);
   if not Result then
@@ -899,6 +908,12 @@ var
   TempArr: TDynArrayOfByte;
   i: Integer;
 begin
+  if APropertyLen > 4 then  //Avoid going past AProperty boundary. This verification is not needed if the function is properly called (i.e. APropertyLen should be obtained from DWordToVarInt).
+  begin
+    Result := False;
+    Exit;
+  end;
+
   InitDynArrayToEmpty(TempArr);
   Result := SetDynLength(TempArr, APropertyLen);
   if not Result then

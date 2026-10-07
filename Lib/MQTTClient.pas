@@ -357,6 +357,7 @@ const
   CMQTT_CannotReserveBadPacketIdentifier = 214; //see 213
   CMQTT_PacketIdentifierNotFound_ClientToServerResend = 215;
   CMQTT_UserError = 216; //may be used to directly call HandleOnMQTTError in user code, for debugging purposes
+  CMQTT_EmptyBuffer = 217;
 
 
   //The following values are start values for various identifiers. The allocated identifiers are incremented by the library (if required) on every new allocation.
@@ -1166,7 +1167,7 @@ end;
 //ServerToClient functions
 function MQTT_GetServerToClientPacketIdentifiersCount(ClientInstance: DWord): TDynArrayLength;
 begin
-  if ClientInstance > ServerToClientPacketIdentifiers.Len - 1 then
+  if (ServerToClientPacketIdentifiers.Len = 0) or (ClientInstance > ServerToClientPacketIdentifiers.Len - 1) then
   {$IFnDEF IsDesktop}
     begin
       Result := 0;
@@ -1182,7 +1183,7 @@ end;
 
 function MQTT_GetServerToClientPacketIdentifierByIndex(ClientInstance: DWord; AIndex: TDynArrayLength): Word; //returns content of PacketIdentifiers array
 begin
-  if ClientInstance > ServerToClientPacketIdentifiers.Len - 1 then
+  if (ServerToClientPacketIdentifiers.Len = 0) or (ClientInstance > ServerToClientPacketIdentifiers.Len - 1) then
   {$IFnDEF IsDesktop}
     begin
       Result := 0;
@@ -1192,7 +1193,8 @@ begin
     raise Exception.Create('ClientInstance out of bounds: ' + IntToStr(ClientInstance));
   {$ENDIF}
 
-  if AIndex > ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Len - 1 then
+  if (ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Len = 0) or
+     (AIndex > ServerToClientPacketIdentifiers.Content^[ClientInstance]^.Len - 1) then
   {$IFnDEF IsDesktop}
     begin
       Result := 0;
@@ -1230,7 +1232,7 @@ begin
   Result := -1;
 
   TempClientInstance := ClientInstance and CClientIndexMask;
-  Dest := ServerToClientPacketIdentifiers.Content^[TempClientInstance]^.Len - 1;
+  Dest := ServerToClientPacketIdentifiers.Content^[TempClientInstance]^.Len - 1;  //Because Dest is LongInt, it can store the value -1, when Len is 0.
 
   for i := 0 to Dest do
     if ServerToClientPacketIdentifiers.Content^[TempClientInstance]^.Content^[i] = APacketIdentifier then
@@ -1864,13 +1866,13 @@ begin
   end;
   MQTT_FreeControlPacket(TempReceivedPacket);
 
-  if Lo(Result) <> CMQTTDecoderNoErr then
+  if (Result and $FF) <> CMQTTDecoderNoErr then
   begin
     //MQTT_FreeConnAckProperties(TempConnAckProperties);    // not initialized here
     Exit;
   end;
 
-  if Lo(Result) = CMQTTDecoderNoErr then   //Decode_ConnAck can return CMQTTDecoderIncompleteBuffer, which is not an error, is likely an info.   However, the event should not be triggered by it.
+  if (Result and $FF) = CMQTTDecoderNoErr then   //Decode_ConnAck can return CMQTTDecoderIncompleteBuffer, which is not an error, is likely an info.   However, the event should not be triggered by it.
   begin
     DoOnAfterMQTT_CONNACK(ClientInstance, TempConnAckFields, TempConnAckProperties, Result);
 
@@ -1896,7 +1898,7 @@ begin
     end
     else
     begin
-      ResendBuffItemCountM1 := ClientToServerResendBuffer.Content^[TempClientInstance]^.Len - 1;
+      ResendBuffItemCountM1 := ClientToServerResendBuffer.Content^[TempClientInstance]^.Len - 1;  //ResendBuffItemCountM1 is LongInt
       for i := 0 to ResendBuffItemCountM1 do
         if not MQTT_RemovePacketFromClientToServerResendBufferByIndex(TempClientInstance, 0) then
         begin
@@ -1954,7 +1956,7 @@ begin
     Exit;
 
   QoS := 4; //some unhandled value
-  if Lo(Result) = CMQTTDecoderNoErr then      // Hi(Result) may contain more info about the error, like the error location.
+  if (Result and $FF) = CMQTTDecoderNoErr then      // Hi(Result) may contain more info about the error, like the error location.
   begin
     QoS := (TempPublishFields.PublishCtrlFlags shr 1) and 3;
 
@@ -2561,7 +2563,7 @@ begin
     PacketType := BufferPointer^.Content^[0];
     Result := CPacketProcessor[(PacketType shr 4) and $0F](ClientInstance, BufferPointer^, SizeToFree);
 
-    if Lo(Result) = CMQTTDecoderNoErr then
+    if (Result and $FF) = CMQTTDecoderNoErr then
     begin
       if not RemoveStartBytesFromDynArray(SizeToFree, BufferPointer^) then //Delete the entire processed packet from ServerToClientBuffer.Content^[ClientInstance].
       begin
@@ -2586,6 +2588,12 @@ var
   PacketType: Byte;
 begin
   Result := CMQTT_Success;
+
+  if ABuffer.Len = 0 then
+  begin
+    Result := CMQTT_EmptyBuffer;
+    Exit;
+  end;
 
   PacketType := ABuffer.Content^[0];
   Result := CPacketLengthValidator[(PacketType shr 4) and $0F](ABuffer, APacketSize);
