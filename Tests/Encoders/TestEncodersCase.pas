@@ -42,6 +42,7 @@ type
     procedure Test_DWordToVarInt_Word_GreaterThan16384;
     procedure Test_DWordToVarInt_DWord_LowerThan2097152;
     procedure Test_DWordToVarInt_DWord_GreaterThan2097152;
+    procedure Test_DWordToVarInt_DWord_FFFFFFFF;
 
     procedure Test_AddDoubleWordToProperties_OnEmptyHeader;
     procedure Test_AddDoubleWordToProperties_OnExistingHeader;
@@ -190,6 +191,31 @@ begin
   Expect(DecodedValue).ToBe(130 shl 16 + 85 shl 8 + 194);
   Expect(DecodedLen).ToBe(4);
   Expect(DecErr).ToBe(False);
+end;
+
+
+procedure TEncodersCase.Test_DWordToVarInt_DWord_FFFFFFFF;
+var
+  Can1: Byte;
+  Res: T4ByteArray;
+  Can2: Byte;
+  Len: Byte;
+  DecodedValue: DWord;
+  DecErr: Boolean;
+  DecodedLen: Byte;
+begin
+  Can1 := 0;
+  Can2 := 0;
+  Len := DWordToVarInt($FFFFFFFF, Res);
+  Expect(Len).ToBe(4);
+  Expect(@Res, 4).ToBe(@[255, 255, 255, 255]);
+  Expect(Can1).ToBe(0, 'before array'); //this gets overwritten with 15, (the 5th item) if DWordToVarInt doesn't stop after the 4th iteration
+  Expect(Can2).ToBe(0, 'after array');
+
+  DecodedValue := VarIntToDWord(Res, DecodedLen, DecErr);
+  Expect(DecodedValue).ToBe(0);  //returns 0 on error
+  Expect(DecodedLen).ToBe(0);
+  Expect(DecErr).ToBe(True);
 end;
 
 
